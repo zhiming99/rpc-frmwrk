@@ -173,11 +173,15 @@ FILE* CSTParserContext::TryOpenFile(
 void ParserPrint(
     const char* szFile,
     gint32 iLineNo,
-    const char* strMsg )
+    const char* strMsg,
+    bool bErr )
 {
     char szBuf[ 512 ];
     sprintf( szBuf, "%s(%d): %s\n",
         szFile, iLineNo, strMsg );
-    fprintf( stderr, szBuf );
+    if( bErr )
+        fprintf( stderr, szBuf );
+    else
+        fprintf( stdout, szBuf );
 }
 

@@ -105,6 +105,7 @@ gint32 StartCaseSelectorCheck(
         CTokenInfo oti = pCtx->GetCurTok( i );
         current_tok = oti.token;
         current_lloc = oti.lloc;
+        current_lval = oti.pVal;
         ret = yypush_parse( case_ps,
             oti.token, &oti.pVal, &oti.lloc, pCtx );
         if( ret != YYPUSH_MORE )
@@ -143,6 +144,12 @@ gint32 StartCaseSelectorCheck(
                 current_tok = READTOK(
                     &current_lval, &current_lloc,
                     pCtx->GetScanner(), pCtx );
+                if( current_tok == TOK_SEMICOLON )
+                {
+                    pCtx->PushToken(
+                        { current_lloc, current_tok, current_lval } );
+                    current_tok = YYEOF;
+                }
             }
             ret = yypush_parse( case_ps,
                 current_tok, &current_lval,
@@ -188,21 +195,22 @@ gint32 AdjustTokens(
 
     gint32 ret = YYPUSH_MORE;
     do{
+        if( current_tok == TOK_SEMICOLON &&
+            next_tok == TOK_SEMICOLON )
+        {
+            // discard simicolons
+            do{
+                next_tok = READTOK( &next_lval,
+                    &next_lloc, pCtx->GetScanner(), pCtx );
+
+            }while( next_tok == TOK_SEMICOLON );
+        }
+
         gint32 iState = GetParserState( current_ps );
         switch( iState )
         {
         case CONFLICT_STATE:
             {
-                if( current_tok == TOK_SEMICOLON &&
-                    next_tok == TOK_SEMICOLON )
-                {
-                    // discard simicolons
-                    do{
-                        next_tok = READTOK( &next_lval,
-                            &next_lloc, pCtx->GetScanner(), pCtx );
-
-                    }while( next_tok == TOK_SEMICOLON );
-                }
 
                 if( current_tok == TOK_ELSE ||
                     current_tok == TOK_END_CASE )
@@ -397,8 +405,10 @@ gint32 StartParse(
     yyscan_t yyscanner;
     yylex_init( &yyscanner );
 
-    pCtx->SetScanner( yyscanner );
     yypstate *main_ps = yypstate_new();
+    pCtx->SetScanner( yyscanner );
+    pCtx->SetParser( main_ps );
+
     yypstate *pragma_ps = nullptr;
     status = yypush_parse( main_ps,
         TOK_VSTART_MAIN, &current_lval, &current_lloc, pCtx );
@@ -461,9 +471,10 @@ gint32 StartParse(
                 if( pCtx->GetCondStackSize() > 256 )
                 {
                     status = YYPUSH_ABORT;
-                    yyerror( &current_lloc, pCtx,
-                        "Error, too many "
-                        "nested conditional pragmas." );
+                    ParserPrint( pCtx->GetCurFileName().c_str(),
+                        current_lloc.first_line,
+                        "error, too many "
+                        "nested conditional pragmas.", true );
                     break;
                 }
                 current_tok = TOK_VSTART_PRAGMA;
@@ -482,8 +493,9 @@ gint32 StartParse(
                 if( cstat.m_iProgress == invalidProgress )
                 {
                     status = YYPUSH_ABORT;
-                    yyerror( &current_lloc, pCtx,
-                        "Fatal error, "
+                    ParserPrint( pCtx->GetCurFileName().c_str(),
+                        current_lloc.first_line,
+                        "error, "
                         "unexpected elsif or endif." );
                     break;
                 }
@@ -619,9 +631,11 @@ gint32 StartParse(
                         yyscanner, pCtx );
                     if( next_tok != TOK_RBRACE )
                     {
-                        yyerror( &temploc, pCtx,
-                            "Fatal error, expecting "
-                            "'}' after 'end_if'" );
+                        ParserPrint(
+                            pCtx->GetCurFileName().c_str(),
+                            temploc.first_line,
+                            "error, expecting "
+                            "'}' after 'end_if'", true );
                         status = YYPUSH_ABORT;
                         break;
                     }
@@ -634,11 +648,7 @@ gint32 StartParse(
 
         if( status == YYPUSH_ABORT ||
             status == YYPUSH_NOMEM )
-        {
-            yyerror( &current_lloc, pCtx,
-                "syntax error occurs" );
             break;
-        }
 
         // 4. Advance: The 'next' becomes the 'current'
         if( bUpdate )
@@ -653,6 +663,13 @@ gint32 StartParse(
         }
     }
 
+    if( status == YYPUSH_ACCEPT )
+    {
+        ParserPrint(
+            pCtx->GetCurFileName().c_str(),
+            current_lloc.first_line, 
+            "Parsing successfully" );
+    }
     yylex_destroy( yyscanner );
     pCtx->SetScanner( nullptr );
     if( pFile )

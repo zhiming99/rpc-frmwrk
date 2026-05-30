@@ -50,7 +50,8 @@ using namespace rpcf;
 extern void ParserPrint(
     const char* szFile,
     gint32 iLineNo,
-    const char* strMsg );
+    const char* strMsg,
+    bool bErr = false );
 
 struct yypstate;
 extern int GetParserState( yypstate* ps );
@@ -154,7 +155,7 @@ program_unit:
 
 body:
     /* empty */
-    | statements
+    | block_statements
 
 type_definition_block:
       TOK_TYPE type_assignments TOK_END_TYPE
@@ -363,10 +364,11 @@ derived_type: instance_path
     | TOK_DOT instance_path
     ;
 
-statements:
+/*statements:
     statement
     | statements semicolons statement
     ;
+    */
 
 
 statement:
@@ -390,14 +392,15 @@ conditional_pragma:
     | TOK_VSTART_PRAGMA TOK_END_IF TOK_RBRACE
     | TOK_VSTART_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
         stdstr strMsg = $3.get()->first;
-        YYLTYPE2& curloc = $1.get()->second;
-        strMsg.insert( 0, "Info: " );
-        yyerror( &curloc, pCtx, strMsg.c_str() );
+        YYLTYPE2& curloc = $2.get()->second;
+        strMsg.insert( 0, "info, " );
+        ParserPrint( pCtx->GetCurFileName().c_str(),
+            curloc.first_line, strMsg.c_str() );
     }
     | TOK_VSTART_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
 
         yyscan_t yyscanner = pCtx->GetScanner();
-        YYLTYPE2& curloc = $1.get()->second;
+        YYLTYPE2& curloc = $2.get()->second;
 
         std::string& strFile = $3.get()->first;
         stdstr strCurFile = basename(
@@ -409,7 +412,8 @@ conditional_pragma:
                 ParserPrint( 
                     strCurFile.c_str(),
                     curloc.first_line,
-                    "Error, expecting file name" );
+                    "error, expecting file name",
+                    true );
             pCtx->IncSemError();
             YYERROR;
         }
@@ -422,19 +426,19 @@ conditional_pragma:
             ParserPrint(
                 strCurFile.c_str(),
                 curloc.first_line,
-                strerror( errno ) );
+                strerror( errno ), true );
             pCtx->IncSemError();
             YYERROR;
         }
         if( pCtx->IsFileOnStack( strFullPath ) )
         {
             stdstr strMsg =
-                "cyclic inclusion of files ";
+                "error, cyclic inclusion of files ";
             strMsg += strFile;
             ParserPrint(
                 strCurFile.c_str(),
                 curloc.first_line,
-                strMsg.c_str() );
+                strMsg.c_str(), true );
             pCtx->IncSemError();
             YYERROR;
         }
@@ -587,34 +591,41 @@ factor:
 
 elseif_branch:
     /* empty */
-    | elseif_branch TOK_ELSIF full_expression TOK_THEN statements
+    | elseif_branch TOK_ELSIF full_expression TOK_THEN block_statements
 
 else_branch:
     /* empty */
-    | TOK_ELSE statements
+    | TOK_ELSE block_statements
 
 opt_semicolons:
     /* empty */
     | semicolons
 
 if_statement:
-    TOK_IF full_expression TOK_THEN statements opt_semicolons elseif_branch else_branch TOK_END_IF
+    TOK_IF full_expression TOK_THEN block_statements elseif_branch else_branch TOK_END_IF
     ;
 
 opt_by_step:
     /* empty */
     | TOK_BY full_expression
 
+block_statements_1:
+    statement
+    | block_statements_1 semicolons statement
+    ;
+block_statements:
+    block_statements_1 opt_semicolons
+
 for_statement:
-    TOK_FOR instance_path TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO statements TOK_END_FOR
+    TOK_FOR instance_path TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO block_statements TOK_END_FOR
     ;
 
 while_statement:
-    TOK_WHILE full_expression TOK_DO statements TOK_END_WHILE
+    TOK_WHILE full_expression TOK_DO block_statements TOK_END_WHILE
     ;
 
 repeat_statement:
-    TOK_REPEAT statements TOK_UNTIL full_expression TOK_END_REPEAT
+    TOK_REPEAT block_statements TOK_UNTIL full_expression TOK_END_REPEAT
     ;
 
 positional_args:
@@ -649,16 +660,16 @@ opt_global_namespace:
 method_declaration:
     TOK_METHOD opt_access_modifier TOK_ID TOK_COLON data_type_spec
         var_declarations
-        statements
+        block_statements
     TOK_END_METHOD
     /*| TOK_METHOD opt_access_modifier TOK_ID TOK_COLON derived_type
         var_declarations
-        statements
+        block_statements
     TOK_END_METHOD*/
     /* TOK_VSEMICOLON is a virtual token*/
     | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON opt_global_namespace instance_path TOK_VSEMICOLON
         var_declarations
-        statements
+        block_statements
     TOK_END_METHOD
     ;
 
@@ -672,8 +683,8 @@ opt_access_modifier:
     ;
 
 function_block:
-    function_block_header using_directive_list var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK 
-    | function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK 
+    function_block_header using_directive_list var_declaration method_declaration_list block_statements TOK_END_FUNCTION_BLOCK 
+    | function_block_header var_declaration method_declaration_list block_statements TOK_END_FUNCTION_BLOCK 
 
 function_block_header:
     TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
@@ -703,7 +714,7 @@ interface_list:
     ;
 
 function:
-    TOK_FUNCTION TOK_ID var_declarations statements TOK_END_FUNCTION
+    TOK_FUNCTION TOK_ID var_declarations block_statements TOK_END_FUNCTION
     ;
 
 case_statement:
@@ -715,7 +726,7 @@ case_statement:
 
 opt_else_statement:
     /* empty */
-    |TOK_ELSE statements
+    |TOK_ELSE block_statements
     ;
 
 case_element_list:
@@ -729,10 +740,15 @@ semicolons:
 
 cinner_statements_1:
     statement
-    | cinner_statements_1 semicolons statement
+    | cinner_statements_1 TOK_SEMICOLON statement
     ;
-cinner_statements:
-    cinner_statements_1 opt_semicolons
+
+
+opt_semicolon:
+    /* empty */
+    | TOK_SEMICOLON
+
+cinner_statements: cinner_statements_1  opt_semicolon
 
 case_element:
     // case_list_selector cinner_statements TOK_SEMICOLON
@@ -741,10 +757,14 @@ case_element:
     case_list_selector cinner_statements TOK_VCASE_SEP
     ;
 
+case_check_statement:
+    assignment_statement
+    | function_call_statement
+
 case_selector_check:
     TOK_VSTART_CASESEL case_list_selector
     { pCtx->m_iLastCaseChk = 0; }
-    | TOK_VSTART_CASESEL statement
+    | TOK_VSTART_CASESEL case_check_statement
     { pCtx->m_iLastCaseChk = 1; }
 
 case_list_selector:
@@ -775,11 +795,10 @@ instance_specific_init_list:
 
 instance_specific_init:
     instance_path TOK_AT direct_address TOK_COLON type_spec semicolons
-    instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value semicolons
+    |instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value semicolons
     ;
 
-instance_path:
-    TOK_ID{ }
+instance_path : TOK_ID{ }
     | instance_path TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
     ;
 
@@ -804,17 +823,36 @@ void yyerror (YYLTYPE* yyloc,
     rpcf::CSTParserContext* pCtx,
     const char* yymsgp)
 {
-    YYLTYPE2* yloc2 = static_cast< YYLTYPE2* >( yyloc );
+    stdstr strCurFile = basename(
+        pCtx->GetCurFileName().c_str() );
+    bool bErr = false;
+    stdstr strMsg = yymsgp;
+    if( strMsg.substr( 0, 12 ) == "syntax error" ||
+        strMsg.substr( 0, 5 ) == "error" ||
+        strMsg.substr( 0, 7 ) == "warning" )
+        bErr = true;
 
-    stdstr strCurFile =
-        basename( pCtx->GetFileName(
-            yloc2->fidx).c_str() );
-    if( strCurFile.size() )
+    if( strCurFile.empty() )
+        strCurFile = " ";
+
+    yypstate* ps = reinterpret_cast< yypstate* >
+        ( pCtx->GetParser() );
+
+    ParserPrint( 
+        strCurFile.c_str(),
+        yyloc->first_line,
+        yymsgp,
+        bErr );
+
+    YYSTYPE pVal = *ps->yyvsp;
+    if( pVal )
     {
-        ParserPrint( 
+        strMsg = "Parser stopped at '";
+        strMsg += pVal->second.text + "'";
+        ParserPrint(
             strCurFile.c_str(),
-            yloc2->first_line,
-            yymsgp );
+            pVal->second.first_line,
+            strMsg.c_str() );
     }
 }
 
