@@ -765,7 +765,33 @@ case_selector_check:
     TOK_VSTART_CASESEL case_list_selector
     { pCtx->m_iLastCaseChk = 0; }
     | TOK_VSTART_CASESEL case_check_statement
-    { pCtx->m_iLastCaseChk = 1; }
+    {
+        pCtx->m_iLastCaseChk = 1;
+        if( yychar != YYEOF )
+        {
+            // insert a TOK_VCASE_SEP
+            auto current_tok = yychar;
+            // and tell the checker to stop
+            yychar = YYEOF;
+
+            auto casep_lloc = yylval->second;
+            casep_lloc.text = ";";
+            casep_lloc.last_column = casep_lloc.first_column;
+            YYSTYPE casep_lval( new YYSPAIR() );
+
+            // current_tok must not be semicolon, which
+            // is filtered off by StartCaseSelectorCheck.
+            // let's insert one to mark the end of the
+            // statement
+            pCtx->PushToken(
+                 { casep_lloc, TOK_VCASE_SEP, casep_lval } );
+
+            auto current_lloc = yylval->second;
+            auto current_lval = yylval;
+            pCtx->PushToken(
+                { current_lloc, current_tok, current_lval } );
+        }
+    }
 
 case_list_selector:
     case_selector TOK_COLON 

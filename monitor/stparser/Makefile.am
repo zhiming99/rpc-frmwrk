@@ -9,7 +9,7 @@ stparser.cpp stparser.h: stparser.y
 	bison --defines=stparser.h -Wcounterexamples --output=stparser.cpp -r all stparser.y
 	bash updconst.sh
 
-#rpcfstc_PROGRAMS=rpcfstc
+rpcfstc_PROGRAMS=rpcfstc
 rpcfstc_SOURCES=stlexer.cpp stlexer.h stparser.cpp stparser.h stbase.cpp stmain.cpp stast.h nonterm.h stbase.h parsrctx.cpp parsrdrv.cpp
 rpcfstcdir=$(bindir)
 rpcfstc_LDADD=../../combase/libcombase.la 

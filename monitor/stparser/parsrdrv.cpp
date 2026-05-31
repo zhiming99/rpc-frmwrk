@@ -79,8 +79,6 @@ gint32 StartCaseSelectorCheck(
 {
 
     gint32 ret = 0;
-    bool bUseQueuedToken = false;
-
     yypstate* case_ps = yypstate_new();
 
     pCtx->m_iLastCaseChk = -1;
@@ -148,6 +146,28 @@ gint32 StartCaseSelectorCheck(
                 {
                     pCtx->PushToken(
                         { current_lloc, current_tok, current_lval } );
+                    do{
+                        current_tok = READTOK(
+                            &current_lval, &current_lloc,
+                            pCtx->GetScanner(), pCtx );
+                    }while( current_tok == TOK_SEMICOLON );
+                    if( current_tok != YYEOF )
+                    {
+                        pCtx->PushToken(
+                            { current_lloc, current_tok, current_lval } );
+                    }
+                    current_tok = YYEOF;
+                }
+                else if( current_tok == TOK_END_CASE ||
+                    current_tok == TOK_ELSE )
+                {
+                    CTokenInfo oti;
+                    oti.token = TOK_VCASE_SEP;
+                    oti.lloc = current_lloc;
+                    oti.lloc.last_column = oti.lloc.first_column;
+                    pCtx->PushToken( oti );
+                    pCtx->PushToken(
+                        { current_lloc, current_tok, current_lval } );
                     current_tok = YYEOF;
                 }
             }
@@ -198,7 +218,7 @@ gint32 AdjustTokens(
         if( current_tok == TOK_SEMICOLON &&
             next_tok == TOK_SEMICOLON )
         {
-            // discard simicolons
+            // discard repeating simicolons
             do{
                 next_tok = READTOK( &next_lval,
                     &next_lloc, pCtx->GetScanner(), pCtx );
@@ -211,6 +231,8 @@ gint32 AdjustTokens(
         {
         case CONFLICT_STATE:
             {
+                if( pCtx->UseQueuedToken() )
+                    break;
 
                 if( current_tok == TOK_ELSE ||
                     current_tok == TOK_END_CASE )
@@ -304,6 +326,19 @@ gint32 AdjustTokens(
                 }
                 else if( current_tok != TOK_SEMICOLON )
                 {
+                    gint32 arrPrefix[] =
+                    { TOK_IF, TOK_FOR, TOK_WHILE, TOK_REPEAT, TOK_CASE };
+                    gint32 iCount =
+                        sizeof( arrPrefix )/sizeof( gint32);
+                    gint32 i = 0;
+                    for( ; i < iCount; i++ )
+                    {
+                        if( current_tok == arrPrefix[ i ] )
+                            break;
+                    }
+                    if( i < iCount )
+                        break;
+
                     // read in more tokens to decide if
                     // this is a case selector or something else.
                     pCtx->ClearTokens();
@@ -665,8 +700,8 @@ gint32 StartParse(
 
     if( status == YYPUSH_ACCEPT )
     {
-        ParserPrint(
-            pCtx->GetCurFileName().c_str(),
+        ParserPrint( basename(
+            pCtx->GetCurFileName().c_str() ),
             current_lloc.first_line, 
             "Parsing successfully" );
     }
