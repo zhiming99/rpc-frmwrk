@@ -782,7 +782,13 @@ case_selector_check:
             // current_tok must not be semicolon, which
             // is filtered off by StartCaseSelectorCheck.
             // let's insert one to mark the end of the
-            // statement
+            // statement. 
+            // inserting a VCASE_SEP instead of
+            // SEMICOLON is because at this point, the
+            // only possible correct case is that the
+            // next line is case selector, or end_case
+            // where the current line is not required
+            // to end up with a SEMICOLON. 
             pCtx->PushToken(
                  { casep_lloc, TOK_VCASE_SEP, casep_lval } );
 
