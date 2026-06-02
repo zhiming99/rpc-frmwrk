@@ -84,6 +84,7 @@ void yyerror (YYLTYPE* yyloc,
 %parse-param { rpcf::CSTParserContext *pCtx }
 
 %define parse.error verbose
+%define parse.lac full
 
 %left TOK_OR
 %left TOK_XOR
@@ -741,6 +742,16 @@ semicolons:
 cinner_statements_1:
     statement
     | cinner_statements_1 TOK_SEMICOLON statement
+    /* error check */
+    | cinner_statements_1 error
+    { 
+        pCtx->IncError();
+        stdstr strCurFile = basename(
+            pCtx->GetCurFileName().c_str() );
+        ParserPrint( strCurFile.c_str(),
+            @2.last_line,
+            "';' is expected");
+    }
     ;
 
 
@@ -797,6 +808,11 @@ case_selector_check:
             pCtx->PushToken(
                 { current_lloc, current_tok, current_lval } );
         }
+    }
+    | TOK_VSTART_CASESEL case_check_statement error
+    {
+        yychar = YYEOF;
+        yyerrok;
     }
 
 case_list_selector:
@@ -855,6 +871,14 @@ void yyerror (YYLTYPE* yyloc,
     rpcf::CSTParserContext* pCtx,
     const char* yymsgp)
 {
+    if( pCtx->GetTokenCount() &&
+        !pCtx->UseQueuedToken() )
+    {
+        printf(
+            "error from lookahead check, %s\n",
+            yymsgp );
+        return;
+    }
     stdstr strCurFile = basename(
         pCtx->GetCurFileName().c_str() );
     bool bErr = false;
@@ -870,12 +894,6 @@ void yyerror (YYLTYPE* yyloc,
     yypstate* ps = reinterpret_cast< yypstate* >
         ( pCtx->GetParser() );
 
-    ParserPrint( 
-        strCurFile.c_str(),
-        yyloc->first_line,
-        yymsgp,
-        bErr );
-
     YYSTYPE pVal = *ps->yyvsp;
     if( pVal )
     {
@@ -885,6 +903,14 @@ void yyerror (YYLTYPE* yyloc,
             strCurFile.c_str(),
             pVal->second.first_line,
             strMsg.c_str() );
+    }
+    else
+    {
+        ParserPrint( 
+            strCurFile.c_str(),
+            yyloc->first_line,
+            yymsgp,
+            bErr );
     }
 }
 

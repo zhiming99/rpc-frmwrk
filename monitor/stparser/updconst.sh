@@ -23,7 +23,7 @@ stateNo="${stateNo%, }"
 sed -i "s/define USING_SEP_STATE .*/define USING_SEP_STATE     $stateNo/" parsrctx.h
 echo USING_SEP_STATE=$stateNo
 
-stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $2; } /TOK_VSTART_CASESEL case_check_statement \xE2\x80\xA2/ { printf( "%d, ",last_match ); }/TOK_VSTART_CASESEL case_list_selector \xE2\x80\xA2/ { printf( "%d, ",last_match ); }' stparser.output`
+stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $2; } /TOK_VSTART_CASESEL case_check_statement \xE2\x80\xA2 error/ { printf( "%d, ",last_match ); }/TOK_VSTART_CASESEL case_list_selector \xE2\x80\xA2/ { printf( "%d, ",last_match ); }' stparser.output`
 stateNo="${stateNo%, }"
 sed -i "s/define CASESEL_CHECK_STATES .*/define CASESEL_CHECK_STATES     std::vector<int>({ ${stateNo} })/" parsrctx.h
 echo CASESEL_CHECK_STATES=$stateNo;

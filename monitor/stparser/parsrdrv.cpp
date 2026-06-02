@@ -174,7 +174,22 @@ gint32 StartCaseSelectorCheck(
             ret = yypush_parse( case_ps,
                 current_tok, &current_lval,
                 &current_lloc, pCtx );
-
+    
+            if( ret == YYPUSH_ABORT )
+            {
+                auto oPrev = pCtx->GetCurTokBack();
+                YYSTYPE pVal( new YYSPAIR() );
+                oPrev.lloc.text = "error";
+                oPrev.lloc.last_line = oPrev.lloc.first_line;
+                oPrev.lloc.last_column = oPrev.lloc.first_column;
+                pVal->second = oPrev.pVal->second;
+                pVal->second = oPrev.lloc;
+                pCtx->PushToken(
+                    { oPrev.lloc, YYerror, pVal } );
+                pCtx->PushToken(
+                    { current_lloc, current_tok, current_lval } );
+                ret = YYPUSH_ACCEPT;
+            }
             if( ret != YYPUSH_MORE )
                 break;
 
@@ -322,6 +337,7 @@ gint32 AdjustTokens(
                         // case selector
                         current_tok = TOK_VCASE_SEP;
                     }
+                    pCtx->m_iLastCaseChk = -1;
                     pCtx->SetUseQueuedToken( true );
                 }
                 else if( current_tok != TOK_SEMICOLON )
@@ -366,6 +382,7 @@ gint32 AdjustTokens(
                         pCtx->DequeToken();
                         pCtx->DequeToken();
                     }
+                    pCtx->m_iLastCaseChk = -1;
                     pCtx->SetUseQueuedToken( true );
                 }
                 break;
@@ -698,7 +715,8 @@ gint32 StartParse(
         }
     }
 
-    if( status == YYPUSH_ACCEPT )
+    if( status == YYPUSH_ACCEPT &&
+        pCtx->GetErrorCount() == 0 )
     {
         ParserPrint( basename(
             pCtx->GetCurFileName().c_str() ),
