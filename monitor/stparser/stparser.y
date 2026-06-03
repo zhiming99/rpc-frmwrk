@@ -742,8 +742,10 @@ semicolons:
 cinner_statements_1:
     statement
     | cinner_statements_1 TOK_SEMICOLON statement
+    {}
+    | cinner_statements_1 TOK_SEMICOLON
     /* error check */
-    | cinner_statements_1 error
+    | cinner_statements_1 error statement
     { 
         pCtx->IncError();
         stdstr strCurFile = basename(
@@ -751,6 +753,7 @@ cinner_statements_1:
         ParserPrint( strCurFile.c_str(),
             @2.last_line,
             "';' is expected");
+        yyerrok;
     }
     ;
 
@@ -759,7 +762,7 @@ opt_semicolon:
     /* empty */
     | TOK_SEMICOLON
 
-cinner_statements: cinner_statements_1  opt_semicolon
+cinner_statements: cinner_statements_1 
 
 case_element:
     // case_list_selector cinner_statements TOK_SEMICOLON
@@ -874,9 +877,6 @@ void yyerror (YYLTYPE* yyloc,
     if( pCtx->GetTokenCount() &&
         !pCtx->UseQueuedToken() )
     {
-        printf(
-            "error from lookahead check, %s\n",
-            yymsgp );
         return;
     }
     stdstr strCurFile = basename(
@@ -897,7 +897,7 @@ void yyerror (YYLTYPE* yyloc,
     YYSTYPE pVal = *ps->yyvsp;
     if( pVal )
     {
-        strMsg = "Parser stopped at '";
+        strMsg = "Parser found error at '";
         strMsg += pVal->second.text + "'";
         ParserPrint(
             strCurFile.c_str(),

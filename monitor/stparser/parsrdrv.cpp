@@ -723,6 +723,13 @@ gint32 StartParse(
             current_lloc.first_line, 
             "Parsing successfully" );
     }
+    else
+    {
+        ParserPrint( basename(
+            pCtx->GetCurFileName().c_str() ),
+            current_lloc.first_line, 
+            "Parsing failed with errors" );
+    }
     yylex_destroy( yyscanner );
     pCtx->SetScanner( nullptr );
     if( pFile )

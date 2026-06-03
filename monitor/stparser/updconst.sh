@@ -1,5 +1,5 @@
 #!/bin/bash
-stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $2; } /opt_semicolon.* \xE2\x80\xA2  \[TOK_VCASE_SEP/ { printf("case %d: ", last_match);}' stparser.output`
+stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $2; } /cinner_statements_1.*\xE2\x80\xA2  \[.*TOK_VCASE_SEP/ { printf("case %d: ", last_match);}' stparser.output`
 tempNo=${stateNo#case};stateNo=${tempNo%: }
 sed -i "s/define CONFLICT_STATE .*/define CONFLICT_STATE     $stateNo/" parsrctx.h
 echo CONFLICT_STATE=$stateNo
