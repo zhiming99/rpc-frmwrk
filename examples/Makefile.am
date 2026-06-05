@@ -59,7 +59,20 @@ EXTRA_DIST += $(pytests)/actcancel/ActiveCancelcli.py \
  $(pytests)/sftest/maincli.py \
  $(pytests)/stmtest/StreamTestcli.py \
  $(pytests)/stmtest/StreamTestsvr.py \
- $(pytests)/stmtest/maincli.py
+ $(pytests)/stmtest/maincli.py \
+ $(pytests)/thermalog/HelloWorldSvcsvr.py \
+ $(pytests)/thermalog/HelloWorldSvcsvrbase.py \
+ $(pytests)/thermalog/HelloWorlddesc.json \
+ $(pytests)/thermalog/HelloWorldstructs.py \
+ $(pytests)/thermalog/Makefile \
+ $(pytests)/thermalog/__init__.py \
+ $(pytests)/thermalog/adddev.sh \
+ $(pytests)/thermalog/cmdline \
+ $(pytests)/thermalog/driver.json \
+ $(pytests)/thermalog/mainsvr.py \
+ $(pytests)/thermalog/read485.py \
+ $(pytests)/thermalog/seribase.py \
+ $(pytests)/thermalog/synccfg.py
 
 cpptests=./cpp
 EXTRA_DIST += \

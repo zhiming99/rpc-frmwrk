@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+import json
+import os
+import sys 
+import errno
+from shutil import move
+from copy import deepcopy
+import multiprocessing
+
+sys.path.append( '/usr/local/bin/rpcf' )
+from updcfg import *
+
+def UpdateBusPort( drvFile, sysVals ):
+    try:
+        ret = 0
+        newParam = None
+
+        srcFp = open( drvFile, "r" )
+        srcVals = json.load( srcFp )
+        srcFp.close()
+        
+        ports = sysVals[ 'Ports' ]
+        for port in ports:
+            if port[ 'PortClass' ] == 'RpcTcpBusPort':
+               newParam = port[ 'Parameters' ][ 0 ]
+               break
+
+        if newParam is None:
+            raise Exception( "Error invalid json file" )
+
+        ports = srcVals[ 'Ports' ]
+        for port in ports:
+            if port[ 'PortClass' ] == 'RpcTcpBusPort':
+                port['Parameters'][0] = newParam
+                break
+
+        srcFp = open( drvFile, "w" )
+        json.dump( srcVals, srcFp, indent = 4)
+        srcFp.close()
+
+    except Exception as err:
+        ret = -errno.EFAULT
+    return ret
+
+def UpdateDrv( sysDrvPath : str ) :
+    drvPath = os.path.dirname(os.path.realpath(__file__))
+    drvFile = drvPath + "/driver.json"
+    ret = 0
+    try:
+        cliSrcVals = None
+        srcVals = None
+
+        bBuiltinRt=False
+        if not bBuiltinRt :
+            return
+
+        sysDrvFile = sysDrvPath + "/driver.json"
+        sysDrvFp = open( sysDrvFile, "r" )
+        sysDrvVals = json.load( sysDrvFp )
+        sysDrvFp.close()
+
+        # update driver.json
+        ret = UpdateBusPort( drvFile, sysDrvVals )
+        if ret < 0:
+            return
+
+        # update driver-cli.json
+        srcFp = open( drvFile, "r" )
+        srcVals = json.load( srcFp )
+        srcFp.close()
+        
+        if 'Arch' in srcVals:
+            oArch = srcVals[ 'Arch' ]
+        else:
+            oArch = dict()
+
+        oArch[ 'Processors' ] = str(
+            multiprocessing.cpu_count() )
+
+        srcVals[ 'Arch' ] = oArch
+
+        if( not IsFeatureEnabled( "gmssl" ) and
+            not IsFeatureEnabled( "openssl") ):
+            return
+
+        bret = IsUsingGmSSL( sysDrvVals )
+        if bret[ 0 ] < 0 :
+            return
+
+        bGmSSL = bret[ 1 ]
+        sslPorts = []
+        for port in sysDrvVals[ 'Ports' ] :
+            strClass = port[ 'PortClass' ]
+            if bGmSSL and strClass != 'RpcGmSSLFido' :
+                continue
+            if not bGmSSL and strClass != 'RpcOpenSSLFido':
+                continue
+            sslPort = deepcopy( port )
+            sslPorts.append( sslPort )
+            break
+
+        if len( sslPorts ) == 0:
+            return
+
+        for sslPort in sslPorts:
+            if not "Parameters" in sslPort:
+                continue
+            params = sslPort[ "Parameters" ]
+            keyPath = params[ "KeyFile" ]
+
+            dirPath = os.path.dirname( keyPath )
+            keyName = os.path.basename( keyPath )
+            if keyName == "signkey.pem":
+                params[ "KeyFile" ] = dirPath + "/clientkey.pem"
+                params[ "CertFile" ] = dirPath + "/clientcert.pem"
+                params[ "CACertFile"] = dirPath + "/certs.pem"
+                params[ "SecretFile"] = ""
+
+        if 'Ports' in srcVals:
+            sslPorts.extend( srcVals[ 'Ports' ] )
+        cliSrcVals = deepcopy( srcVals )
+        cliSrcVals[ "Ports" ] = sslPorts
+        cliDrvFile = drvPath + "/driver-cli.json"
+
+    except Exception as oErr :
+        ret = -errno.EFAULT
+    finally:
+        if ret < 0 or srcVals is None:
+            return
+        destFp = open( drvFile, 'w' )
+        json.dump( srcVals, destFp, indent = 4)
+        destFp.close()
+
+        if cliSrcVals is None:
+            return
+        destFp = open( cliDrvFile, 'w' )
+        json.dump( cliSrcVals, destFp, indent = 4 )
+        destFp.close()
+
+def SyncCfg() :
+
+    srcPath = '/usr/local/etc/rpcf/echodesc.json'
+    destPath= './HelloWorlddesc.json'
+    destObjs=['HelloWorldSvc']
+    bBuiltinRt=False
+
+    destPath = os.path.dirname(os.path.realpath(__file__)) + "/" + destPath
+    try:
+        srcFp = open( srcPath, "r" )
+        srcVals = json.load( srcFp )
+        srcCfgs = None
+        if 'Objects' in srcVals :
+            for elem in srcVals[ 'Objects' ] :
+                try:
+                    if elem[ "ObjectName" ] == "CEchoServer" :
+                        srcCfgs = elem
+                        break
+                except Exception as oErr :
+                    pass
+
+        srcFp.close()
+        if srcCfgs is None :        
+            return -1
+
+        destFp = open( destPath, "r" )
+        destVals = json.load( destFp )
+        destFp.close()
+        bChanged = False
+        if 'Objects' in destVals :
+            for elem in destVals[ 'Objects' ]:
+                if ( 'ProxyPortClass' in elem and
+                    elem[ 'ProxyPortClass' ] != 'DBusProxyPdo' ) :
+                        continue
+
+                if  not 'ProxyPortClass' in elem :
+                    continue
+
+                elem[ 'EnableSSL' ] = srcCfgs[ 'EnableSSL' ]
+                elem[ 'PortNumber' ] = srcCfgs[ 'PortNumber' ]
+
+                if 'AuthInfo' in srcCfgs :
+                    elem[ 'AuthInfo' ] = srcCfgs[ 'AuthInfo' ]
+                elif 'AuthInfo' in elem :
+                    del elem[ 'AuthInfo' ]
+
+                elem[ 'IpAddress' ] = srcCfgs[ 'IpAddress' ]
+                elem[ 'EnableWS' ] = srcCfgs[ 'EnableWS' ]
+                elem[ 'Compression' ] = srcCfgs[ 'Compression' ]
+                elem[ 'RouterPath' ] = srcCfgs[ 'RouterPath' ]
+
+                if 'DestURL' in srcCfgs :
+                    elem[ 'DestURL' ] = srcCfgs[ 'DestURL' ]
+                elif 'DestURL' in elem :
+                    del elem[ 'DestURL' ]
+
+                if( 'PortClass' in elem and 
+                    elem[ 'PortClass' ] == 'DBusLocalPdo' and
+                    bBuiltinRt ):
+                    elem[ 'PortClass' ] = 'DBusLoopbackPdo2'
+
+                bChanged = True
+
+        if bChanged : 
+            destFp = open( destPath, 'w' )
+            json.dump( destVals, destFp, indent = 4)
+            destFp.close()
+
+        UpdateDrv( os.path.dirname( srcPath ) )
+        print( "Configuration updated successfully" )
+
+    except Exception as err:
+        text = "Failed to sync desc file:" + str( err )
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+        print( "%s, %s" % (text, second_text) )
+
+    return 0
+
+if __name__ == '__main__' :
+    SyncCfg()
