@@ -70,7 +70,6 @@ EXTRA_DIST += $(pytests)/actcancel/ActiveCancelcli.py \
  $(pytests)/thermalog/cmdline \
  $(pytests)/thermalog/driver.json \
  $(pytests)/thermalog/mainsvr.py \
- $(pytests)/thermalog/read485.py \
  $(pytests)/thermalog/seribase.py \
  $(pytests)/thermalog/synccfg.py
 
