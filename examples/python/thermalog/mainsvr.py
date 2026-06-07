@@ -100,13 +100,15 @@ def mainsvr(
                 time.sleep( 1 )
             else:
                 break
-                
+        # oAppMan is the client object to interact with the rpc-frmwrk monitor.       
         count = 0
         # open the thermometer device on RS485
         client = Open485()
         if client is None:
             print( "Failed to connect to RS485 device" )
             return -1
+        # connect to the device and make sure it is connected before
+        # we start to read data from it.
         connection = client.connect()
         if not connection:
             print( "Unable to connect to RS485 device" )
@@ -116,6 +118,7 @@ def mainsvr(
             time.sleep( 1 )
             if bExit or amc.IsExit():
                 break
+            # read the temperature and humidity data every 60 seconds
             if count % 60 == 0:
                 # read both the temperature and
                 # humidity registers in one read
@@ -137,8 +140,10 @@ def mainsvr(
                     hum.strKey = "humidity"
                     hum.oValue = oVal2
                     arrValues.append( hum )
-                    # report the temperature to
-                    # the rpc-frmwrk monitor.
+                    # report the temperature and humidity data to the rpc-frmwrk
+                    # monitor by calling the SetPointValues API of the app
+                    # manager client. this will update the data in the monitor
+                    # which will show up in the monitor's web UI. 
                     ret = oAppMan.SetPointValues(
                         "thermometer", arrValues )
                     if ret[ 0 ] < 0:

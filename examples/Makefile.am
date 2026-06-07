@@ -71,7 +71,12 @@ EXTRA_DIST += $(pytests)/actcancel/ActiveCancelcli.py \
  $(pytests)/thermalog/driver.json \
  $(pytests)/thermalog/mainsvr.py \
  $(pytests)/thermalog/seribase.py \
- $(pytests)/thermalog/synccfg.py
+ $(pytests)/thermalog/synccfg.py \
+ $(pytests)/thermalog/README_cn.md \
+ $(pytests)/thermalog/listing-thermal-app.png \
+ $(pytests)/thermalog/temperature-chart.png \
+ $(pytests)/thermalog/thermal-app-detail.png \
+ $(pytests)/thermalog/thermometer-with-rs485.png
 
 cpptests=./cpp
 EXTRA_DIST += \
