@@ -22,7 +22,7 @@
 
 ### 改写mainsvr.py
 * 我们改写的思路是，加入一个无穷的循环，在循环里读取温度传感器的寄存器，然后再写到温度的日志中。`rpc-frmwrk`监视器的网页客户端就可以自动的展示温度的历史信息。
-* 为此，我们使用了一个名为`pymodbus`的模块。这个模块可以很方便的进行modbus通信，而不用我们逐个字节的去写tty文件。
+* 为此，我们使用了一个名为`pymodbus`的模块。这个模块可以很方便的进行modbus通信，而不用我们逐个字节的去写tty文件。安装`pymodbus`可以运行命令`pip3 install pymodbus`或者`apt install python3-pymodbus`。
 * 对mainsvr.py的修改，已经在该文件中作了详细的注释。
 
 ### 温度数据是如何展示的   
