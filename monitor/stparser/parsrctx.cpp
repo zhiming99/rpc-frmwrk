@@ -23,6 +23,9 @@
  */
 #include <rpc.h>
 #include "parsrctx.h"
+#include <iostream>
+#include <sstream>
+
 using namespace rpcf;
 
 namespace rpcf
@@ -170,18 +173,21 @@ FILE* CSTParserContext::TryOpenFile(
 
 }
 
+
 void ParserPrint(
     const char* szFile,
     gint32 iLineNo,
     const char* strMsg,
     bool bErr )
 {
-    char szBuf[ 512 ];
-    sprintf( szBuf, "%s(%d): %s\n",
-        szFile, iLineNo, strMsg );
+    std::ostringstream ss;
+
+    ss << szFile << "(" << iLineNo << "): "
+       << strMsg << "\n";
+
     if( bErr )
-        fprintf( stderr, szBuf );
+        std::cerr << ss.str();
     else
-        fprintf( stdout, szBuf );
+        std::cout << ss.str();
 }
 

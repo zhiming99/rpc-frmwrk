@@ -115,14 +115,21 @@ std::string DebugMsgEx(
         return std::string( "" );
 
     gint32 iSize = sizeof( szBuf );
-    szBuf[ iSize - 1 ] = 0;
+    szBuf[ MAX_DUMP_SIZE - 1 ] = 0;
 
     va_list argptr;
     va_start(argptr, ret );
-    vsnprintf( szBuf, iSize - 1, strFmt.c_str(), argptr );
-    va_end(argptr);
 
-    return DebugMsgInternal( ret, szBuf, szFunc, iLineNum );
+    int iRet = vsnprintf( szBuf,
+        sizeof( szBuf ),
+        strFmt.c_str(), argptr );
+
+    va_end(argptr);
+    if( iRet < 0 )
+        return std::string( "" );
+
+    return DebugMsgInternal(
+        ret, szBuf, szFunc, iLineNum );
 }
 
 gint64 GetRandom()
