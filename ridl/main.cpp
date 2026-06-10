@@ -57,7 +57,6 @@ static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
 
-    INIT_MAP_ENTRY( CBuffer );
     INIT_MAP_ENTRY( CAttrExp );
     INIT_MAP_ENTRY( CAttrExps );
     INIT_MAP_ENTRY( CPrimeType );

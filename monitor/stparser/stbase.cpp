@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  st_base.cpp
+ *       Filename:  stbase.cpp
  *
  *    Description:  support functions for ST parser 
  *
@@ -21,22 +21,18 @@
  *
  * =====================================================================================
  */
-#include <cstring>
-#include <strings.h>
-#include <ctime>
-#include <cctype>
-#include <cstdlib>
-#include <string>
-#include <stdint.h>
-#include <sstream>
-#include <iomanip>
+#include "rpc.h"
+#include "parsrctx.h"
+#include "stlexer.h"
 
-struct timespec st_time_to_timespec(const char* text) {
+using namespace rpcf;
+
+timespec st_time_to_timespec(const char* text) {
     struct timespec ts = {0, 0};
     if (!text) return ts;
 
     // Skip the "T#" or "TIME#" prefix
-    const char* ptr = std::strchr(text, '#');
+    const char* ptr = strchr(text, '#');
     if (!ptr) return ts;
     ptr++; 
 
@@ -226,4 +222,196 @@ std::wstring TranslateSTWString(const std::string& input) {
         }
     }
     return result;
+}
+
+ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
+{
+    gint32 ret = 0;
+    IntVecPtr pvecInt;
+    pvecInt.NewObj();
+    yyscan_t scanner = pCtx->GetScanner();
+
+    do{
+        // "%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+|"*")?(":P"|":p")? 
+        // 1. Dynamically find where the ADDR_AREA begins
+        // Skip '%' (index 0). If index 1 is 'P' or 'p', skip that too.
+        int area_idx = (yytext[1] == 'P' || yytext[1] == 'p') ? 2 : 1;
+        int size_idx = area_idx + 1;
+        int is_periphrial = ( area_idx == 2 );
+
+        int addr_size, addr_idx = 0, addr_bidx = -1;
+
+        // 2. Extract Area ('I', 'Q', 'M')
+        int text_len = yyget_leng( scanner );
+        if( !is_periphrial &&
+            (  yytext[ text_len - 1 ] == 'P' ||
+            yytext[ text_len - 1 ] == 'p' ) )
+            is_periphrial = true;
+
+        ( *pvecInt )().push_back( is_periphrial );
+        ( *pvecInt )().push_back( yytext[ area_idx ] );
+
+        // 3. Determine if Size is explicit, or if we hit a number immediately
+        int digit_start_idx = size_idx;
+        bool size_is_explicit = !(yytext[size_idx] >= '0' && yytext[size_idx] <= '9');
+
+        if (size_is_explicit) {
+            addr_size = std::toupper(yytext[size_idx]); // Normalize to uppercase
+            digit_start_idx = size_idx + 1;
+        } else {
+            addr_size = 'X'; // Default fallback under IEC 61131-3
+        }
+        ( *pvecInt )().push_back( addr_size );
+
+        gint32 iLineNo = yyget_lineno( scanner );
+        auto current_ptr = yytext + digit_start_idx;
+        if( *current_ptr == '*' )
+        {
+            if( is_periphrial )
+            {
+                ParserPrint( 
+                    pCtx->GetCurFileName().c_str(), 
+                    iLineNo,
+                    "Error, 'incomplete address' cannot specify 'P' flag" );
+                ret = -EINVAL;
+                break;
+            }
+            // address will be set in the VAR_CONFIG section.
+            ( *pvecInt )().push_back( -2 );
+            ( *pvecInt )().push_back( -2 );
+            break;
+        }
+
+        // 4. Extract the primary index (Byte/Word offset)
+        addr_idx = std::atoi(current_ptr);
+
+        // 5. Look for the dot '.' separating the sub-bit index
+        auto dot_ptr = strchr(current_ptr, '.');
+        gint32 ret = 0;
+        int max_bit_limit = 7;
+        if (dot_ptr != nullptr)
+        {
+            addr_bidx = std::atoi(dot_ptr + 1);
+
+            // Compute maximum allowable bit boundary based on the token context
+            switch (addr_size) {
+                case 'W': max_bit_limit = 15; break;
+                case 'D': max_bit_limit = 31; break;
+                case 'L': max_bit_limit = 63; break;
+                default:  max_bit_limit = 7;  break;
+            }
+
+            // Strict Range Validation
+            if (addr_bidx < 0 || addr_bidx > max_bit_limit) {
+                ret = -EINVAL;
+            }
+        }
+        else if( addr_size == 'X' )
+        {
+            addr_bidx = addr_bidx;
+            addr_idx = 0;
+            if( addr_bidx > 7 )
+                ret = -EINVAL;
+        }
+        else
+        {
+            addr_bidx = -1;
+        }
+
+        if( ERROR( ret ) )
+        {
+            char szBuf[ 512 ];
+            sprintf( szBuf, 
+                "Error, Bit index %d exceeds the limit of %d bits "
+                "for size modifier '%c'",
+                addr_bidx, max_bit_limit, addr_size );
+            ParserPrint( 
+                pCtx->GetCurFileName().c_str(), 
+                iLineNo,
+                szBuf );
+            break;
+        }
+
+        // direct address type: 0 for peripheral access
+        ( *pvecInt )().push_back( addr_idx );
+        ( *pvecInt )().push_back( addr_bidx );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return ObjPtr();
+    return ObjPtr( pvecInt );
+}
+
+ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
+{
+    StrVecPtr pvecStr;
+    pvecStr.NewObj();
+    gint32 ret = 0;
+
+    //"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? 
+    // 1. Dynamically find where the ADDR_AREA begins
+    // Skip '%' (index 0). If index 1 is 'P' or 'p', skip that too.
+    do{
+        int ptype_idx = 1;
+        int size_idx = ptype_idx + 1;
+        int attr_idx = -1;
+
+        int addr_size, addr_idx = 0, addr_bidx = -1;
+        yyscan_t scanner = pCtx->GetScanner();
+
+
+        ( *pvecStr )().push_back(
+            stdstr( yytext + ptype_idx, 1 ) );
+
+        ( *pvecStr )().push_back(
+            stdstr( yytext + size_idx, 1 ) );
+
+        const char* pend = nullptr;
+        const char* colon_ptr = strchr(
+            yytext + size_idx + 1, ':');
+
+        stdstr strAttr = "value";
+        if( colon_ptr != nullptr )
+        {
+            pend = colon_ptr;
+            strAttr = colon_ptr + 1;
+        }
+        else
+        {
+            int text_len = yyget_leng( scanner );
+            pend = yytext + text_len;
+        }
+
+        ( *pvecStr )().push_back( strAttr );
+
+        stdstr strPath( yytext + 3, pend - yytext - 3 );
+        std::replace( strPath.begin(), strPath.end(), '.', '/' );
+        std::vector< stdstr > comps;
+        ret = CRegistry::Namei( strPath, comps );
+        if( ERROR( ret ) )
+            break;
+
+        if( comps.empty() )
+        {
+            gint32 iLineNo = yyget_lineno( scanner );
+            ParserPrint( 
+                pCtx->GetCurFileName().c_str(), 
+                iLineNo,
+                "Error, Invalid rpcf address" );
+            ret = -EINVAL;
+            break;
+        }
+        // reversely push the component
+        auto iter = comps.rbegin();
+        while( iter != comps.rend() )
+            ( *pvecStr )().push_back( *iter );
+        // the layout is
+        // <point type> <data size> <attr name > <point name> [<app name> [<node name>]]
+
+    }while( 0 );
+    if( ERROR( ret ) )
+        return ObjPtr();
+
+    return ObjPtr( pvecStr );
 }

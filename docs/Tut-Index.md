@@ -10,3 +10,4 @@
   * [教程7-异步编程进阶](./Tut-AsyncProgramming_cn-7.md)
   * [教程8-调试](./Tut-Debug_cn-8.md)
   * [教程9-如何编译rpc-frmwrk](./Tut-HowToBuild_cn-9.md)
+  * [教程10-如何手搓一个观察记录温度的监控程序](../examples/python/thermalog/README_cn.md)![new](../pics/new.png)

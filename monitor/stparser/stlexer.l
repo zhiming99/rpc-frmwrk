@@ -23,16 +23,57 @@
  */
 %top{
 #include <stdio.h>
-#include "y.tab.h"
 #include <string>
 #include <vector>
 #include <cstdlib>
 #include <cctype>
+#include <rpc.h>
+#include "stparser.h"
+#include "stbase.h"
 
-std::string ProcessSTString(const char* input);
-typedef Variant YYSTYPE;
+#define YY_DECL int yylex(YYSTYPE * yylval_param, \
+    YYLTYPE * yylloc_param, yyscan_t yyscanner, \
+    rpcf::CSTParserContext* pCtx )
+
+extern int yylex(YYSTYPE * yylval_param,
+    YYLTYPE * yylloc_param, void* yyscanner,
+    rpcf::CSTParserContext* pCtx );
+}
+
+%{
+
+#include "parsrctx.h"
+using namespace rpcf;
+
+#define YY_USER_ACTION \
+    do {  \
+        if( yylloc == nullptr ) break; \
+        yylloc->first_line = yylloc->last_line = yyget_lineno(yyscanner); \
+        yylloc->first_column = yyget_column(yyscanner); \
+        yylloc->last_column = yyget_column(yyscanner) + yyleng - 1; \
+        auto yylloc2 = static_cast< YYLTYPE2* >( yylloc ); \
+        yylloc2->text = yyget_text( yyscanner );\
+        yylloc2->fidx = pCtx->GetFileIdx( pCtx->m_strCurFile ); \
+        yyset_column(yyget_column(yyscanner) + yyleng, yyscanner); \
+        if( yylval != nullptr ) yylval->get()->second = *yylloc2; \
+    }while( 0 );
+
+int comment_depth = 0;
+void lexerr(const char *s) {
+    fprintf(stderr, "Error: %s\n", s);
+
+}
 
 %}
+
+%option     8bit bison-bridge
+%option     bison-locations
+%option     warn
+%option     reentrant
+%option     yylineno
+%option     stack 
+%option     noyywrap
+
 
  /* Definitions */
 ST_TYPE     (?i:BOOL|BYTE|WORD|DWORD|LWORD|SINT|INT|DINT|LINT|USINT|UINT|UDINT|ULINT|REAL|LREAL)
@@ -46,8 +87,11 @@ DT_PREFIX   (?i:date_and_time|dt)#
 
 ADDR_AREA   (?i:[IQM])
 ADDR_SIZE   (?i:[XBWDL])
-IDENTIFIER  [a-zA-Z_][a-zA-Z0-9_]*
-int comment_depth = 0;
+LETTER      [a-zA-Z]
+IDENTIFIER  ({LETTER}|("_"({LETTER}|{DIGIT})))("_"?({LETTER}|{DIGIT}))*
+
+ /* point type: I=input, O=output, S=setpoint */
+ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 /* Define Exclusive States */
 %x ST_COMM C_COMM SINGLE_COMM
 
@@ -57,8 +101,13 @@ int comment_depth = 0;
  // (?i:TIME|T|TO)#-?([0-9]+(\.[0-9]+)?(_?[0-9]+)*(d|h|m|s|ms|us|ns))+ {
 (?i:T|TIME|TO)#-?([0-9]+(\.[0-9]+)?d)?([0-9]+(\.[0-9]+)?h)?([0-9]+(\.[0-9]+)?m)?([0-9]+(\.[0-9]+)?s)?([0-9]+(\.[0-9]+)?ms)? {
     /* Copy the matched text to pass to Bison */
-    yylval.strval = strdup(yytext); 
+    yylval->get()->first = yytext; 
     return TOK_TIME;
+}
+(?i:LT|LTIME|LTO)#-?([0-9]+(\.[0-9]+)?d)?([0-9]+(\.[0-9]+)?h)?([0-9]+(\.[0-9]+)?m)?([0-9]+(\.[0-9]+)?s)?([0-9]+(\.[0-9]+)?ms)?([0-9]+(\.[0-9]+)?us)?([0-9]+(\.[0-9]+)?ns)? {
+    /* Copy the matched text to pass to Bison */
+    yylval->get()->first = yytext; 
+    return TOK_LTIME;
 }
 
 (?i:INCLUDE)                return TOK_INCLUDE;
@@ -94,7 +143,7 @@ int comment_depth = 0;
 (?i:IF)                     return TOK_IF;
 (?i:THEN)                   return TOK_THEN;
 (?i:ELSE)                   return TOK_ELSE;
-(?i:ELSIF)                  return TOK_ELSEIF;
+(?i:ELSIF)                  return TOK_ELSIF;
 (?i:END_IF)                 return TOK_END_IF;
 (?i:CASE)                   return TOK_CASE;
 (?i:OF)                     return TOK_OF;
@@ -130,7 +179,7 @@ int comment_depth = 0;
 (?i:AT)                     return TOK_AT;
 (?i:BY)                     return TOK_BY;
 (?i:RETAIN)                 return TOK_RETAIN;
-(?i:PERSISTANT)             return TOK_PERSISTANT;
+(?i:PERSISTENT)             return TOK_PERSISTENT;
 (?i:ABSTRACT)               return TOK_ABSTRACT;
 (?i:FINAL)                  return TOK_FINAL;
 (?i:SUPER)                  return TOK_SUPER;
@@ -145,42 +194,45 @@ int comment_depth = 0;
 (?i:INFO)                   return TOK_INFO;
 (?i:REGION)                 return TOK_REGION;
 (?i:END_REGION)             return TOK_END_REGION;
+(?i:NAMESPACE)              return TOK_NAMESPACE;
+(?i:END_NAMESPACE)          return TOK_END_NAMESPACE;
+(?i:USING)                  return TOK_USING;
+(?i:VAR_STAT)               return TOK_VAR_STAT;
 
 
  /* Matches D#2024-12-25 */
 {D_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2} {
-    yylval.qwVal = ParseStTimeToUnix( yytext );
+    yylval->get()->first = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_DATE;
 }
 
  /* Matches TOD#14:30:05.123 */
 {TOD_PREFIX}[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval.qwVal = ParseStTimeToUnix( yytext );
+    yylval->get()->first = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_TIME_OF_DAY;
 }
 
  /* Matches DT#2024-12-25-14:30:05 */
 {DT_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval.qwVal = ParseStTimeToUnix( yytext );
-    return TOK_DATE_TIME
+    yylval->get()->first = ( guint64 )ParseStTimeToUnix( yytext );
+    return TOK_DATE_TIME;
 }
 
  /* Standard STRING literal */
 '(''|[^'\n]|(\$[0-9a-fA-F]{2})|\$[LlPpRrTtQ$])*' {
     // Action: process string (strip quotes, resolve escapes)
-    yylval.strVal = TranslateSTString( yytext );
+    yylval->get()->first = TranslateSTString( yytext );
     return TOK_STRING;
 }
 
  /* WSTRING literal */
 \"(\"\"|[^\"\n]|(\$[0-9a-fA-F]{4})|\$[LlPpRrTtQ$])*\" {
-    yylval.strVal = TranslateSTString( yytext );
-    return TOK_WSTRING;
+    lexerr( "wide character string are not supported, yet" );
 }
 
  /* Error handling for unterminated strings */
-'[^'\n]* { yyerror("Unterminated string literal"); }
-\"[^\"\n]* { yyerror("Unterminated wide string literal"); }
+'[^'\n]* { lexerr("Unterminated string literal"); }
+\"[^\"\n]* { lexerr("Unterminated wide string literal"); }
 
 
  /* Match Typed Literals like INT#10, DWORD#16#FFFF, REAL#10.5 */
@@ -193,7 +245,8 @@ int comment_depth = 0;
     std::string valStr = s.substr(hashPos + 1);
 
     // Remove underscores from value string
-    valStr.erase(std::remove(valStr.begin(), valStr.end(), '_'), valStr.end());
+    valStr.erase(std::remove(
+        valStr.begin(), valStr.end(), '_'), valStr.end());
 
     if (type == "REAL" || type == "LREAL") {
         printf("f32.const %s\n", valStr.c_str());
@@ -210,22 +263,12 @@ int comment_depth = 0;
     return TOK_NUMBER;
 }
 
- /* Matches Bit addresses: %IX0.0, %Q0.1, %M10.5 */
-"%"{ADDR_AREA}X?({DIGIT}+"."{DIGIT}+|\*) {
-    //yylval.addr_val = parse_absolute_address(yytext);
-    return TOK_ABS_ADDR_BIT;
-}
-
- /* Matches Byte/Word/DWord: %IB4, %QW10, %MD20 */
-"%"{ADDR_AREA}{ADDR_SIZE}({DIGIT}+|\*) {
-    //yylval.addr_val = parse_absolute_address(yytext);
-    return TOK_ABS_ADDR_BLOCK;
-}
-
  /* Matches Peripheral Access (PI): %IW0:P or %PIW0 */
-"%P"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+ |
-"%"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+":P" {
-    //yylval.addr_val = parse_absolute_address(yytext);
+"%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+|"*")?(":P"|":p")?  {
+    ObjPtr pAddr = ParsePeriAddr( yytext, pCtx );
+    if( pAddr.IsEmpty() )
+        return YYerror;
+    yylval->get()->first = pAddr;
     return TOK_ABS_ADDR_PERIPHERAL;
 }
 
@@ -238,13 +281,19 @@ int comment_depth = 0;
 
  /* 3. Simple Decimal (e.g., 123) */
  /* This is the fallback for any sequence of digits without a "#" */
-{DIGIT}[0-9_]* {
+[0-9][0-9_]* {
     return TOK_NUMBER;
 }
 
-"@"{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? { yylval = * strdup(yytext); return TOK_RPCF_ADDR; }
+"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? {
+     ObjPtr pAddr = ParseRpcfAddr( yytext, pCtx );
+     if( pAddr.IsEmpty() )
+         return YYerror;
+     yylval->get()->first = pAddr;
+     return TOK_RPCF_ADDR;
+ }
 
-{IDENTIFIER} { yylval = strdup(yytext); return TOK_ID; }
+{IDENTIFIER} { yylval->get()->first = yytext; return TOK_ID; }
 
     /* Entry into Native ST Comment (* ... *) */
 "(*"            { comment_depth = 1; BEGIN(ST_COMM); }
@@ -263,7 +312,8 @@ int comment_depth = 0;
                 }
     "/*"        { /* Optional: handle C-style nested inside ST */ }
     "*/"        { /* Optional: handle C-style nested inside ST */ }
-    .|\n        { /* Ignore all other characters */ }
+    .           {}
+    "\n"        { yyset_column( 1, yyscanner ); }
 }
 
     /* C-Style Comment Logic */
@@ -275,13 +325,17 @@ int comment_depth = 0;
                 }
     "(*"        { /* Optional: handle ST nested inside C-style */ }
     "*)"        { /* Optional: handle ST nested inside C-style */ }
-    .|\n        { /* Ignore all other characters */ }
+    .           { /* Ignore all other characters */ }
+    "\n"        { yyset_column( 1, yyscanner ); }
 }
 
     /* --- Single Line Comment // ... --- */
 <SINGLE_COMM>{
-    \n          { BEGIN(INITIAL); }
-    .           { /* Ignore until end of line */ }
+    "\n"          {
+          BEGIN(INITIAL);
+          yyset_column( 1, yyscanner );
+    }
+    .     { /* Ignore until end of line */ }
 }
 
     /* --- Error Handling for Unclosed Comments --- */
@@ -299,11 +353,11 @@ int comment_depth = 0;
 ";"                 return TOK_SEMICOLON;
 ":"                 return TOK_COLON;
 ","                 return TOK_COMMA;
-"+"                 return TOK_PLUS;
+"+"                 return TOK_ADD;
 "-"                 return TOK_MINUS;
 "**"                return TOK_POWER;
-"*"                 return TOK_MULTIPLY;
-"/"                 return TOK_DIVIDE;
+"*"                 return TOK_MUL;
+"/"                 return TOK_DIV;
 "["                 return TOK_LBRACKET;
 "]"                 return TOK_RBRACKET;
 "{"                 return TOK_LBRACE; 
@@ -317,11 +371,33 @@ int comment_depth = 0;
 "#"                 return TOK_PUNC;
 "^"                 return TOK_CARET;
 
-[ \t\n]+        ; /* Ignore whitespace */
-.               { fprintf(stderr, "Unknown character: %s\n", yytext); }
+[ \t]+        ; /* Ignore whitespace */
+[\n]           { yyset_column( 1, yyscanner ); }
+.              {
+        fprintf(stderr, "Unknown character: %s\n", yytext);
+        yyterminate();
+        }
 
+<<EOF>> {
+    do{
+        yypop_buffer_state( yyscanner );
+        if ( !YY_CURRENT_BUFFER )
+            break;
+
+        if( pCtx->m_vecFileStack.empty() )
+            break;
+
+        FILECTX2* pFileCtx =
+            pCtx->m_vecFileStack.back().get();
+        YYLTYPE oloc = pFileCtx->m_oLocation;
+        yyset_lineno( oloc.last_line, yyscanner );
+        yyset_column( oloc.last_column, yyscanner );
+        pCtx->m_strCurFile = pFileCtx->m_strPath;
+        pCtx->m_vecFileStack.pop_back();
+        // tell the caller to retry
+        return YYEMPTY;
+    }while( 0 );
+    yyterminate();
+}
 %%
 
-int yywrap() {
-    return 1;
-}

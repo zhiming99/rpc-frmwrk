@@ -650,9 +650,9 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
     const Variant& value /*[ In ]*/ )
 {
     gint32 ret = 0;
+    std::vector< stdstr > vecComps;
     do{
         stdstr strPath = "/" APPS_ROOT_DIR "/";
-        std::vector< stdstr > vecComps;
         ret = SplitPath( strAttrPath, vecComps );
         if( ERROR( ret ) )
         {
@@ -671,9 +671,51 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" + strAttr; 
-        ret = m_pAppRegfs->SetValue(
-            strAttrVal, value );
+
+        auto iType = value.GetTypeId();
+        if( iType < typeDMsg )
+        {
+            ret = m_pAppRegfs->SetValue(
+                strAttrVal, value );
+        }
+        else if( iType == typeByteArr )
+        {
+            auto pBuf = ( const BufPtr& )value;
+            if( pBuf.IsEmpty() || pBuf->empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            guint32 dwSize = pBuf->size();
+            if( dwSize > MAX_FILE_SIZE )
+            {
+                ret = -ERANGE;
+                break;
+            }
+
+            RFHANDLE hFile;
+            ret = m_pAppRegfs->OpenFile(
+                strAttrVal, O_WRONLY | O_TRUNC,
+                hFile );
+            if( ERROR( ret ) )
+                break;
+            CFileHandle ofh( m_pAppRegfs, hFile );
+            ret = m_pAppRegfs->WriteFile( hFile,
+                pBuf->ptr(), dwSize, 0 );
+        }
+        else
+        {
+            ret = -ENOTSUP;
+        }
     }while( 0 );
+    if( ERROR( ret ) && vecComps.size() >= 3 )
+    {
+        OutputMsg( ret,
+            "Error SetAttrValue %s/%s/%s",
+            vecComps[0].c_str(),
+            vecComps[1].c_str(),
+            vecComps[2].c_str() );
+    }
     return ret;
 }
 /* Async Req Handler*/
@@ -683,10 +725,9 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
     Variant& rvalue /*[ Out ]*/ )
 {
     gint32 ret = 0;
+    std::vector< stdstr > vecComps;
     do{
         stdstr strPath = "/" APPS_ROOT_DIR "/";
-
-        std::vector< stdstr > vecComps;
         ret = SplitPath( strAttrPath, vecComps );
         if( ERROR( ret ) )
         {
@@ -706,7 +747,45 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
             strPoint + "/" + strAttr; 
         ret = m_pAppRegfs->GetValue(
             strAttrVal, rvalue );
+        if( SUCCEEDED( ret ) )
+            break;
+        if( ret == -ENODATA )
+        {
+            // test if a large value
+            RFHANDLE hFile;
+            ret = m_pAppRegfs->OpenFile(
+                strAttrVal, O_WRONLY | O_TRUNC,
+                hFile );
+            if( ERROR( ret ) )
+                break;
+            CFileHandle ofh( m_pAppRegfs, hFile );
+            struct stat st;
+            ret = m_pAppRegfs->GetAttr( hFile, st );
+            if( ERROR( ret ) )
+                break;
+            guint32 dwSize = st.st_size;
+            if( dwSize == 0 )
+            {
+                ret = -ENODATA;
+                break;
+            }
+            BufPtr pBuf( true );
+            pBuf->Resize( dwSize );
+            ret = m_pAppRegfs->ReadFile( hFile,
+                pBuf->ptr(), dwSize, 0 );
+            if( ERROR( ret ) )
+                break;
+            rvalue = pBuf;
+        }
     }while( 0 );
+    if( ERROR( ret ) && vecComps.size() >= 3 )
+    {
+        OutputMsg( ret,
+            "Error SetAttrValue %s/%s/%s",
+            vecComps[0].c_str(),
+            vecComps[1].c_str(),
+            vecComps[2].c_str() );
+    }
     return ret;
 }
 

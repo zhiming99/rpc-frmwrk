@@ -36,8 +36,8 @@ namespace rpcf
 {
 
 // rpc-frmwrk components, last allocation was from
-// rpc/ratlimit.h
-#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 100 )
+// stparser/stclsids.h
+#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 200 )
 
 // last allocation was from fastrpc.h
 #define PROPIDS_ALLOCATED   ( propReservedEnd + 140 )
