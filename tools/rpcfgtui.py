@@ -290,6 +290,14 @@ class MenuDialog:
                             conn_params['EnableWS'] = state
                         elif label == _("Enable Authentication"):
                             conn_params['HasAuth'] = state
+                            if state == 'true' and conn_params.get('EnableSSL', 'false') == 'false':
+                                raise ValueError(_("Authentication requires SSL to be enabled"))
+                            if state == 'true':
+                                oSecurity = self.initCfg.get('Security', {})
+                                authInfo = oSecurity.get('AuthInfo', {})
+                                authMech = authInfo.get('AuthMech', None)
+                                if authMech is not None:
+                                    conn_params['AuthMech'] = authMech
                         elif label == _("Enable Flow Control"):
                             conn_params['EnableBPS'] = state
             for conn in oConnParams[:]:
@@ -738,17 +746,17 @@ class MenuDialog:
                     keyFile = widget.edit_text.strip()
                     if not os.access( keyFile, os.R_OK ):
                         raise Exception( _("Error key file is not accessible") )
-                    sslFiles['KeyFile'] = keyFile
+                    sslFiles['KeyFile'] = os.path.abspath( keyFile )
                 elif label == _("Cert File :"):
                     certFile = widget.edit_text.strip()
                     if not os.access( certFile, os.R_OK ):
                         raise Exception( _("Error cert file is not accessible") )
-                    sslFiles['CertFile'] = certFile
+                    sslFiles['CertFile'] = os.path.abspath( certFile )
                 elif label == _("CACert File :"):
                     certsFile = widget.edit_text.strip()
                     if len( certsFile ) > 0 and not os.access( certsFile, os.R_OK ):
                         raise Exception( _("Error CA Cert file is not accessible") )
-                    sslFiles['CACertFile'] = certsFile
+                    sslFiles['CACertFile'] = os.path.abspath( certsFile )
                 elif label == _("OA2Checker Ip :"):
                     authInfo['OA2ChkIp'] = widget.edit_text.strip()
                 elif label == _("OA2Checker Port :"):
@@ -815,16 +823,29 @@ class MenuDialog:
                     oMisc['KinitProxy' ] = "true" if widget.get_state() else "false"
 
         # Determine AuthMech based on which fields are filled or which checkboxes are checked
+        curAuthMech = None
         for authMech in self.authMechs:
             if authMech.base_widget.get_state():
                 label = authMech.base_widget.get_label().strip()
                 if label == _("SimpAuth"):
                     authInfo['AuthMech'] = 'SimpAuth'
+                    curAuthMech = 'SimpAuth'
                 elif label == _("Kerberos"):
                     authInfo['AuthMech'] = 'krb5'
+                    curAuthMech = 'krb5'
                 elif label == _("OAuth2"): 
                     authInfo['AuthMech'] = 'OAuth2'
+                    curAuthMech = 'OAuth2'
                 break
+        oConnParams = self.initCfg.get('Connections', [])
+        for conn in oConnParams:
+            if conn.get( 'HasAuth', 'false') == 'true':
+                conn['AuthMech'] = curAuthMech if curAuthMech is not None else "SimpAuth"  # default to SimpAuth if no auth mech is selected
+
+        oSecurity['SSLCred'] = sslFiles
+        oSecurity['AuthInfo'] = authInfo
+        oSecurity['misc'] = oMisc
+        self.initCfg['Security'] = oSecurity  # ensure the Security section is in the config
 
     def update_security_config(self, button):
         if button.get_label() != _("Return to Previous Level"):
