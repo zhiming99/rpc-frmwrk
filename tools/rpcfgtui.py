@@ -739,22 +739,32 @@ class MenuDialog:
         authInfo = oSecurity.get('AuthInfo', {})
         secItems = self.oSecWidgets
         oMisc = oSecurity.get( 'misc', {} )
+
+        oConnParams = self.initCfg.get('Connections', [])
+        for conn in oConnParams:
+            if conn.get( 'HasAuth', 'false') == 'true':
+                conn['AuthMech'] = curAuthMech if curAuthMech is not None else "SimpAuth"  # default to SimpAuth if no auth mech is selected
+            if conn.get( 'EnableSSL', 'false') == 'true':
+                bSSL = True
+            else:
+                bSSL = False
+
         for widget in secItems:
             if isinstance(widget, urwid.Edit):
                 label = widget.caption.strip()
                 if label == _("Key File :"):
                     keyFile = widget.edit_text.strip()
-                    if not os.access( keyFile, os.R_OK ):
+                    if bSSL and not os.access( keyFile, os.R_OK ):
                         raise Exception( _("Error key file is not accessible") )
                     sslFiles['KeyFile'] = os.path.abspath( keyFile )
                 elif label == _("Cert File :"):
                     certFile = widget.edit_text.strip()
-                    if not os.access( certFile, os.R_OK ):
+                    if bSSL and not os.access( certFile, os.R_OK ):
                         raise Exception( _("Error cert file is not accessible") )
                     sslFiles['CertFile'] = os.path.abspath( certFile )
                 elif label == _("CACert File :"):
                     certsFile = widget.edit_text.strip()
-                    if len( certsFile ) > 0 and not os.access( certsFile, os.R_OK ):
+                    if bSSL and len( certsFile ) > 0 and not os.access( certsFile, os.R_OK ):
                         raise Exception( _("Error CA Cert file is not accessible") )
                     sslFiles['CACertFile'] = os.path.abspath( certsFile )
                 elif label == _("OA2Checker Ip :"):
@@ -837,13 +847,9 @@ class MenuDialog:
                     authInfo['AuthMech'] = 'OAuth2'
                     curAuthMech = 'OAuth2'
                 break
-        oConnParams = self.initCfg.get('Connections', [])
-        for conn in oConnParams:
-            if conn.get( 'HasAuth', 'false') == 'true':
-                conn['AuthMech'] = curAuthMech if curAuthMech is not None else "SimpAuth"  # default to SimpAuth if no auth mech is selected
-
         oSecurity['SSLCred'] = sslFiles
-        oSecurity['AuthInfo'] = authInfo
+        if authInfo:
+            oSecurity['AuthInfo'] = authInfo
         oSecurity['misc'] = oMisc
         self.initCfg['Security'] = oSecurity  # ensure the Security section is in the config
 
