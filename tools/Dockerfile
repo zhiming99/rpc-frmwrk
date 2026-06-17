@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:24.04
 MAINTAINER woodhead99@gmail.com
 RUN apt-get update
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata locales apt-utils
@@ -16,27 +16,32 @@ CMD bash /root/initkrb5.sh || exit 1
 CMD kinit -k -t /etc/krb5.keytab zhiming || exit 2
 
 RUN apt-get install -y --fix-missing gcc g++ python3 python3-dev python3-pip python3-build flex bison \
-libtool shtool automake autoconf autotools-dev make dbus dbus-bin \
+libtool shtool automake autoconf autotools-dev make dbus dbus-bin python3-venv \
 libdbus-1-dev libjsoncpp-dev libkrb5-dev \
 liblz4-dev lz4 openssl libssl-dev libcppunit-dev \
 libfuse3-dev fuse3 bash net-tools procps swig cmake attr \
 libcommons-cli-java curl figlet python3-urwid gettext
-RUN apt-get install -y openjdk-8-jdk-headless || apt-get install -y \
-    openjdk-11-jdk-headless || apt-get install -y openjdk-17-jdk-headless 
+RUN apt-get install -y default-jdk-headless || apt-get install -y openjdk-8-jdk-headless
 
+# Create our clean sandbox environment 
+RUN python3 -m venv /opt/venv
+
+# Inject the environment paths globally for all future layers and execution tasks
+ENV PATH="/opt/venv/bin:$PATH"
 
 # ubuntu 22.04's official version of nodejs is outdated, lets install node 20 from nodejs'
 # site instead.
-ENV NVM_DIR="${HOME}/.nvm"
+ENV NVM_DIR="/root/.nvm"
 
 RUN success="false";for i in $(seq 1 100);do \
-    if ! curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash; then continue; fi; \
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; \ 
+    if ! curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash; then sleep 1; continue; fi; \
+    [ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"; \ 
     if nvm install 20 && node -v && nvm list; then success="true";break;fi;\
     done; \
     if [[ "$success" == "false" ]]; then echo -e "\e[33mcannot download nvm and nodejs..., disable JS support\e[0m"; touch ${HOME}/nojs; fi
 
-RUN apt-get -y install sip-tools python3-sipbuild || apt-get -y install sip-dev python3-sip python3-sip-dev || true
+RUN pip install --upgrade pip && pip install sip
+
 RUN apt-get -y install git devscripts debhelper expect vim screen tmux iputils-ping;
 RUN cd ${HOME};for i in $(seq 1 100);do if git clone 'https://github.com/zhiming99/GmSSL.git'; then break; fi;done
 RUN cd ${HOME};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
