@@ -56,6 +56,9 @@ genpipopt:
         echo Warning: break-system-packages enabled; \
     fi;
 
+# check if venv is enabled, and supress --user option if venv is active.
+useropt = $(shell python3 -c "import os; print('' if 'VIRTUAL_ENV' in os.environ else '--user')")
+
 install: genpipopt
 	@if [ "x$(DESTDIR)" != "x" ];then \
         cp rpcf/$(PYTHON_EXT) ./$(PYTHON_EXT).bak; \
@@ -73,9 +76,9 @@ install: genpipopt
 	if [ "x$(DESTDIR)" == "x" ]; then \
 		echo destdir is $(DESTDIR);\
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip3 install ${pipopt} --force-reinstall --user $${pkg};\
+			pip3 install ${pipopt} --force-reinstall $(useropt) $${pkg};\
 		else \
-			su -c "pip3 install ${pipopt} --force-reinstall --user $${pkg}" $${SUDO_USER};\
+			su -c "pip3 install ${pipopt} --force-reinstall $(useropt) $${pkg}" $${SUDO_USER};\
 		fi; \
 	else\
         mv ./$(PYTHON_EXT).bak rpcf/$(PYTHON_EXT); \
