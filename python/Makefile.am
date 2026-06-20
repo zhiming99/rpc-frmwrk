@@ -23,7 +23,7 @@ all:
 	@if echo "$(COMMON_LINK)" | grep "latomic"; then export ARMBUILD="1"; else export ARMBUILD="0";fi;\
 	if [ "x$(SIPVER)" == "x5" ]; then \
         FUSE3="$(LINK_FUSE)" bash gentoml.sh $(libdir);\
-		CXXFLAGS= sip-build --verbose --build-dir ./sipbuild; \
+		CXXFLAGS= python3 -m sipbuild.tools.build --verbose --build-dir ./sipbuild; \
         rm -f rpcf/rpcbase*.so*;\
 		sofile=$$(find ./sipbuild -name $(PYTHON_EXT1));\
         cp `pwd`/$${sofile} rpcf/$(PYTHON_EXT) ;\
@@ -47,7 +47,7 @@ all:
 genpipopt:
 	$(eval pipopt=$(shell os_name=$$(grep '^ID=' /etc/os-release | awk -F'=' '{print $$2}');\
     os_version=$$(grep '^VERSION_ID=' /etc/os-release | awk -F'=' '{print $$2}' | tr -d '"');\
-    if [[ "x$${os_name}" == "xdebian" ]] || [[ "x$${os_name}" == "xRaspbian" ]]; then \
+    if [[ "x$${os_name}" == "xdebian" ]] || [[ "x$${os_name}" == "xraspbian" ]]; then \
         echo $$(if awk "BEGIN{ exit $${os_version} >= 12?0:1}";then echo '--break-system-packages';else echo ''; fi); \
     elif [ "x$${os_name}" == "xubuntu" ]; then \
         echo $$(if awk "BEGIN{ exit $${os_version} >= 23?0:1}";then echo '--break-system-packages';else echo ''; fi); \
@@ -55,6 +55,9 @@ genpipopt:
 	@if [ "x${pipopt}" != "x" ]; then \
         echo Warning: break-system-packages enabled; \
     fi;
+
+# check if venv is enabled, and supress --user option if venv is active.
+useropt = $(shell python3 -c "import os; print('' if 'VIRTUAL_ENV' in os.environ else '--user')")
 
 install: genpipopt
 	@if [ "x$(DESTDIR)" != "x" ];then \
@@ -73,9 +76,9 @@ install: genpipopt
 	if [ "x$(DESTDIR)" == "x" ]; then \
 		echo destdir is $(DESTDIR);\
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip3 install ${pipopt} --force-reinstall --user $${pkg};\
+			pip3 install ${pipopt} --force-reinstall $(useropt) $${pkg};\
 		else \
-			su -c "pip3 install ${pipopt} --force-reinstall --user $${pkg}" $${SUDO_USER};\
+			su -c "pip3 install ${pipopt} --force-reinstall $(useropt) $${pkg}" $${SUDO_USER};\
 		fi; \
 	else\
         mv ./$(PYTHON_EXT).bak rpcf/$(PYTHON_EXT); \
