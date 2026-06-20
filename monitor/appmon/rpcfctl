@@ -57,6 +57,22 @@ function is_app_online()
     return $ret
 }
 
+function wait_app_offline()
+{
+    local ticks=10
+    local appname=$1
+    while is_app_online $appname > /dev/null ; do
+        echo waiting app $appname offline...
+        sleep 1
+        (( ticks-- ))
+        if (( $ticks == 0 )); then
+            echo Error waiting  "$appname" offline
+            exit 110
+        fi
+    done
+    return 0
+}
+
 case "$cmd" in
     config | cfg)
         if [[ -f $tooldir/rpcfg.py ]]; then
@@ -103,9 +119,8 @@ case "$cmd" in
                 echo "Error bad working directory to start $appname"
                 exit 1
             fi
-            cd $working_dir || exit 1
             echo $cmdline
-            setsid -f $cmdline > /dev/null 2>&1
+            cd $working_dir && setsid -f $cmdline > /dev/null 2>&1
         done
         ;;
     stop)
@@ -166,8 +181,17 @@ case "$cmd" in
             exit 1
         fi
         appname="$1"
+        rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "restarting app $appname"
         bash $script_dir/rpcfctl stop $appname
-        bash $script_dir/rpcfctl start $appname
+        if wait_app_offline $appname; then
+            if ! bash $script_dir/rpcfctl start $appname; then
+                rpcf_sendlog -f rpcfctl -l 254 -t ERROR -n rpcfctl -p $$ "failed to start app $appname($?)"
+            else
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "successfully restarted app $appname"
+            fi
+        else
+            rpcf_sendlog -f rpcfctl -l 254 -t ERROR -n rpcfctl -p $$ "failed to stop app $appname"
+        fi
         ;;
     status)
         if [[ $# -lt 1 ]]; then

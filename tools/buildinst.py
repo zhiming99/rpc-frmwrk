@@ -34,7 +34,7 @@ for i in $paths; do
 done
 
 if [ "x$rpcfgnui" == "x" ]; then
-    $rpcfgnui="/usr/local/bin/rpcf/rpcfgnui.py"
+    rpcfgnui="/usr/local/bin/rpcf/rpcfgnui.py"
     if [ ! -f $rpcfgnui ]; then
         exit 1
     fi       

@@ -1134,9 +1134,9 @@
                 let range = this.getAttribute('data-range');
                 // Call your log download and showTimeSeriesModal logic here
                 let timeRangeSec = 0;
-                if (range === '1h') timeRangeSec = 400;
-                else if (range === '2h') timeRangeSec = 4000;
-                else if (range === '3h') timeRangeSec = 40000;
+                if (range === '1h') timeRangeSec = 200;
+                else if (range === '2h') timeRangeSec = 2000;
+                else if (range === '3h') timeRangeSec = 20000;
                 else timeRangeSec = 0; // 0 means full log
 
                 var oContext = {};

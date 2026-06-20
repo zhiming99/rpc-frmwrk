@@ -1,0 +1,2 @@
+#!/bin/sh
+ridlc --server -m thermometer -psO . ../../hellowld.ridl 

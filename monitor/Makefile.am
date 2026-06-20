@@ -3,3 +3,4 @@ if ENABLE_JS
 SUBDIRS += oinit
 endif
 SUBDIRS += appmon
+SUBDIRS += stparser

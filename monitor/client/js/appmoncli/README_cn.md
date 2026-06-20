@@ -16,10 +16,12 @@
       * 可以在生成业务服务器框架代码的`ridlc`的命令行加上 `-m <应用名称>`，更新相关的代码。该选项只影响服务器端代码。
       * 使用命令`rpcfctl addapp <应用名称>`注册该程序。
       * 手工运行一次该服务器，以便其注册启动信息和其他一些实例信息。
-      * 此时该应用已经可以通过监视器网页进行监控了。zhiming99/django-oa2cli-cgi/general:SimpAuth-https-2
+      * 此时该应用已经可以通过监视器网页进行监控了。
       * 关于如何定制监视的内容，不久将会有新的文章进行叙述，请耐心等待。
-   * `zhiming99/django-oa2cli-cgi:SimpAuth-https-2`是一个docker镜像，有最新的监视器的演示程序。使用`docker pull`可下载使用。
-   * 下面是监视器程序的一些用户界面：
+   * 如果觉得上面的步骤麻烦，也可以下载docker镜像`zhiming99/django-oa2cli-cgi:SimpAuth-https-2`，有最新的监视器的演示程序。
+   * 也可以使用docker镜像`zhiming99/rpc-frmwrk:server`，这是一个开发环境，可以更方便的进行系统的定制。
+   * 有关`rpc-frmwrk`的构建和配置可以参考这篇[文章](../../../../docs/Tut-HowToBuild_cn-9.md)   
+   #### 下面是监视器程序的一些用户界面：
    * 登陆界面   
    ![login](../../../../pics/mon-login.png)
    * 主界面   

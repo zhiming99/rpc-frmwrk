@@ -450,20 +450,23 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
         struct stat stBuf;
         gint32 iFd = pAlloc->GetFd();
         fstat( iFd, &stBuf );
-        if( stBuf.st_size - dwMaxAlloced * GROUP_SIZE >
-            ( SUPER_BLOCK_SIZE + GRPBMP_SIZE ) )
+        if( stBuf.st_size - ( ( guint64 )dwMaxAlloced ) *
+            GROUP_SIZE > ( SUPER_BLOCK_SIZE + GRPBMP_SIZE ) )
         {
-            guint64 qwGrps = dwMaxAlloced * GROUP_SIZE;
+            guint64 qwGrps =
+                ( ( guint64 )dwMaxAlloced )* GROUP_SIZE;
             OutputMsg2( 0,
                 "Warning registry occupied more "
                 "space than needed, allocated bytes "
                 "%lld, reg size %lld, ",
                 qwGrps, stBuf.st_size );
         }
-        else if( dwMaxAlloced * GROUP_SIZE - stBuf.st_size >
-            GROUP_SIZE - SUPER_BLOCK_SIZE - GRPBMP_SIZE )
+        else if( ( ( guint64 )dwMaxAlloced ) * GROUP_SIZE -
+            stBuf.st_size > GROUP_SIZE - SUPER_BLOCK_SIZE -
+            GRPBMP_SIZE )
         {
-            guint64 qwGrps = dwMaxAlloced * GROUP_SIZE;
+            guint64 qwGrps =
+                ( ( guint64 )dwMaxAlloced ) * GROUP_SIZE;
             OutputMsg2( 0,
                 "Warning registry size is too "
                 "small to hold all the block "
