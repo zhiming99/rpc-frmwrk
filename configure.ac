@@ -91,9 +91,9 @@ case $enable_python in
     AC_CHECK_PROG([python3], python3, yes)
     AC_CHECK_PROG([sipbuild], [sip-build], yes)
     AC_CHECK_PROG([sip], [sip], yes)
-    AS_IF( [ test x$ac_cv_prog_python3 = xno ],
+    AS_IF( [ test "x$python3" = "xno" ],
         [ AC_MSG_ERROR(["******Feature 'python' requires python3, but not be found, configure will abort.******"]) ],
-        [ test x$ac_cv_prog_sip = xno -a  x$ac_cv_prog_sipbuild = xno ],
+        [ test "x$sip" = "xno" -a  "x$sipbuild" = "xno" ],
         [ AC_MSG_ERROR(["******Feature 'python' requires sip, but not be found, configure will abort.******"]) ]
         )
     ;;
@@ -105,7 +105,7 @@ case $enable_js in
     yes)
     AC_CHECK_PROG([npm], npm, yes, no)
     AC_CHECK_PROG([node], node, yes, no)
-    AS_IF( [ test x$ac_cv_prog_npm = xno -a x$ac_cv_prog_node = xno ],
+    AS_IF( [ test "x$npm" = "xno" -a "x$node" = "xno" ],
         [ AC_MSG_ERROR(["******Feature 'js' requires npm and node, but not be found, configure will abort.******"]) ]
         )
     ;;
@@ -117,7 +117,7 @@ case $enable_java in
     yes)
     AC_CHECK_PROG([javac],javac,yes, no)
     AC_CHECK_PROG([swig], swig, yes, no)
-    AS_IF( [ test x$ac_cv_prog_javac = xno -a x$ac_cv_prog_swig = xno ],
+    AS_IF( [ test "x$javac" = "xno" -a "x$swig" = "xno" ],
         [ AC_MSG_ERROR(["******Feature 'java' requires Java JDK but not detected, configure will abort.******"]) ]
         )
     ;;
@@ -468,19 +468,19 @@ AC_CONFIG_FILES([Makefile
                  docs/Makefile
                  rpcf.pc ])
 
-AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
-AM_CONDITIONAL([ENABLE_OPENSSL],[test x$enable_openssl = xyes])
-AM_CONDITIONAL([ENABLE_KRB5],[test x$enable_krb5 = xyes])
-AM_CONDITIONAL([ENABLE_AUTH],[test x$enable_krb5 = xyes -o x$enable_js = xyes ])
-AM_CONDITIONAL([ENABLE_GMSSL],[test x$enable_gmssl = xyes])
-AM_CONDITIONAL([ENABLE_FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes -a x$enable_fuse3 = xyes])
-AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
-AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip = xyes])
-AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
-AM_CONDITIONAL([ENABLE_JAVA],[test x$ac_cv_prog_javac = xyes -a x$enable_java = xyes])
-AM_CONDITIONAL([ENABLE_PYTHON],[test \( "x$ac_cv_prog_sip" = "xyes" -o "x$ac_cv_prog_sipbuild" = "xyes" \) -a "x$enable_python" = "xyes"])
-AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
-AM_CONDITIONAL([ENABLE_JS],[test x$ac_cv_prog_npm = xyes -a x$enable_js=xyes ])
+AM_CONDITIONAL([ENABLE_TESTCASES],[test "x$enable_testcases" = "xyes"])
+AM_CONDITIONAL([ENABLE_OPENSSL],[test "x$enable_openssl" = "xyes"])
+AM_CONDITIONAL([ENABLE_KRB5],[test "x$enable_krb5" = "xyes"])
+AM_CONDITIONAL([ENABLE_AUTH],[test "x$enable_krb5" = "xyes" -o "x$enable_js" = "xyes" ])
+AM_CONDITIONAL([ENABLE_GMSSL],[test "x$enable_gmssl" = "xyes"])
+AM_CONDITIONAL([ENABLE_FUSE3],[test "x$ac_cv_lib_fuse3_fuse_mount" = "xyes" -a "x$enable_fuse3" = "xyes"])
+AM_CONDITIONAL([SIPBUILD],[test "x$sipbuild" = "xyes"])
+AM_CONDITIONAL([SIP4],[test "x$sip" = "xyes"])
+AM_CONDITIONAL([SWIG],[test "x$swig" = "xyes"])
+AM_CONDITIONAL([ENABLE_JAVA],[test "x$javac" = "xyes" -a "x$enable_java" = "xyes"])
+AM_CONDITIONAL([ENABLE_PYTHON],[test \( "x$sip" = "xyes" -o "x$sipbuild" = "xyes" \) -a "x$enable_python" = "xyes"])
+AM_CONDITIONAL([BITWIDTH32],[test "x$BITWIDTH" = "x32"])
+AM_CONDITIONAL([ENABLE_JS],[test "x$npm" = "xyes" -a "x$enable_js"="xyes" ])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)

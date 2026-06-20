@@ -24,6 +24,7 @@ libcommons-cli-java curl figlet python3-urwid gettext \
 git devscripts debhelper expect vim screen tmux iputils-ping
 
 RUN apt-get install -y default-jdk-headless || apt-get install -y openjdk-8-jdk-headless
+RUN apt-get install -y sip-tools python3-sipbuild || apt-get install -y sip-dev python3-sip python3-sip-dev || true
 
 # Create our clean sandbox environment 
 RUN python3 -m venv /opt/venv
@@ -50,17 +51,16 @@ RUN cd ${HOME};for i in $(seq 1 100); do if git clone 'https://github.com/zhimin
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
 
-FROM scratch AS debug-checkpoint
-COPY --from=0 / /
-
 RUN if [ -f ${HOME}/nojs ]; then opt='--disable-js'; fi; \
     cd ${HOME}/rpc-frmwrk && bash cfgsel -r $opt && make -j4 && make install;
 
 ENV LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/rpcf:${LD_LIBRARY_PATH}"
+ENV PATH="/opt/venv/bin:$PATH"
 
 ADD ./testcfgs/mincfg.json /root
 RUN python3 /usr/local/bin/rpcf/rpcfgnui.py ${HOME}/mincfg.json
 RUN if [ -f ${HOME}/nojs ]; then echo -e "\e[33mrpc-frmwrk is built without JS support \e[0m"; rm -f ${HOME}/nojs; else cd ${HOME}/rpc-frmwrk; figlet -cm 60 'RPC-FRMWRK ROCKS !';fi
+
 # uncomment the following to start the tests
 #dbus-run-session bash tools/runtest.sh 2 & \
 #dbus-run-session bash tools/runtest.sh 1
