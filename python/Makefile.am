@@ -57,7 +57,8 @@ genpipopt:
     fi;
 
 # check if venv is enabled, and supress --user option if venv is active.
-useropt = $(shell python3 -c "import os; print('' if 'VIRTUAL_ENV' in os.environ else '--user')")
+IS_VENV := $(shell python3 -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')")
+useropt := $(if $(filter false,$(IS_VENV)),--user,)
 
 install: genpipopt
 	@if [ "x$(DESTDIR)" != "x" ];then \
