@@ -39,7 +39,7 @@ RUN pip install --upgrade pip && pip install sip wheel numpy
 
 ARG NODE_MAJOR=24
 
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash -
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
 
 # 3. Install Node.js directly via apt
 RUN apt-get install -y nodejs || touch ${HOME}/nojs
@@ -55,7 +55,6 @@ RUN if [ -f ${HOME}/nojs ]; then opt='--disable-js'; fi; \
     cd ${HOME}/rpc-frmwrk && bash cfgsel -r $opt && make -j4 && make install;
 
 ENV LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/rpcf:${LD_LIBRARY_PATH}"
-ENV PATH="/opt/venv/bin:$PATH"
 
 ADD ./testcfgs/mincfg.json /root
 RUN python3 /usr/local/bin/rpcf/rpcfgnui.py ${HOME}/mincfg.json
