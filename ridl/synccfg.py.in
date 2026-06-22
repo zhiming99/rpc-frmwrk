@@ -125,17 +125,15 @@ def UpdateDrv( sysDrvPath : str ) :
     except Exception as oErr :
         ret = -errno.EFAULT
     finally:
-        if ret < 0 or srcVals is None:
-            return
-        destFp = open( drvFile, 'w' )
-        json.dump( srcVals, destFp, indent = 4)
-        destFp.close()
+        if ret < 0 or srcVals is not None:
+            destFp = open( drvFile, 'w' )
+            json.dump( srcVals, destFp, indent = 4)
+            destFp.close()
 
-        if cliSrcVals is None:
-            return
-        destFp = open( cliDrvFile, 'w' )
-        json.dump( cliSrcVals, destFp, indent = 4 )
-        destFp.close()
+        if cliSrcVals is not None:
+            destFp = open( cliDrvFile, 'w' )
+            json.dump( cliSrcVals, destFp, indent = 4 )
+            destFp.close()
 
 def SyncCfg() :
 
