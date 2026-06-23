@@ -20,17 +20,16 @@ kwargs = {
 
 # 2. Grab the active major version safely as an integer
 setuptools_major = int(setuptools.__version__.split(".")[0])
+kwargs["license"] = "GPL-3.0-only"
 
 # 3. Handle the dynamic version fork seamlessly in pure Python
 if setuptools_major >= 77:
     # Modern layout for Ubuntu 26.04+ (PEP 639 strings)
-    kwargs["license"] = "GPL-3.0-only"
     # Modern setuptools natively tracks license files, but we declare it to match PEP 639
     kwargs["license_files"] = ["LICENSE"]
 else:
     # Legacy fallback for Ubuntu 20.04 / 22.04 / 24.04
     # We pass a clean dict table structure to simulate the old TOML validation rules
-    kwargs["license"] = {"text": "GPL-3.0-only"}
     kwargs["classifiers"] = [
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
     ]
