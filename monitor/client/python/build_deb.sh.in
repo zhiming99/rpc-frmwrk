@@ -85,7 +85,7 @@ echo cp "$WHEEL_FILE" "$DEB_DIR/usr/lib/rpcf"
 cp "$WHEEL_FILE" "$DEB_DIR/usr/lib/rpcf"
 
 # Build the Debian package
-dpkg-deb --build "$DEB_DIR"
+dpkg-deb --root-owner-group --build "$DEB_DIR"
 
 # Clean up
 rm -rf "$DEB_DIR"
