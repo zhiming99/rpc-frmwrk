@@ -2,6 +2,20 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = ["appmancli"]
+
+[tool.setuptools.package-data]
+"appmancli" = ["README.md"]
+
+[project.scripts]
+start_appmancli = "maincli:StartAppManagercli"
+start_timer = "apptimer:StartTimer"
+
+[project.urls]
+Homepage = "@PACKAGE_URL@"
+
+# project must be the last section to append 'dynamic' if necessary
 [project]
 name = "appmancli"
 version = "@VERSION@"
@@ -15,20 +29,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent"
 ]
-license-files = [ "LICENSE" ]
 dependencies = [
     "rpcf >= @VERSION@",
 ]
 
-[tool.setuptools]
-packages = ["appmancli"]
-
-[tool.setuptools.package-data]
-"appmancli" = ["README.md"]
-
-[project.scripts]
-start_appmancli = "maincli:StartAppManagercli"
-start_timer = "apptimer:StartTimer"
-
-[project.urls]
-Homepage = "@PACKAGE_URL@"

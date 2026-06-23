@@ -17,6 +17,9 @@ command := $(if $(filter false,$(IS_VENV)),python3 -m build --wheel --no-isolati
 
 dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/AppManagercli.py appmancli/maincli.py appmancli/apptimer.py
 	cp ../../../../LICENSE ./LICENSE
+	if ! grep 'dynamic = ' pyproject.toml; then \
+	python3 -c "import setuptools; v=int(setuptools.__version__.split('.')[0]); f=open('pyproject.toml', 'a'); f.write('dynamic = [\"license\"]\n') if v>=77 else True; f.close()";\
+    fi;
 	$(command) ;\
     EXIT_CODE=$$? ; \
 	rm -f ./LICENSE ; \
