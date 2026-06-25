@@ -8,6 +8,9 @@ man_MANS=oinit.1
 rev=0
 PACKAGE_NAME=python3-oinit
 
+IS_VENV := $(shell python3 -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')")
+command := $(if $(filter false,$(IS_VENV)),python3 -m build --wheel --no-isolation --outdir dist/ ., pip wheel . --no-deps --no-build-isolation -w dist/ )
+
 deb:
 	echo buiding debian package...
 	if [ -d debpkg ]; then rm -rf debpkg; fi
@@ -30,7 +33,7 @@ rpm:
 	if [ -d rpmpkg ]; then rm -rf rpmpkg; fi
 	if [ ! -d rpmpkg/oinit ]; then mkdir -p rpmpkg/oinit;fi;
 	cp *.py rpmpkg/oinit;mv rpmpkg/oinit/setup.py rpmpkg/; cp README* rpmpkg/oinit; cp oinitdesc.json rpmpkg/oinit
-	pushd rpmpkg; python3 setup.py bdist_wheel; cp dist/*.whl $${HOME}/oinitrpm/SOURCES/;popd
+	pushd rpmpkg; $(command); cp dist/*.whl $${HOME}/oinitrpm/SOURCES/;popd
 	cp oinit.spec $${HOME}/oinitrpm/SPECS
 	pushd $${HOME}/oinitrpm/;if rpmbuild -bb --define "_topdir `pwd`" SPECS/oinit.spec; then cp ./RPMS/noarch/*.rpm $(abs_builddir);fi;popd
 	rm -rf $${HOME}/oinitrpm; rm -rf rpmpkg
@@ -39,17 +42,18 @@ rpm:
 	echo rpm package is generated in 'output' directory.
 
 wheel:
-	if [ ! -d output ]; then mkdir output; fi
+	if [ ! -d output ]; then mkdir output;else rm output/*.whl; fi
 	if [ -d rpmpkg ]; then rm -rf rpmpkg; fi
 	if [ ! -d rpmpkg/oinit ]; then mkdir -p rpmpkg/oinit;fi;
 	cp *.py rpmpkg/oinit;mv rpmpkg/oinit/setup.py rpmpkg/; cp README* rpmpkg/oinit; cp oinitdesc.json rpmpkg/oinit
-	pushd rpmpkg; python3 setup.py bdist_wheel; cp dist/*.whl ../output;popd
+	pushd rpmpkg; $(command); cp dist/*.whl ../output;popd
 	rm -rf rpmpkg
 	echo wheel package is generated in 'output' directory.
 
 localinst:
 	make wheel
-	pip3 install output/*.whl
+    pipopt := $(if $(filter false,$(IS_VENV)),--force-reinstal --user --break-system-packages, )
+	pip3 install $(pipopt) output/*.whl
 
 .PHONY: deb rpm wheel localinst
 
