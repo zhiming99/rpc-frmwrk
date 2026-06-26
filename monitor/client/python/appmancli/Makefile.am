@@ -12,9 +12,18 @@ all: appmancli/__init__.py dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl
 	cp dist/appmancli*.whl ../dist
 
 # Build the Python wheel package
+IS_VENV := $(shell python3 -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')")
+command := $(if $(filter false,$(IS_VENV)),python3 -m build --wheel --no-isolation --outdir dist/ ., pip wheel . --no-deps --no-build-isolation -w dist/ )
+
 dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/AppManagercli.py appmancli/maincli.py appmancli/apptimer.py
-	python3 setup.py bdist_wheel
-#python3 -m build --wheel .
+	cp ../../../../LICENSE ./LICENSE
+	if ! grep 'dynamic = ' pyproject.toml; then \
+	python3 -c "import setuptools; v=int(setuptools.__version__.split('.')[0]); f=open('pyproject.toml', 'a'); f.write('dynamic = [\"license\"]\n') if v>=61 else True; f.close()";\
+    fi;
+	$(command) ;\
+    EXIT_CODE=$$? ; \
+	rm -f ./LICENSE ; \
+	exit $$EXIT_CODE
 
 appmancli/__init__.py:
 	@pushd appmancli; \

@@ -1,3 +1,4 @@
+import setuptools
 from setuptools import setup, find_packages
 import importlib.machinery
 version='@VERSION@'
@@ -9,16 +10,29 @@ kwargs = {
       'author': 'zhiming',
       'author_email':'@PACKAGE_BUGREPORT@',
       'url':'@PACKAGE_URL@',
-      'license':'GPL-3.0',
-      #'include_package_data' : True,
       'zip_safe' : False,
-      #'package_data':{'appmancli': []}
       'entry_points':{
         'console_scripts': [
             'start_appmancli = maincli:StartAppManagercli',
             'start_timer = apptimer:StartTimer',
         ] },
 }
+
+# 2. Grab the active major version safely as an integer
+setuptools_major = int(setuptools.__version__.split(".")[0])
+kwargs["license"] = "GPL-3.0-only"
+
+# 3. Handle the dynamic version fork seamlessly in pure Python
+if setuptools_major >= 77:
+    # Modern layout for Ubuntu 26.04+ (PEP 639 strings)
+    # Modern setuptools natively tracks license files, but we declare it to match PEP 639
+    kwargs["license_files"] = ["LICENSE"]
+else:
+    # Legacy fallback for Ubuntu 20.04 / 22.04 / 24.04
+    # We pass a clean dict table structure to simulate the old TOML validation rules
+    kwargs["classifiers"] = [
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+    ]
 
 setup(**kwargs)
 

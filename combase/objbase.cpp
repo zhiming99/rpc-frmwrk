@@ -1318,13 +1318,12 @@ gint32 CSharedLock::ReleaseWrite()
     else
     {
         m_bWrite = false;
-        while( m_queue.front() == true )
+        while( m_queue.size() &&
+            m_queue.front() == true )
         {
             m_iReadCount++;
             m_queue.pop_front();
             Sem_Post( &m_semReader );
-            if( m_queue.empty() )
-                break;
         }
     }
     return STATUS_SUCCESS;

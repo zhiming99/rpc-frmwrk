@@ -41,7 +41,7 @@
 * [rpcfs文件系统介绍](../fuse/README.md)
 * [rpc模块的架构](../rpc/readme.md)
 * [注册表模块介绍](../monitor/registry/README_cn.md)
-* [rpc-frmwrk监视器的使用方法](../monitor/client/js/appmoncli/README_cn.md)![new](../pics/new.png)
+* [rpc-frmwrk监视器的使用方法](../monitor/client/js/appmoncli/README_cn.md)
 * [概念和名词解释](../Concept_cn.md)
   - [设计思想](../Concept_cn.md#设计思想)
   - [RPC参与方和传输的信息](../Concept_cn.md#rpc参与方和传输的信息)
@@ -79,3 +79,4 @@
   * [教程7-异步编程进阶](./Tut-AsyncProgramming_cn-7.md)
   * [教程8-调试](./Tut-Debug_cn-8.md)
   * [教程9-如何编译rpc-frmwrk](./Tut-HowToBuild_cn-9.md)
+  * [教程10-如何手搓一个观察记录温度的监控程序](../examples/python/thermalog/README_cn.md)![new](../pics/new.png)

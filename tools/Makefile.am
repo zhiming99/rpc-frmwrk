@@ -34,9 +34,10 @@ else
 endif
 
 EXTRA_DIST= $(pysources) README.md README_cn.md runtest.sh.in regtest.sh \
-ridlctst.sh updcfg.py.in Dockerfile.in Dockerfile.arm.in buildall-deb.sh.in \
-buildall-fed.sh.in makerpcf.sh buildall-rasp.sh.in makerpcf-rasp.sh \
-btinrtst.sh $(testcfgfiles) $(runtime_files) rpcfgtui-zh_CN.po 
+ridlctst.sh updcfg.py.in Dockerfile.in Dockerfile.arm.in Dockerfile \
+Dockerfile.arm buildall-deb.sh.in buildall-fed.sh.in makerpcf.sh \
+buildall-rasp.sh.in makerpcf-rasp.sh btinrtst.sh $(testcfgfiles) \
+$(runtime_files) rpcfgtui-zh_CN.po 
 
 locale_rpcfgtui_DATA=rpcfgtui.mo
 locale_rpcfgtuidir=$(localedir)/zh_CN/LC_MESSAGES
