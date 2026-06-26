@@ -510,9 +510,9 @@ case $enable_openssl in
         OPENSSL_RPMFILES='%{_bindir}/rpcf/opensslkey.shZZZZZ%{_libdir}/libsslpt.so*ZZZZZ%{_sysconfdir}/rpcf/openssl.cnf'
         OPENSSL_CFGOPT=
         OPENSSL_DEBLIBS='libssl-dev,'
-        OPENSSL_DEBPKGS='openssl, libssl1.1 | libssl3, expect,'
+        OPENSSL_DEBPKGS='openssl, expect,'
         OPENSSL_RPMLIBS='openssl-devel,'
-        OPENSSL_RPMPKGS='openssl openssl-libs expect'
+        OPENSSL_RPMPKGS='openssl expect'
         enable_websock=yes
         FEATURES+="+openssl "
     ;;
@@ -542,11 +542,11 @@ case $enable_fuse3 in
         FUSE3_RPMLIBS="fuse3-devel,"
         FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcliZZZZZ%{_libdir}/rpcf/librtfiles.so*'
         FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
-        FUSE3_RPMPKGS="fuse3 fuse3-libs"
+        FUSE3_RPMPKGS="fuse3 "
         FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcliZZZZZusr/lib/*/rpcf/librtfiles.so*"
         FUSE3_DEBLIBS=" libfuse3-dev,"
         FUSE3_DEBHEADERS=
-        FUSE3_DEBPKGS="fuse3,libfuse3-3 | libfuse3-4,"
+        FUSE3_DEBPKGS="fuse3,"
         FUSE3_CFGOPT=
         FEATURES+="+fuse3 "
     ;;
@@ -588,11 +588,11 @@ case $enable_java in
     yes)
         JAVA_RPMLIBS="(java >= 1.8.0 or java-latest-openjdk-devel), swig, apache-commons-cli, "
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/*.jar"
-        JAVA_RPMPKGS="(java >= 1.8.0 or java-latest-openjdk) apache-commons-cli "
+        JAVA_RPMPKGS="apache-commons-cli "
         JAVA_RPMPOST="pushd %{_libdir}/rpcf;if [[[ -f rpcbase-${VERSION}.jar ]]];then rm -f rpcbase.jar; ln -s rpcbase-${VERSION}.jar rpcbase.jar;fi;if [[[ -f appmancli-${VERSION}.jar ]]];then rm -f appmancli.jar; ln -s appmancli-${VERSION}.jar appmancli.jar;fi;popd;"
         JAVA_RPMPOSTUN="pushd %{_libdir}/rpcf;rm -f rpcbase.jar appmancli.jar;popd;"
-        JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
-        JAVA_DEBPKGS="openjdk-8-jre-headless |  openjdk-11-jre-headless | default-jre-headless, libcommons-cli-java, "
+        JAVA_DEBLIBS="default-jdk-headless | openjdk-11-jdk-headless | openjdk-8-jdk-headless, swig, libcommons-cli-java, "
+        JAVA_DEBPKGS="libcommons-cli-java, "
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
         JAVA_CFGOPT=
         FEATURES+="+java "
