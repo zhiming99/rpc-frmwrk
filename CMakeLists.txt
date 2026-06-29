@@ -7,6 +7,7 @@ project(rpcf
     LANGUAGES C CXX
 )
 
+
 # --- Replaces AX_CXX_COMPILE_STDCXX(11, ...) ---
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,6 +25,8 @@ configure_file(
 )
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ipc)
 
 # --- Configuration Options (Autotools AC_ARG_ENABLE translations) ---
 
@@ -153,8 +156,9 @@ if(ENABLE_JAVA)
     endif()
 endif()
 
-option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
+#option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
 
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libraries by default")
 # ==============================================================================
 # --- Part 6: Core Library Dependencies (dbus-1, lz4, jsoncpp) ---
 # ==============================================================================
@@ -166,6 +170,7 @@ pkg_check_modules(DBUS REQUIRED IMPORTED_TARGET dbus-1)
 if(DBUS_FOUND)
     # Replaces AC_DEFINE([HAVE_LIBdbus_1], [1])
     set(HAVE_LIBdbus_1 1)
+    include_directories(${DBUS_INCLUDE_DIRS})
 else()
     # Replaces AC_MSG_ERROR
     message(FATAL_ERROR "****** dbus-1 was not found ******")
@@ -177,6 +182,8 @@ pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET liblz4)
 if(NOT LZ4_FOUND)
     # Fallback in case pkg-config package name is just 'lz4'
     pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET lz4)
+else()
+    include_directories(${LZ4_INCLUDE_DIRS})
 endif()
 
 if(LZ4_FOUND)
@@ -192,6 +199,7 @@ pkg_check_modules(JSONCPP IMPORTED_TARGET jsoncpp)
 if(JSONCPP_FOUND)
     # Replaces AC_DEFINE([HAVE_LIBjsoncpp], [1])
     set(HAVE_LIBjsoncpp 1)
+    include_directories(${JSONCPP_INCLUDE_DIRS})
 endif()
 
 # ==============================================================================
@@ -209,6 +217,7 @@ if(ENABLE_OPENSSL)
         set(HAVE_LIBssl 1)
         # Replaces AC_CHECK_HEADERS implicitly setting HAVE_OPENSSL_SSL_H
         set(HAVE_OPENSSL_SSL_H 1)
+        include_directories(${OPENSSL_INCLUDE_DIRS})
     endif()
 endif()
 
@@ -235,6 +244,7 @@ if(ENABLE_KRB5)
         set(HAVE_LIBkrb5 1)
         # Replaces AC_CHECK_HEADERS([gssapi/gssapi_krb5.h])
         set(HAVE_GSSAPI_GSSAPI_KRB5_H 1)
+        include_directories(${KRB5_INCLUDE_DIRS})
     else()
         message(FATAL_ERROR "****** Kerberos (krb5/gssapi) was enabled but could not be found ******")
     endif()
@@ -249,6 +259,7 @@ if(ENABLE_FUSE3)
     if(FUSE3_FOUND)
         # Replaces AC_DEFINE([HAVE_LIBfuse3], [1])
         set(HAVE_LIBfuse3 1)
+        include_directories(${FUSE3_INCLUDE_DIRS})
     else()
         # Replaces AC_MSG_ERROR([fuse3 was not found])
         message(FATAL_ERROR "****** fuse3 was enabled but could not be found ******")
@@ -333,12 +344,19 @@ if(NOT with_sysroot OR "${with_sysroot}" STREQUAL "no")
     )
 
     set(SYSROOT "")
-    set(CXXFLAGS "`pkg-config --cflags ${DEPLIBS_ALL}` -D_USE_LIBEV -I\$(top_srcdir)/include -I\$(top_srcdir)/3rd_party")
-    set(COMMON_LINK         "`pkg-config --libs ${DEPLIBS}`")
-    set(COMMON_LINK_CPPUNIT "`pkg-config --libs ${DEPLIBS_CPPUNIT}`")
-    set(COMMON_LINK_SSL     "`pkg-config --libs ${DEPLIBS_SSL}`")
-    set(COMMON_LINK_KRB5    "`pkg-config --libs ${DEPLIBS_KRB5}`")
-    set(COMMON_LINK_FUSE3   "`pkg-config --libs ${DEPLIBS_FUSE3}`")
+    pkg_check_modules(DEPLIBS REQUIRED ${DEPLIBS})
+    set(COMMON_LINK "${DEPLIBS_LDFLAGS}")
+
+    pkg_check_modules(DEPLIBS_CPPUNIT REQUIRED ${DEPLIBS_CPPUNIT})
+    set(COMMON_LINK_CPPUNIT "${DEPLIBS_CPPUNIT_LDFLAGS}")
+    pkg_check_modules(DEPLIBS_SSL REQUIRED ${DEPLIBS_SSL})
+    set(COMMON_LINK_SSL     "${DEPLIBS_SSL_LDFLAGS}")
+    pkg_check_modules(DEPLIBS_KRB5 REQUIRED ${DEPLIBS_KRB5})
+    set(COMMON_LINK_KRB5    "${DEPLIBS_KRB5_LDFLAGS}")
+    pkg_check_modules(DEPLIBS_FUSE3 REQUIRED ${DEPLIBS_FUSE3})
+    set(COMMON_LINK_FUSE3   "${DEPLIBS_FUSE3_LDFLAGS}")
+    pkg_check_modules(DEPLIBS_ALL REQUIRED ${DEPLIBS_ALL})
+    set(CXXFLAGS "${DEPLIBS_ALL_CFLAGS} -D_USE_LIBEV -I${CMAKE_CURRENT_SOURCE_DIR}/include -I${CMAKE_CURRENT_SOURCE_DIR}/3rd_party")
 
 else()
 
@@ -482,11 +500,8 @@ add_compile_definitions(_GNU_SOURCE=1)
 # Translate Autotools internal .la library references to their CMake static/shared target locations.
 # Note: Instead of using relative file paths like -L, we map them directly to our internal build layout locations.
 set(TSTLDFLG_LIST
-    "${CMAKE_BINARY_DIR}/ipc/libipc.a"
-    "${CMAKE_BINARY_DIR}/combase/libcombase.a"
-    "stdc++"
-    "cppunit"
-    "${COMMON_LINK_CPPUNIT_LIST}" # Extracted cleanly from our Part 12 profiles list array
+    "-lipc -lcombase"
+    ${COMMON_LINK_CPPUNIT} # Expands your external dependencies natively
 )
 
 # Convert our list array into a standard space-separated string required by your downstream .pc templates
@@ -603,7 +618,7 @@ endif()
 
 # 2. --- Replaces VERSION2='$(subst .,:,$(VERSION))' ---
 # Replicates the Autotools string manipulation replacing periods with colons (e.g., 0.9.0 -> 0:9:0)
-string(REPLACE "." ":" VERSION2 "${PROJECT_VERSION}")
+#string(REPLACE "." "." VERSION2 "${PROJECT_VERSION}")
 
 
 # 3. --- Initializes FEATURES Variable ---
@@ -613,7 +628,7 @@ set(FEATURES "")
 # 4. --- Global Cache Variable Registration (Replaces AC_SUBST mappings) ---
 set(ENABLE_AUTH   "${ENABLE_AUTH}"   CACHE INTERNAL "")
 set(BITWIDTH32     "${BITWIDTH32}"     CACHE INTERNAL "")
-set(VERSION2       "${VERSION2}"       CACHE INTERNAL "Version separated by colons")
+set(VERSION2       "${PROJECT_VERSION}"       CACHE INTERNAL "Version number")
 set(FEATURES       "${FEATURES}"       CACHE INTERNAL "" FORCE)
 
 
@@ -710,6 +725,8 @@ else()
     set(FUSE3_CFGOPT     "--disable-fuse3")
     string(APPEND FEATURES "-fuse3 ")
 endif()
+
+find_package(Threads REQUIRED)
 
 # 3. --- Global Cache Variable Registration (Replaces AC_SUBST mappings) ---
 set(WEBSOCK_RPMFILES   "${WEBSOCK_RPMFILES}"   CACHE INTERNAL "")
@@ -1069,10 +1086,41 @@ add_custom_target(rpm
 # --- Integrated CPack Source Archiving (Required for the 'package_source' target) ---
 set(CPACK_SOURCE_GENERATOR "TGZ")
 set(CPACK_SOURCE_PACKAGE_FILE_NAME "${DISTDIR}")
-set(CPACK_SOURCE_IGNORE_FILES
-    "/.git/"
-    "/build/"
-    "${CMAKE_BINARY_DIR}"
-)
+
+# ==============================================================================
+# Git-Driven Source Packaging (Strictly Packages Tracked Files Only)
+# ==============================================================================
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    execute_process(
+        COMMAND git status --porcelain=v1
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE GIT_STATUS
+    )
+    
+    # Optional: Warn the developer if they have uncommitted project files
+    if(GIT_STATUS)
+        message(STATUS "Warning: You have uncommitted or untracked changes in your workspace.")
+    endif()
+
+    # Generate a list of everything to IGNORE by finding untracked files
+    execute_process(
+        COMMAND git ls-files --others --ignored --exclude-standard
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE UNTRACKED_FILES
+    )
+    
+    # Convert newline-separated git output into a CMake regex-ready string list
+    string(REPLACE "\n" ";" UNTRACKED_LIST "${UNTRACKED_FILES}")
+    foreach(_file ${UNTRACKED_LIST})
+        if(_file)
+            # Escape strings to protect special layout characters for CPack regex engine
+            string(REGEX REPLACE "([+*?^$()[\\]|\\\\])" "\\\\\\1" _escaped_file "${_file}")
+            list(APPEND CPACK_SOURCE_IGNORE_FILES "${_escaped_file}$")
+        endif()
+    endforeach()
+endif()
+
+# Fallback basic ignores for standard metadata directories
+list(APPEND CPACK_SOURCE_IGNORE_FILES "/.git/" "/build/" "${CMAKE_BINARY_DIR}")
 include(CPack)
 
