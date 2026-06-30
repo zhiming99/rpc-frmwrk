@@ -7,7 +7,7 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Base Variables Mapping (Inherits from Master Scope)
 # ==============================================================================
-set(include_ipcdir "${PROJECT_SOURCE_DIR}/ipc")
+set(include_ipcdir "${CMAKE_SOURCE_DIR}/ipc")
 
 # Handle 32-bit architecture offsets and macro blocks conditionally
 set(OFFSET_MACRO "")
@@ -48,7 +48,7 @@ set_target_properties(regfs PROPERTIES
 
 # Replaces: libregfs_la_LIBADD
 find_package(Threads REQUIRED)
-target_link_directories(regfs PRIVATE "${PROJECT_SOURCE_DIR}/3rd_party")
+target_link_directories(regfs PRIVATE "${CMAKE_SOURCE_DIR}/3rd_party")
 target_link_libraries(regfs PRIVATE
     combase # Target linking instead of .la asset references
     Threads::Threads
@@ -70,9 +70,9 @@ set(BINARY_LIBS
 )
 
 set(BINARY_LINK_DIRS
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
 )
 
 # --- Target: regfsmnt ---

@@ -7,7 +7,7 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Base Variables Mapping (Inherits from Master Scope)
 # ==============================================================================
-set(mon_dir "${PROJECT_SOURCE_DIR}/monitor")
+set(mon_dir "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # ==============================================================================
 # 2. Shared Library Target (librpcfenc.la)
