@@ -7,22 +7,18 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Base Variables Mapping (Inherits from Master Scope)
 # ==============================================================================
-set(include_dir "${PROJECT_SOURCE_DIR}/ipc")
-set(mon_dir "${PROJECT_SOURCE_DIR}/monitor")
-set(top_dir "${PROJECT_SOURCE_DIR}")
+set(include_dir "${CMAKE_SOURCE_DIR}/ipc")
+set(mon_dir "${CMAKE_SOURCE_DIR}/monitor")
+set(top_dir "${CMAKE_SOURCE_DIR}")
 
 # ==============================================================================
 # 2. Automated Custom Code Generation Target via IDL Compiler (ridlc)
 # ==============================================================================
 # List generated source outputs to establish compile-time tracking chains
 set(GENERATED_OUTPUTS
-    "${CMAKE_CURRENT_BINARY_DIR}/AppManagercli.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/SimpleAuthcli.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/IAppStorecli.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/IDataProducercli.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/IUserManagercli.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/AppManagercli.h"
-    "${CMAKE_CURRENT_BINARY_DIR}/SimpleAuthcli.h"
     "${CMAKE_CURRENT_BINARY_DIR}/IUserManagercli.h"
     "${CMAKE_CURRENT_BINARY_DIR}/IDataProducercli.h"
     "${CMAKE_CURRENT_BINARY_DIR}/IAppStorecli.h"
@@ -32,31 +28,20 @@ set(GENERATED_OUTPUTS
     "${CMAKE_CURRENT_BINARY_DIR}/appmonstruct.h"
 )
 
+set(RIDLC_OPTIONS "ridlc --sync_mode IAppStore=async_p --sync_mode IUserManager=async_p --services=AppManager,SimpleAuth --client -slO \"${CMAKE_CURRENT_BINARY_DIR}\" ${mon_dir}/appmon/appmon.ridl" )
+#message(STATUS "haha")
 # Replicates: appmon.ridl target step cleanly inside the binary output workspace
 add_custom_command(
     OUTPUT ${GENERATED_OUTPUTS}
-    # Verify the native IDL compiler from your repository tree is available
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "
-        if [ ! -f '${PROJECT_BINARY_DIR}/ridl/ridlc' ] && [ ! -f '${top_dir}/ridl/ridlc' ]; then
-            echo 'ridlc tool executable not discovered! Please verify components building architecture sequencing.';
-            exit 1;
-        fi
-    "
+
     # Stage auxiliary configuration generation assets cleanly inside localized folders
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${top_dir}/ridl/mktpl" "${top_dir}/ridl/mktplsvr" "${top_dir}/ridl/mktplcli"
         "${top_dir}/ridl/drvtpl.json" "${top_dir}/ridl/odesctpl2.json" "${top_dir}/ridl/synccfg.py"
         "${CMAKE_CURRENT_BINARY_DIR}/"
-        
-    # Fire compiler execution rules tracking library mapping configurations
-    COMMAND ${CMAKE_COMMAND} -E env 
-        LD_LIBRARY_PATH="${PROJECT_BINARY_DIR}/combase:${top_dir}/combase:\$ENV{LD_LIBRARY_PATH}"
-        "${top_dir}/ridl/ridlc" 
-        --sync_mode IAppStore=async_p 
-        --sync_mode IUserManager=async_p 
-        --services=AppManager,SimpleAuth 
-        --client -slO "${CMAKE_CURRENT_BINARY_DIR}" 
-        "${mon_dir}/appmon/appmon.ridl"
+
+    COMMAND bash -lc "${RIDLC_OPTIONS}"
+    DEPENDS "${mon_dir}/appmon/appmon.ridl" ridlc
         
     # Purge intermediate boilerplate setup files safely
     COMMAND ${CMAKE_COMMAND} -E rm -f 

@@ -7,7 +7,7 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Base Variables Mapping (Inherits from Master Scope)
 # ==============================================================================
-set(ridl_file "${PROJECT_SOURCE_DIR}/monitor/appmon/appmon.ridl")
+set(ridl_file "${CMAKE_SOURCE_DIR}/monitor/appmon/appmon.ridl")
 set(archive_name "appmonui.tar.gz")
 
 set(auto_files
@@ -35,28 +35,26 @@ foreach(_file ${auto_files})
     list(APPEND GENERATED_JS_FILES "${CMAKE_CURRENT_BINARY_DIR}/${_file}")
 endforeach()
 
+set(RIDLC_COMMAND "ridlc --noreadme --services=AppMonitor -sJO . ${ridl_file}" )
 add_custom_command(
     OUTPUT ${GENERATED_JS_FILES}
     # Stage boilerplate code-generation templates securely into the binary directory
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${PROJECT_SOURCE_DIR}/ridl/mktpl" "${PROJECT_SOURCE_DIR}/ridl/mktplsvr" 
-        "${PROJECT_SOURCE_DIR}/ridl/mktplcli" "${PROJECT_SOURCE_DIR}/ridl/drvtpl.json" 
-        "${PROJECT_SOURCE_DIR}/ridl/odesctpl2.json" "${PROJECT_SOURCE_DIR}/ridl/synccfg.py"
+        "${CMAKE_SOURCE_DIR}/ridl/mktpl" "${CMAKE_SOURCE_DIR}/ridl/mktplsvr" 
+        "${CMAKE_SOURCE_DIR}/ridl/mktplcli" "${CMAKE_SOURCE_DIR}/ridl/drvtpl.json" 
+        "${CMAKE_SOURCE_DIR}/ridl/odesctpl2.json" "${CMAKE_SOURCE_DIR}/ridl/synccfg.py"
         "${CMAKE_CURRENT_BINARY_DIR}/"
         
     # Execute internal IDL tool compiler mapping environments
-    COMMAND ${CMAKE_COMMAND} -E env 
-        LD_LIBRARY_PATH="${PROJECT_BINARY_DIR}/combase:${PROJECT_SOURCE_DIR}/combase:\$ENV{LD_LIBRARY_PATH}"
-        "${PROJECT_SOURCE_DIR}/ridl/ridlc" 
-        --noreadme --services=AppMonitor -sJO . "${ridl_file}"
-        
+    COMMAND bash -lc "${RIDLC_COMMAND}"
+    DEPENDS "${ridl_file}" ridlc
+
     # Clean up intermediate configuration logs
     COMMAND ${CMAKE_COMMAND} -E rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json
     
     # Run downstream profile data updating wrapper
-    COMMAND python3 "${PROJECT_SOURCE_DIR}/monitor/appmon/upddesc.py"
+    COMMAND python3 "${CMAKE_SOURCE_DIR}/monitor/appmon/upddesc.py"
     
-    DEPENDS "${ridl_file}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Compiling JavaScript AppMonitor IDL Interfaces via ridlc"
 )
@@ -67,6 +65,9 @@ add_custom_target(generate_appmon_js_cli DEPENDS ${GENERATED_JS_FILES})
 # 3. Webpack Compilation Pipeline Target (dist/appmon.js)
 # ==============================================================================
 # Replicates: dist/appmon.js: $(auto_files) maincli.js AppMonitorcli.js
+
+set(PACKAGING_COMMAND "if [[ \"${CMAKE_BUILD_TYPE}\" == \"Debug\" ]]; then make -f Makefile.skel debug; else make -f Makefile.skel release; fi" )
+
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/dist/appmon.js"
     # Replicate tracking configurations from source into binary playground
@@ -74,16 +75,16 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/webpack.config.js" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/maincli.js" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/AppMonitorcli.js" "${CMAKE_CURRENT_BINARY_DIR}/"
+    COMMAND bash -lc "tar zxf ${CMAKE_BINARY_DIR}/js/rpcbase.js.tar.gz -C ${CMAKE_BINARY_DIR}/js "
+    VERBATIM
     
     # Replicates condition: if echo $(CPPFLAGS) | grep 'DDEBUG'; then ...
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "
-        if [[ \"\${CMAKE_BUILD_TYPE}\" == \"Debug\" ]]; then
-            make -f Makefile.skel debug;
-        else
-            make -f Makefile.skel release;
-        fi
-    "
+    COMMAND bash -lc "${PACKAGING_COMMAND}"
+    VERBATIM
     DEPENDS ${GENERATED_JS_FILES} "${CMAKE_CURRENT_SOURCE_DIR}/maincli.js" "${CMAKE_CURRENT_SOURCE_DIR}/AppMonitorcli.js"
+
+    COMMAND bash -lc "rm -rf ${CMAKE_BINARY_DIR}/js/{ipc,rpc,dbusmsg,combase}"
+    VERBATIM
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Compiling JavaScript distribution web bundle via Webpack"
 )
@@ -95,6 +96,7 @@ add_dependencies(appmon_js_bundle generate_appmon_js_cli)
 # 4. Target "all" Archive Construction (appmonui.tar.gz)
 # ==============================================================================
 set(TARBALL_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}")
+string(REPLACE ";" " " files_to_package "${files_to_package}")
 
 add_custom_command(
     OUTPUT "${TARBALL_OUTPUT}"
@@ -107,7 +109,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/locales/en.json" "${CMAKE_CURRENT_BINARY_DIR}/locales/"
     
     # Replicates: tar zcf appmonui.tar.gz $(files_to_package) dist/*
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "tar zcf '${TARBALL_OUTPUT}' ${files_to_package} dist/*"
+    COMMAND bash -c "tar zcf ${TARBALL_OUTPUT} ${files_to_package} dist/*"
+    VERBATIM
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/dist/appmon.js"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Packaging web user interface application into ${archive_name}"
@@ -120,9 +123,12 @@ add_dependencies(appmonui appmon_js_bundle)
 # ==============================================================================
 # 5. Supplementary Packaging Targets (package & dbg-package)
 # ==============================================================================
+set(PACKAGING_RELEASE "make -f Makefile.skel release && tar zcf '${TARBALL_OUTPUT}' ${files_to_package} dist/*" )
+set(PACKAGING_DEBUG "make -f Makefile.skel debug && tar zcf '${TARBALL_OUTPUT}' ${files_to_package} dist/*" )
 add_custom_target(package_appmonui
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cd '${CMAKE_CURRENT_BINARY_DIR}' && make -f Makefile.skel && tar zcf '${TARBALL_OUTPUT}' ${files_to_package} dist/*"
+    COMMAND bash -lc "$PACKAGING_RELEASE"
+    VERBATIM
     DEPENDS generate_appmon_js_cli
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Executing production pipeline package bundle"
@@ -130,7 +136,8 @@ add_custom_target(package_appmonui
 
 add_custom_target(dbg-package_appmonui
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cd '${CMAKE_CURRENT_BINARY_DIR}' && make -f Makefile.skel debug && tar zcf '${TARBALL_OUTPUT}' ${files_to_package} dist/*"
+    COMMAND bash -lc "$PACKAGING_DEBUG"
+    VERBATIM
     DEPENDS generate_appmon_js_cli
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Executing debug pipeline package bundle"

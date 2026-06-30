@@ -4,6 +4,8 @@ project(rpcf_appmancli_py LANGUAGES NONE)
 # Expose standard directory variables if needed
 include(GNUInstallDirs)
 
+set(mon_dir "${CMAKE_SOURCE_DIR}/monitor")
+set(top_dir "${CMAKE_SOURCE_DIR}")
 # ==============================================================================
 # 1. Environment Introspection & Package Configuration (genpipopt & IS_VENV)
 # ==============================================================================
@@ -18,22 +20,16 @@ else()
     set(PYTHON_BUILD_CMD "pip3" "wheel" "." "--no-deps" "--no-build-isolation" "-w" "dist/")
 endif()
 
+cmake_host_system_information(RESULT OS_NAME QUERY DISTRIB_ID)
+cmake_host_system_information(RESULT OS_VERSION QUERY DISTRIB_VERSION_ID)
+
 # PEP 668 system protection overrides for modern Debian/Ubuntu baselines
 set(pipopt "")
-if(EXISTS "/etc/os-release")
-    file(READ "/etc/os-release" OS_RELEASE_CONTENT)
-    string(REGEX MATCH "ID=([^\n]+)" OS_ID_MATCH "${OS_RELEASE_CONTENT}")
-    string(REPLACE "ID=" "" OS_NAME "${CMAKE_MATCH_1}")
-    string(REPLACE "\"" "" OS_NAME "${OS_NAME}")
-    string(REGEX MATCH "VERSION_ID=([^\n]+)" OS_VER_MATCH "${OS_RELEASE_CONTENT}")
-    string(REPLACE "VERSION_ID=" "" OS_VERSION "${CMAKE_MATCH_1}")
-    string(REPLACE "\"" "" OS_VERSION "${OS_VERSION}")
 
-    if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
-        set(pipopt "--break-system-packages")
-    elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
-        set(pipopt "--break-system-packages")
-    endif()
+if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
+    set(pipopt "--break-system-packages")
+elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
+    set(pipopt "--break-system-packages")
 endif()
 
 if(pipopt)
@@ -50,32 +46,28 @@ set(GENERATED_PY_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/appmancli/apptimer.py"
 )
 
+set(RIDLC_COMMAND "ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  ${mon_dir}/appmon/appmon.ridl" )
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/appmancli")
+
 add_custom_command(
     OUTPUT ${GENERATED_PY_FILES}
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/appmancli"
     
     # Stage boilerplate code-generation tracking tools securely
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${PROJECT_SOURCE_DIR}/ridl/mktpl" "${PROJECT_SOURCE_DIR}/ridl/mktplsvr" 
-        "${PROJECT_SOURCE_DIR}/ridl/pymktpl" "${PROJECT_SOURCE_DIR}/ridl/mktplcli" 
-        "${PROJECT_SOURCE_DIR}/ridl/drvtpl.json" "${PROJECT_SOURCE_DIR}/ridl/odesctpl2.json" 
-        "${PROJECT_SOURCE_DIR}/ridl/synccfg.py"
+        "${top_dir}/ridl/mktpl" "${top_dir}/ridl/mktplsvr" 
+        "${top_dir}/ridl/pymktpl" "${top_dir}/ridl/mktplcli" 
+        "${top_dir}/ridl/drvtpl.json" "${top_dir}/ridl/odesctpl2.json" 
+        "${top_dir}/ridl/synccfg.py"
         "${CMAKE_CURRENT_BINARY_DIR}/appmancli/"
         
     # Execute internal IDL tool compiler mapping environments
-    COMMAND ${CMAKE_COMMAND} -E env 
-        LD_LIBRARY_PATH="${PROJECT_BINARY_DIR}/combase:${PROJECT_SOURCE_DIR}/combase:\$ENV{LD_LIBRARY_PATH}"
-        "${PROJECT_SOURCE_DIR}/ridl/ridlc" 
-        --sync_mode IAppStore=sync 
-        --sync_mode IDataProducer=sync 
-        --services=AppManager --client -pslO . "${PROJECT_SOURCE_DIR}/monitor/appmon/appmon.ridl"
+    COMMAND bash -lc "${RIDLC_COMMAND}"
+    DEPENDS "${mon_dir}/appmon/appmon.ridl" ridlc
         
     # Cleanup trailing tracking files
     COMMAND ${CMAKE_COMMAND} -E rm -f 
         mktpl pymktpl mktplsvr mktplcli odesctpl2.json drvtpl.json 
         *.new appmondesc.json driver.json *.md cmdline synccfg.py
-        
-    DEPENDS "${PROJECT_SOURCE_DIR}/monitor/appmon/appmon.ridl"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/appmancli"
     COMMENT "Compiling Python AppMonitor interfaces via ridlc"
 )
@@ -88,19 +80,18 @@ add_custom_target(generate_appman_py_cli DEPENDS ${GENERATED_PY_FILES})
 # ==============================================================================
 set(WHEEL_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/dist/appmancli-${PACKAGE_VERSION}-py3-none-any.whl")
 
+set(EXPORT_LICENSE "if ! grep 'dynamic = ' pyproject.toml; then python3 -c \"import setuptools; v=int(setuptools.__version__.split('.')[0]); f=open('pyproject.toml', 'a'); f.write('dynamic = [\\\"license\\\"]\\n') if v>=61 else True; f.close()\"; fi")
+
 add_custom_command(
     OUTPUT "${WHEEL_OUTPUT}"
     # Synchronize setup templates into the workspace
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/setup.py" "${CMAKE_CURRENT_BINARY_DIR}/"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/LICENSE" "${CMAKE_CURRENT_BINARY_DIR}/LICENSE"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${top_dir}/LICENSE" "${CMAKE_CURRENT_BINARY_DIR}/LICENSE"
     
     # Process dynamic pyproject configurations matching modern requirements
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "
-        if ! grep 'dynamic = ' pyproject.toml; then 
-            python3 -c \"import setuptools; v=int(setuptools.__version__.split('.')[0]); f=open('pyproject.toml', 'a'); f.write('dynamic = [\\\"license\\\"]\\n') if v>=61 else True; f.close()\";
-        fi
-    "
+    COMMAND bash -lc "${EXPORT_LICENSE}"
+    VERBATIM
     # Compile the final distribution wheel packager target
     COMMAND ${PYTHON_BUILD_CMD}
     COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_CURRENT_BINARY_DIR}/LICENSE"
@@ -114,6 +105,7 @@ add_custom_command(
     COMMENT "Generating Python appmancli Wheel package distribution"
 )
 
+message( STATUS, "haha" )
 add_custom_target(appmancli_wheel ALL DEPENDS "${WHEEL_OUTPUT}")
 add_dependencies(appmancli_wheel generate_appman_py_cli)
 

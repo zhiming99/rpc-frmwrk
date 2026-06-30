@@ -7,7 +7,7 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Base Variables and Architecture Macros Mapping
 # ==============================================================================
-set(include_ipcdir "${PROJECT_SOURCE_DIR}/ipc")
+set(include_ipcdir "${CMAKE_SOURCE_DIR}/ipc")
 
 set(OFFSET_MACRO "")
 if(BITWIDTH32)
@@ -16,10 +16,10 @@ endif()
 
 # Replicate broad compile parameters array block
 set(APPMON_BASE_INCLUDES
-    "${CMAKE_CURRENT_BINARY_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../registry"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../sinit"
+    "${CMAKE_SOURCE_DIR}/monitor/registry"
+    "${CMAKE_SOURCE_DIR}/monitor/sinit"
+    "${CMAKE_SOURCE_DIR}/include"
     "${include_ipcdir}"
 )
 
@@ -42,27 +42,35 @@ set(GENERATED_SERVER_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/IUserManagersvr.h"
     "${CMAKE_CURRENT_BINARY_DIR}/IAppStoreExsvr.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/IAppStoreExsvr.h"
-    "${CMAKE_CURRENT_BINARY_DIR}/AppMonitorsvr.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/AppMonitorsvr.h"
-    "${CMAKE_CURRENT_BINARY_DIR}/SimpleAuthsvr.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/SimpleAuthsvr.h"
-    "${CMAKE_CURRENT_BINARY_DIR}/AppManagersvr.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/AppManagersvr.h"
 )
 
+message(STATUS "current working dir ${CMAKE_CURRENT_BINARY_DIR}")
+set(RIDLC_COMMAND "ridlc --server -sO.  ${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl;echo haha" )
 add_custom_command(
     OUTPUT ${GENERATED_SERVER_FILES}
     # Stage boilerplate code-generation templates securely into the binary directory
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${PROJECT_SOURCE_DIR}/ridl/mktpl" "${PROJECT_SOURCE_DIR}/ridl/mktplsvr" 
-        "${PROJECT_SOURCE_DIR}/ridl/mktplcli" "${PROJECT_SOURCE_DIR}/ridl/drvtpl.json" 
-        "${PROJECT_SOURCE_DIR}/ridl/odesctpl2.json" "${PROJECT_SOURCE_DIR}/ridl/synccfg.py"
+        "${CMAKE_SOURCE_DIR}/ridl/mktpl" "${CMAKE_SOURCE_DIR}/ridl/mktplsvr" 
+        "${CMAKE_SOURCE_DIR}/ridl/mktplcli" "${CMAKE_SOURCE_DIR}/ridl/drvtpl.json" 
+        "${CMAKE_SOURCE_DIR}/ridl/odesctpl2.json" "${CMAKE_SOURCE_DIR}/ridl/synccfg.py"
         "${CMAKE_CURRENT_BINARY_DIR}/"
-        
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/AppMonitorsvr.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/AppMonitorsvr.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/SimpleAuthsvr.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/SimpleAuthsvr.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/AppManagersvr.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/AppManagersvr.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/mainsvr.cpp"
+        "${CMAKE_CURRENT_BINARY_DIR}/"
+
     # Execute internal IDL tool compiler mapping environments
-    COMMAND ${CMAKE_COMMAND} -E env 
-        LD_LIBRARY_PATH="${PROJECT_BINARY_DIR}/combase:${PROJECT_SOURCE_DIR}/combase:\$ENV{LD_LIBRARY_PATH}"
-        "${PROJECT_SOURCE_DIR}/ridl/ridlc" --server -sO . "./appmon.ridl"
+    COMMAND bash -lc "${RIDLC_COMMAND}"
+    VERBATIM
+    DEPENDS ridlc
+        "${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl" 
+        "${CMAKE_SOURCE_DIR}/monitor/registry/regfsif.ridl"
         
     # Clean up intermediate tracking configuration logs
     COMMAND ${CMAKE_COMMAND} -E rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json
@@ -71,11 +79,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E env bash -c "sed -i 's/EnumMyClsid/EnumAMClsid/' appmon.h"
     
     # Run downstream data transformation updating wrappers
-    COMMAND python3 upddesc.py
+    COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/upddesc.py
     
-    DEPENDS 
-        "${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl" 
-        "${PROJECT_SOURCE_DIR}/monitor/registry/regfsif.ridl"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Compiling AppMonitor Server IDL Interfaces via ridlc"
 )
@@ -108,9 +113,9 @@ endif()
 # ==============================================================================
 set(appmonsvr_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/mainsvr.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/AppMonitorsvr.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/SimpleAuthsvr.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/AppManagersvr.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/AppMonitorsvr.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SimpleAuthsvr.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/AppManagersvr.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/appmancli.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ptlogger.cpp
 )
@@ -140,9 +145,9 @@ endif()
 # Set up link dependency maps
 find_package(Threads REQUIRED)
 target_link_directories(appmonsvr PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
 )
 
 target_link_libraries(appmonsvr PRIVATE

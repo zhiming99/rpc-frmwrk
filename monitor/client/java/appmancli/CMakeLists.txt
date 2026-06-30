@@ -11,7 +11,7 @@ find_package(Java REQUIRED COMPONENTS Development)
 # 1. Base Variables Mapping (Inherits from Master Scope)
 # ==============================================================================
 set(javasrcpath "org/rpcf/appmancli")
-set(top_dir "${PROJECT_SOURCE_DIR}")
+set(top_dir "${CMAKE_SOURCE_DIR}")
 set(ridlfile "${top_dir}/monitor/appmon/appmon.ridl")
 
 set(jarname "appmancli-${VERSION}.jar") # Assumes ${VERSION} comes from your master file
