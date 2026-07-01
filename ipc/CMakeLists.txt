@@ -20,18 +20,18 @@ add_library(ipc ${IPC_SOURCES})
 # 3. --- Define Public Header Install Group (rpcfipc_HEADERS) ---
 # Prepend the directory path since they are located in $(top_srcdir)/include
 set(RPCF_IPC_HEADERS
-    "../include/loopool.h"    "../include/connhelp.h"   "../include/counters.h"
-    "../include/dbusport.h"   "../include/emaphelp.h"   "../include/evloop.h"
-    "../include/filetran.h"   "../include/frmwrk.h"     "../include/ifhelper.h"
-    "../include/ifstat.h"     "../include/iftasks.h"    "../include/iiddict.h"
-    "../include/irp.h"        "../include/jsondef.h"    "../include/mainloop.h"
-    "../include/msgmatch.h"   "../include/namespc.h"    "../include/port.h"
-    "../include/portdrv.h"    "../include/portex.h"     "../include/reqopen.h"
-    "../include/sevpoll.h"    "../include/stream.h"     "../include/streamex.h"
-    "../include/tasklets.h"   "../include/tractgrp.h"   "../include/utils.h"
-    "../include/uxport.h"     "../include/uxstream.h"   "../include/proxy.h"
-    "../include/prxyport.h"   "../include/fdodrv.h"     "../include/stmport.h"
-    "../include/fastrpc.h"    "../include/stmcp.h"      "../include/seqtgmgr.h"
+    "loopool.h"    "connhelp.h"   "counters.h"
+    "dbusport.h"   "emaphelp.h"   "evloop.h"
+    "filetran.h"   "frmwrk.h"     "ifhelper.h"
+    "ifstat.h"     "iftasks.h"    "iiddict.h"
+    "irp.h"        "jsondef.h"    "mainloop.h"
+    "msgmatch.h"   "namespc.h"    "port.h"
+    "portdrv.h"    "portex.h"     "reqopen.h"
+    "sevpoll.h"    "stream.h"     "streamex.h"
+    "tasklets.h"   "tractgrp.h"   "utils.h"
+    "uxport.h"     "uxstream.h"   "proxy.h"
+    "prxyport.h"   "fdodrv.h"     "stmport.h"
+    "fastrpc.h"    "stmcp.h"      "seqtgmgr.h"
 )
 
 # 4. --- Handle Include Directories (libipc_la_CPPFLAGS) ---

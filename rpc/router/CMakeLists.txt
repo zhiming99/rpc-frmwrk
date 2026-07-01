@@ -7,9 +7,9 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Base Variables and Architecture Macros Mapping
 # ==============================================================================
-set(include_rpcdir "${PROJECT_SOURCE_DIR}/rpc")
-set(include_ipcdir "${PROJECT_SOURCE_DIR}/ipc")
-set(include_fusedir "${PROJECT_SOURCE_DIR}/fuse")
+set(include_rpcdir "${CMAKE_SOURCE_DIR}/rpc")
+set(include_ipcdir "${CMAKE_SOURCE_DIR}/ipc")
+set(include_fusedir "${CMAKE_SOURCE_DIR}/fuse")
 
 set(OFFSET_MACRO "")
 if(BITWIDTH32)
@@ -43,7 +43,7 @@ add_library(rtfiles SHARED ${librtfiles_la_SOURCES})
 # Replaces: librtfiles_la_CPPFLAGS
 target_include_directories(rtfiles PRIVATE 
     ${ROUTER_COMMON_INCLUDES}
-    "${PROJECT_SOURCE_DIR}/monitor/client/cpp/appmancli"
+    "${CMAKE_SOURCE_DIR}/monitor/client/cpp/appmancli"
 )
 set_target_properties(rtfiles PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -64,7 +64,7 @@ set_target_properties(rtfiles PROPERTIES
 
 # Replaces: librtfiles_la_LIBADD
 find_package(Threads REQUIRED)
-target_link_directories(rtfiles PRIVATE "${PROJECT_SOURCE_DIR}/3rd_party")
+target_link_directories(rtfiles PRIVATE "${CMAKE_SOURCE_DIR}/3rd_party")
 target_link_libraries(rtfiles PRIVATE
     appmancli     # Native targets reference mapping instead of physical .la paths
     rpc
@@ -107,11 +107,11 @@ endif()
 
 # Replaces: rpcrouter_LDADD
 target_link_directories(rpcrouter PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
-    "${PROJECT_SOURCE_DIR}/fuse"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/fuse"
 )
 
 target_link_libraries(rpcrouter PRIVATE

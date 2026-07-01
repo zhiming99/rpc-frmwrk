@@ -22,9 +22,9 @@ add_library(gmsslpt SHARED ${libgmsslpt_la_SOURCES})
 # Replaces: libgmsslpt_la_CPPFLAGS
 # Automatically handles compiler search contexts for system header environments using cross-compilation toolchains
 target_include_directories(gmsslpt PRIVATE
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/combase"
     "/usr/local/include"
 )
 
@@ -45,10 +45,10 @@ set_target_properties(gmsslpt PROPERTIES
 # Replaces: libgmsslpt_la_LIBADD
 find_package(Threads REQUIRED)
 target_link_directories(gmsslpt PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
     "/usr/local/lib"
 )
 

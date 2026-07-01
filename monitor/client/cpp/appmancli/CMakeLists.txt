@@ -29,7 +29,6 @@ set(GENERATED_OUTPUTS
 )
 
 set(RIDLC_OPTIONS "ridlc --sync_mode IAppStore=async_p --sync_mode IUserManager=async_p --services=AppManager,SimpleAuth --client -slO \"${CMAKE_CURRENT_BINARY_DIR}\" ${mon_dir}/appmon/appmon.ridl" )
-#message(STATUS "haha")
 # Replicates: appmon.ridl target step cleanly inside the binary output workspace
 add_custom_command(
     OUTPUT ${GENERATED_OUTPUTS}

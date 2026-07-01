@@ -24,9 +24,9 @@ add_library(wspt SHARED ${libwspt_la_SOURCES})
 
 # Replaces: libwspt_la_CPPFLAGS
 target_include_directories(wspt PRIVATE
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/combase"
 )
 
 set_target_properties(wspt PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -40,10 +40,10 @@ set_target_properties(wspt PROPERTIES
 # Replaces: libwspt_la_LIBADD
 find_package(Threads REQUIRED)
 target_link_directories(wspt PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
     "${CMAKE_CURRENT_SOURCE_DIR}/wsproto"
 )
 
@@ -51,7 +51,6 @@ target_link_libraries(wspt PRIVATE
     rpc          # Native target tokens instead of physical .la text path targets
     ipc
     combase
-    wsproto      # Assumes a library target named wsproto is defined in the subdirectory
     wsock
     utils
     Threads::Threads
