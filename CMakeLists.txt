@@ -1120,6 +1120,7 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
     endforeach()
 endif()
 
+set(CMAKE_SKIP_INSTALL_RPATH ON)
 # Fallback basic ignores for standard metadata directories
 list(APPEND CPACK_SOURCE_IGNORE_FILES "/.git/" "/build/" "${CMAKE_BINARY_DIR}")
 include(CPack)

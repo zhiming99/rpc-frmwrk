@@ -45,7 +45,7 @@ set(GENERATED_SERVER_FILES
 )
 
 message(STATUS "current working dir ${CMAKE_CURRENT_BINARY_DIR}")
-set(RIDLC_COMMAND "ridlc --server -sO.  ${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl;echo haha" )
+set(RIDLC_COMMAND "ridlc --server -sO.  ${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl" )
 add_custom_command(
     OUTPUT ${GENERATED_SERVER_FILES}
     # Stage boilerplate code-generation templates securely into the binary directory

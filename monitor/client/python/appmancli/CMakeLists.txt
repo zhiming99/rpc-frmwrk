@@ -105,7 +105,6 @@ add_custom_command(
     COMMENT "Generating Python appmancli Wheel package distribution"
 )
 
-message( STATUS, "haha" )
 add_custom_target(appmancli_wheel ALL DEPENDS "${WHEEL_OUTPUT}")
 add_dependencies(appmancli_wheel generate_appman_py_cli)
 

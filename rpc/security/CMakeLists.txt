@@ -66,15 +66,15 @@ add_library(auth SHARED ${libauth_la_SOURCES})
 
 # Replaces: libauth_la_CPPFLAGS
 target_include_directories(auth PRIVATE
-    "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
-    "${PROJECT_SOURCE_DIR}/monitor/appmon"
-    "${PROJECT_SOURCE_DIR}/monitor/client/cpp/appmancli"
-    "${PROJECT_SOURCE_DIR}/monitor/sinit"
-    "${PROJECT_SOURCE_DIR}/monitor/registry"
+    "${CMAKE_SOURCE_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/monitor/appmon"
+    "${CMAKE_SOURCE_DIR}/monitor/client/cpp/appmancli"
+    "${CMAKE_SOURCE_DIR}/monitor/sinit"
+    "${CMAKE_SOURCE_DIR}/monitor/registry"
 )
 
 # Apply dynamic compilation scope macro blocks
@@ -97,10 +97,10 @@ set_target_properties(auth PROPERTIES
 # Replaces: libauth_la_LIBADD
 find_package(Threads REQUIRED)
 target_link_directories(auth PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
 )
 
 target_link_libraries(auth PRIVATE

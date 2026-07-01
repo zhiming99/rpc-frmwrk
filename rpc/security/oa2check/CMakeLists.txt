@@ -20,11 +20,11 @@ add_library(oa2check STATIC ${liboa2check_a_SOURCES})
 
 # Replaces: liboa2check_a_CPPFLAGS
 target_include_directories(oa2check PRIVATE
-    "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_SOURCE_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/3rd_party"
 )
 
 # Enforce Position Independent Code flags natively (-fPIC)
