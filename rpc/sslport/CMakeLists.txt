@@ -21,9 +21,9 @@ add_library(sslpt SHARED ${libsslpt_la_SOURCES})
 # Native CMake cross-compilation configurations automatically handle the CMAKE_SYSROOT 
 # target paths, meaning we don't need to manually inject $(SYSROOT)/usr/include.
 target_include_directories(sslpt PRIVATE
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/combase"
+    "${CMAKE_SOURCE_DIR}/ipc"
+    "${CMAKE_SOURCE_DIR}/rpc"
+    "${CMAKE_SOURCE_DIR}/combase"
 )
 
 set_target_properties(sslpt PROPERTIES POSITION_INDEPENDENT_CODE ON)

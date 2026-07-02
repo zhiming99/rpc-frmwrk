@@ -39,6 +39,9 @@ option(ENABLE_TESTCASES "Build and install with testcases" ON)
 # Replaces AC_ARG_ENABLE([krb5], ...)
 option(ENABLE_KRB5 "Build and install with Kerberos authentication" ON)
 
+# Replaces AC_ARG_ENABLE([openssl], ...)
+option(ENABLE_OPENSSL "Build and install with OpenSSL" ON)
+
 # Replaces AC_ARG_ENABLE([gmssl], ...)
 option(ENABLE_GMSSL "Build and install with GmSSL" ON)
 
@@ -1118,6 +1121,13 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
             list(APPEND CPACK_SOURCE_IGNORE_FILES "${_escaped_file}$")
         endif()
     endforeach()
+endif()
+
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    message(STATUS "ccache compiler optimization accelerator discovered natively!")
+    set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
 set(CMAKE_SKIP_INSTALL_RPATH ON)
