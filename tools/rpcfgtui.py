@@ -740,6 +740,21 @@ class MenuDialog:
         secItems = self.oSecWidgets
         oMisc = oSecurity.get( 'misc', {} )
 
+        # Determine AuthMech based on which fields are filled or which checkboxes are checked
+        curAuthMech = None
+        for authMech in self.authMechs:
+            if authMech.base_widget.get_state():
+                label = authMech.base_widget.get_label().strip()
+                if label == _("SimpAuth"):
+                    authInfo['AuthMech'] = 'SimpAuth'
+                    curAuthMech = 'SimpAuth'
+                elif label == _("Kerberos"):
+                    authInfo['AuthMech'] = 'krb5'
+                    curAuthMech = 'krb5'
+                elif label == _("OAuth2"): 
+                    authInfo['AuthMech'] = 'OAuth2'
+                    curAuthMech = 'OAuth2'
+                break
         oConnParams = self.initCfg.get('Connections', [])
         for conn in oConnParams:
             if conn.get( 'HasAuth', 'false') == 'true':
@@ -832,21 +847,6 @@ class MenuDialog:
                 elif label == _("Enable kinit proxy on installation (client)"):
                     oMisc['KinitProxy' ] = "true" if widget.get_state() else "false"
 
-        # Determine AuthMech based on which fields are filled or which checkboxes are checked
-        curAuthMech = None
-        for authMech in self.authMechs:
-            if authMech.base_widget.get_state():
-                label = authMech.base_widget.get_label().strip()
-                if label == _("SimpAuth"):
-                    authInfo['AuthMech'] = 'SimpAuth'
-                    curAuthMech = 'SimpAuth'
-                elif label == _("Kerberos"):
-                    authInfo['AuthMech'] = 'krb5'
-                    curAuthMech = 'krb5'
-                elif label == _("OAuth2"): 
-                    authInfo['AuthMech'] = 'OAuth2'
-                    curAuthMech = 'OAuth2'
-                break
         oSecurity['SSLCred'] = sslFiles
         if authInfo:
             oSecurity['AuthInfo'] = authInfo

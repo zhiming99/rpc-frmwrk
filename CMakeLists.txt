@@ -1072,7 +1072,7 @@ add_custom_target(deb
     COMMAND ${CMAKE_COMMAND} -E chdir bldpkg ${CMAKE_COMMAND} -E tar zxf "${DEBTAR}"
     COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
     COMMAND ${CMAKE_COMMAND} -E rename "bldpkg/${DISTDIR}" "bldpkg/${DISTDIR}-${REV}"
-    COMMAND ${CMAKE_COMMAND} --build bldpkg --target deb 
+    COMMAND ${CMAKE_COMMAND} --build bldpkg --target deb_rpcf
             -- DESTDIR=${CMAKE_BINARY_DIR}/bldpkg/${DISTDIR}-${REV}/debian/${PROJECT_NAME}
     COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -1081,47 +1081,11 @@ add_custom_target(deb
 
 # 4. Custom 'rpm' Target
 add_custom_target(rpm
-    COMMAND ${CMAKE_COMMAND} --build bldpkg --target rpm
+    COMMAND ${CMAKE_COMMAND} --build bldpkg --target rpm_rpcf
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building RPM package..."
 )
 
-# --- Integrated CPack Source Archiving (Required for the 'package_source' target) ---
-set(CPACK_SOURCE_GENERATOR "TGZ")
-set(CPACK_SOURCE_PACKAGE_FILE_NAME "${DISTDIR}")
-
-# ==============================================================================
-# Git-Driven Source Packaging (Strictly Packages Tracked Files Only)
-# ==============================================================================
-if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
-    execute_process(
-        COMMAND git status --porcelain=v1
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        OUTPUT_VARIABLE GIT_STATUS
-    )
-    
-    # Optional: Warn the developer if they have uncommitted project files
-    if(GIT_STATUS)
-        message(STATUS "Warning: You have uncommitted or untracked changes in your workspace.")
-    endif()
-
-    # Generate a list of everything to IGNORE by finding untracked files
-    execute_process(
-        COMMAND git ls-files --others --ignored --exclude-standard
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        OUTPUT_VARIABLE UNTRACKED_FILES
-    )
-    
-    # Convert newline-separated git output into a CMake regex-ready string list
-    string(REPLACE "\n" ";" UNTRACKED_LIST "${UNTRACKED_FILES}")
-    foreach(_file ${UNTRACKED_LIST})
-        if(_file)
-            # Escape strings to protect special layout characters for CPack regex engine
-            string(REGEX REPLACE "([+*?^$()[\\]|\\\\])" "\\\\\\1" _escaped_file "${_file}")
-            list(APPEND CPACK_SOURCE_IGNORE_FILES "${_escaped_file}$")
-        endif()
-    endforeach()
-endif()
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -1131,7 +1095,12 @@ if(CCACHE_PROGRAM)
 endif()
 
 set(CMAKE_SKIP_INSTALL_RPATH ON)
-# Fallback basic ignores for standard metadata directories
-list(APPEND CPACK_SOURCE_IGNORE_FILES "/.git/" "/build/" "${CMAKE_BINARY_DIR}")
-include(CPack)
+
+# the custom target 'dist'
+add_custom_target(dist
+    COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/collect_files.sh" "${CMAKE_BINARY_DIR}/${PKGNAME}"
+        && echo "Successfully generated distribution package ${CMAKE_BINARY_DIR}/${PKGNAME}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    VERBATIM
+)
 
