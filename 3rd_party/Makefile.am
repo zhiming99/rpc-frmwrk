@@ -10,3 +10,4 @@ libutils_a_LIBADD=
 
 libutils_HEADERS=base64.h sha1.h
 libutilsdir=$(includedir)/rpcf/ipc
+EXTRA_DIST=CMakeLists.txt

@@ -24,3 +24,4 @@ evtsvrtst_LDADD=$(evtest_LDFLAGS) libevtst.la
 evtsvrtst_CPPFLAGS=$(evtest_CPPFLAGS) -DSERVER
 
 link_dir=./
+EXTRA_DIST=CMakeLists.txt

@@ -20,3 +20,4 @@ inproctst_LDADD=$(inproc_LDFLAGS) libinproc.la -lpthread
 inproctst_CPPFLAGS=$(inproc_CPPFLAGS)
 
 link_dir=./
+EXTRA_DIST=CMakeLists.txt

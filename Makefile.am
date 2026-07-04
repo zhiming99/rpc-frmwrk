@@ -34,7 +34,7 @@ endif
 SUBDIRS += monitor logger rpc tools pics examples 
 SUBDIRS += bldpkg
 
-EXTRA_DIST= README.md cfgsel Concept.md logs.md LICENSE README_cn.md Concept_cn.md
+EXTRA_DIST= README.md cfgsel Concept.md logs.md LICENSE README_cn.md Concept_cn.md CMakeLists.txt
 
 dist_pkgconfig_DATA=rpcf.pc
 

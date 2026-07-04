@@ -53,4 +53,5 @@ dbg-package:
 clean:
 	rm -f $(auto_files) dist/* appmonui$(EXEEXT)
 
+EXTRA_DIST=CMakeLists.txt
 .PHONY: package dbg-package ../../../appmon/appmon.ridl

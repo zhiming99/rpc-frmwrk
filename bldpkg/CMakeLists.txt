@@ -7,12 +7,6 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Environment Introspection & Package Configuration (From Part 1)
 # ==============================================================================
-set(rev "0")
-set(PACKAGE_NAME "${PROJECT_NAME}") # Inherits from your root configuration name
-set(VERSION "${PROJECT_VERSION}")   # Inherits from your root version string
-
-# Staging context variable mirroring Autotools $(DISTDIR)
-set(DISTDIR "${CMAKE_CURRENT_BINARY_DIR}/${PACKAGE_NAME}-${VERSION}-${rev}")
 
 if(ENABLE_PYTHON)
     set(ena_python "yes")
@@ -35,21 +29,25 @@ endif()
 # ==============================================================================
 # 2. Target "debdir" Custom Operation
 # ==============================================================================
+set(DEB_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/${DISTDIR}-${REV}")
+set(SETUP_DEBMETA "arch=\$(dpkg --print-architecture);\
+bash ${CMAKE_CURRENT_SOURCE_DIR}/blddpkg.sh '${DEB_BUILD_DIR}' '\${DESTDIR}' '${PACKAGE_NAME}_${VERSION}-${REV}_\${arch}' '${CMAKE_INSTALL_PREFIX}' '${ena_python}' '${ena_js}' '${ena_java}' ")
+
+set(CREATE_CHANGE_LOG "cd '${DEB_BUILD_DIR}' && \
+DEBEMAIL='zhiming <woodhead99@gmail.com>' dch --create -v '${VERSION}-${REV}' --package '${PACKAGE_NAME}' '${PACKAGE_NAME}-${VERSION}-${REV} released' ")
+
 add_custom_target(debdir
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${DISTDIR}/debian/${PACKAGE_NAME}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${DEB_BUILD_DIR}/debian/${PACKAGE_NAME}"
     
     # Process downstream blddpkg.sh tool tracking environment paths
     # Replicates: arch=$(dpkg --print-architecture); bash blddpkg.sh ...
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "
-        arch=\$(dpkg --print-architecture)\;
-        bash ${CMAKE_CURRENT_SOURCE_DIR}/blddpkg.sh '${DISTDIR}' '\$ENV{DESTDIR}' '${PACKAGE_NAME}_\${VERSION}-${rev}_\${arch}' '${CMAKE_INSTALL_PREFIX}' '${ena_python}' '${ena_js}' '${ena_java}'
-    "
-    
+    COMMAND bash -lc "${SETUP_DEBMETA}"    
+    VERBATIM
+
     # Generate temporary changelog metadata templates
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "
-        cd '${DISTDIR}' && 
-        DEBEMAIL='zhiming <woodhead99@gmail.com>' dch --create -v '${VERSION}-${rev}' --package '${PACKAGE_NAME}' '${PACKAGE_NAME}-${VERSION}-${rev} released'
-    "
+    COMMAND bash -lc "${CREATE_CHANGE_LOG}"
+    VERBATIM
+
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Preparing Debian packaging workspace configuration (debdir)"
 )
@@ -58,41 +56,36 @@ add_custom_target(debdir
 # 3. Target "deb" Custom Operation (From Part 2)
 # ==============================================================================
 # Triggers full packaging run. Replicates core shell assertions and validations.
+
+cmake_host_system_information(RESULT OS_NAME QUERY DISTRIB_ID)
+cmake_host_system_information(RESULT OS_VERSION QUERY DISTRIB_VERSION_ID)
+string(SUBSTRING "${OS_NAME}" 0 1 oid)
+string(REGEX REPLACE "\\..*" "" MAJOR_VERSION "${OS_VERSION}")
+set(debian_ver "${oid}${MAJOR_VERSION}")
+
+set(CHECK_DESTDIR "\ if [ -z \"\${DESTDIR}\" ]; then echo 'Error: DESTDIR environment variable must be explicitly defined when triggering package staging targets.'; exit 1; fi")
+set(COPY_DEBS "echo debian OS version is ${OS_VERSION}; \
+if compgen -G '*.deb' > /dev/null; then for i in *.deb; do mv \$i \${i%%.deb}.${debian_ver}.deb; done; fi;\
+if compgen -G '*.ddeb' > /dev/null; then for i in *.ddeb; do mv \$i \${i%%.ddeb}.${debian_ver}.ddeb; done; fi ")
+
 add_custom_target(deb_rpcf
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "
-        if [ -z \"\$ENV{DESTDIR}\" ]\; then
-            echo 'Error: DESTDIR environment variable must be explicitly defined when triggering package staging targets.'\;
-            exit 1\;
-        fi
-    "
+    COMMAND bash -lc "${CHECK_DESTDIR}" 
+    VERBATIM
+
     # Execute workspace preparations target
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_CURRENT_BINARY_DIR} --target debdir
     
     # Purge old residual artifacts safely inside binary working directory
-    COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_CURRENT_BINARY_DIR}/*.deb" "${CMAKE_CURRENT_BINARY_DIR}/*.ddeb"
+    COMMAND "${CMAKE_COMMAND}" -E rm -f "${CMAKE_CURRENT_BINARY_DIR}/*.deb"
+    COMMAND "${CMAKE_COMMAND}" -E rm -f "${CMAKE_CURRENT_BINARY_DIR}/*.ddeb"
     
     # Trigger native debuild routine
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cd '${DISTDIR}' && debuild -us -uc -d"
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "cd '${DEB_BUILD_DIR}' && debuild -us -uc -d"
     
     # Replicates complex OS parsing string normalization and tagging rules:
     # Extracted tokens append platform flags like d12 or u24 to binary filenames
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "
-        debian_ver=\$(cat /etc/os-release | grep VERSION_ID | awk -F '\"' '{print \$2}')\;
-        debian_id=\$(cat /etc/os-release | grep '^ID=' | awk -F '=' '{print \$2}')\;
-        oid=\${debian_id:0:1}\;
-        echo 'debian OS version is '\${debian_ver}\;
-        debian_ver=\${oid}\${debian_ver%%.*}\;
-        if compgen -G '*.deb' > /dev/null\; then
-            for i in *.deb\; do
-                mv \"\$i\" \"\${i%%.deb}.\${debian_ver}.deb\"\;
-            done\;
-        fi\;
-        if compgen -G '*.ddeb' > /dev/null\; then
-            for i in *.ddeb\; do
-                mv \"\$i\" \"\${i%%.ddeb}.\${debian_ver}.ddeb\"\;
-            done\;
-        fi
-    "
+    COMMAND bash -lc "${COPY_DEBS}"
+    VERBATIM
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Compiling primary distribution system packages (.deb)"
 )

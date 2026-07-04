@@ -4,7 +4,7 @@
 javasrcpath=./org/rpcf/appmancli/
 basefiles= AppManagercli.java MainThread.java AppTimerProxy.java
 
-EXTRA_DIST:=$(addprefix $(javasrcpath), $(basefiles))
+EXTRA_DIST:=$(addprefix $(javasrcpath), $(basefiles)) CMakeLists.txt
 
 top_dir=$(abs_top_srcdir)
 jarname=appmancli-$(PACKAGE_VERSION).jar

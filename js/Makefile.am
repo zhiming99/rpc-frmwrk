@@ -15,7 +15,7 @@ rpc/lz4.js ipc/fastrpc.js ipc/login.js ipc/chkrtpath.js rpc/chkrtpathrmt.js
 js_files=index.html index.js webpack.config.js test/evtest.js test/asynctst.js \
 test/actcancel.js test/katest.js test/stmtest.js $(jslib_files)
 
-EXTRA_DIST=$(js_files) README_cn.md
+EXTRA_DIST=$(js_files) README_cn.md CMakeLists.txt
 
 jslibdir=$(libdir)/rpcf
 #dist_jslib_DATA=rpcbase.js.tar.gz

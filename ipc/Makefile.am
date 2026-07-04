@@ -35,3 +35,4 @@ libipc_la_CPPFLAGS= -I$(top_srcdir)/logger
 
 libipc_la_LDFLAGS=-version-info @VERSION2@
 libipc_la_LIBADD= -L../combase ../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) 
+EXTRA_DIST=CMakeLists.txt

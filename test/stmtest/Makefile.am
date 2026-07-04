@@ -25,3 +25,4 @@ stmsvrtst_CPPFLAGS=$(stmtest_CPPFLAGS) -DSERVER
 
 link_dir=./
 
+EXTRA_DIST=CMakeLists.txt

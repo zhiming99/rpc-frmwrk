@@ -15,7 +15,7 @@ rpcffuseif_HEADERS=fuseif.h fusedefs.h serijson.h
 rpcffuseifdir=$(includedir)/rpcf/ipc
 
 libfuseif_ladir=$(libdir)
-EXTRA_DIST=fuse_i.h
+EXTRA_DIST=fuse_i.h CMakeLists.txt
 
 EXTRA_DIST+= \
 examples/python/actcancel/ActiveCancelcli.py \

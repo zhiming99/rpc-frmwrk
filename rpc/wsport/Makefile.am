@@ -12,3 +12,4 @@ libwspt_la_LIBADD = $(COMMON_LINK) -L../../combase -L.. -L../../ipc -L./wsproto 
 
 
 SUBDIRS= wsproto
+EXTRA_DIST=CMakeLists.txt

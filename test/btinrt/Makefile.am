@@ -26,3 +26,5 @@ btinrtsvr_CPPFLAGS=$(btinrt_CPPFLAGS) -DSERVER
 btinrtsvr_LDFLAGS=-rdynamic
 
 link_dir=./
+
+EXTRA_DIST=CMakeLists.txt

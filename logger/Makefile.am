@@ -19,7 +19,7 @@ OFFSET_MACRO=-D_FILE_OFFSET_BITS=64
 else
 OFFSET_MACRO=
 endif
-EXTRA_DIST= logger.ridl
+EXTRA_DIST= logger.ridl CMakeLists.txt
 
 rpcf_logger_CPPFLAGS= -I$(top_srcdir)/include -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) -I$(top_srcdir)/monitor/client/cpp/appmancli
 

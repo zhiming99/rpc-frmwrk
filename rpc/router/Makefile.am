@@ -30,7 +30,7 @@ else
 OFFSET_MACRO=
 endif
 
-EXTRA_DIST=README.md README_cn.md
+EXTRA_DIST=README.md README_cn.md CMakeLists.txt
 rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
 
 librtfiles_la_LTLIBRARIES=librtfiles.la

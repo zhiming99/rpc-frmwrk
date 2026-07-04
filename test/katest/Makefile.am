@@ -24,3 +24,4 @@ kasvrtst_LDADD=$(katest_LDFLAGS) libkasvr.la
 kasvrtst_CPPFLAGS=$(katest_CPPFLAGS) -DSERVER
 
 link_dir=./
+EXTRA_DIST=CMakeLists.txt

@@ -1,4 +1,5 @@
 EXTRA_DIST= \
+CMakeLists.txt \
 hellowld.png \
 hellowld-tree.png \
 installer-name.png \

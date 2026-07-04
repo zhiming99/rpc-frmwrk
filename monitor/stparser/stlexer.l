@@ -28,21 +28,66 @@
 #include <cstdlib>
 #include <cctype>
 #include <rpc.h>
-#include "stparser.h"
-#include "stbase.h"
+
+struct YYLTYPE1
+{
+  int first_line;
+  int first_column;
+  int last_line;
+  int last_column;
+};
+
+#define YYLTYPE YYLTYPE1
+
+struct YYLTYPE2 :
+    public YYLTYPE
+{
+    stdstr text;
+    int fidx = -1; // file name index into the m_vecFiles.
+    void initialize()
+    {
+        first_line = 1;
+        first_column = 1;
+        last_line = 1;
+        last_column = 1;
+    }
+
+    YYLTYPE2( const YYLTYPE2& rhs )
+    {
+        first_line = rhs.first_line;
+        first_column = rhs.first_column;
+        last_line = rhs.last_line;
+        last_column = rhs.last_column;
+        text = rhs.text;
+    }
+    YYLTYPE2()
+    {
+        initialize();
+        fidx = -1;
+    }
+};
+
+typedef std::pair< rpcf::Variant, YYLTYPE2 > YYSPAIR;
+#define YYSTYPE std::shared_ptr< YYSPAIR >
 
 #define YY_DECL int yylex(YYSTYPE * yylval_param, \
     YYLTYPE * yylloc_param, yyscan_t yyscanner, \
-    rpcf::CSTParserContext* pCtx )
+    void* pctx )
 
 extern int yylex(YYSTYPE * yylval_param,
     YYLTYPE * yylloc_param, void* yyscanner,
-    rpcf::CSTParserContext* pCtx );
+    void* plexctx );
+
+#define pLCtx ((rpcf::CSTParserContext*)pctx)
+
 }
 
 %{
 
 #include "parsrctx.h"
+#include "stparser.h"
+#include "stbase.h"
+
 using namespace rpcf;
 
 #define YY_USER_ACTION \
@@ -53,7 +98,7 @@ using namespace rpcf;
         yylloc->last_column = yyget_column(yyscanner) + yyleng - 1; \
         auto yylloc2 = static_cast< YYLTYPE2* >( yylloc ); \
         yylloc2->text = yyget_text( yyscanner );\
-        yylloc2->fidx = pCtx->GetFileIdx( pCtx->m_strCurFile ); \
+        yylloc2->fidx = pLCtx->GetFileIdx( pLCtx->m_strCurFile ); \
         yyset_column(yyget_column(yyscanner) + yyleng, yyscanner); \
         if( yylval != nullptr ) yylval->get()->second = *yylloc2; \
     }while( 0 );
@@ -265,7 +310,7 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 
  /* Matches Peripheral Access (PI): %IW0:P or %PIW0 */
 "%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+|"*")?(":P"|":p")?  {
-    ObjPtr pAddr = ParsePeriAddr( yytext, pCtx );
+    ObjPtr pAddr = ParsePeriAddr( yytext, pLCtx );
     if( pAddr.IsEmpty() )
         return YYerror;
     yylval->get()->first = pAddr;
@@ -286,7 +331,7 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 }
 
 "@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? {
-     ObjPtr pAddr = ParseRpcfAddr( yytext, pCtx );
+     ObjPtr pAddr = ParseRpcfAddr( yytext, pLCtx );
      if( pAddr.IsEmpty() )
          return YYerror;
      yylval->get()->first = pAddr;
@@ -384,16 +429,16 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
         if ( !YY_CURRENT_BUFFER )
             break;
 
-        if( pCtx->m_vecFileStack.empty() )
+        if( pLCtx->m_vecFileStack.empty() )
             break;
 
         FILECTX2* pFileCtx =
-            pCtx->m_vecFileStack.back().get();
+            pLCtx->m_vecFileStack.back().get();
         YYLTYPE oloc = pFileCtx->m_oLocation;
         yyset_lineno( oloc.last_line, yyscanner );
         yyset_column( oloc.last_column, yyscanner );
-        pCtx->m_strCurFile = pFileCtx->m_strPath;
-        pCtx->m_vecFileStack.pop_back();
+        pLCtx->m_strCurFile = pFileCtx->m_strPath;
+        pLCtx->m_vecFileStack.pop_back();
         // tell the caller to retry
         return YYEMPTY;
     }while( 0 );
