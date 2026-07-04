@@ -31,7 +31,8 @@ regfsmnt_LDADD+= $(COMMON_LINK)
 endif
 regfsmnt_LDFLAGS=-rdynamic
 
-EXTRA_DIST=README_cn.md regfsif.ridl regfs.ridl regfsmnt.1 regfschk.1
+EXTRA_DIST=README_cn.md regfsif.ridl regfs.ridl regfsmnt.1 regfschk.1 \
+CMakeLists.txt
 
 libregfs_la_LTLIBRARIES=libregfs.la
 libregfs_la_SOURCES = regfs.cpp blkalloc.h blkalloc.cpp dir.cpp file.cpp dllexp.cpp 

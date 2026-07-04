@@ -28,13 +28,13 @@ add_custom_command(
     COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/updconst.sh"
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/stparser.cpp.hook"
     DEPENDS ${BISON_StParser_OUTPUTS}
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     COMMENT "Executing custom symbol translation scripts (updconst.sh)"
 )
 
 # Emulate flex rule: flex --header-file=stlexer.h -o stlexer.cpp stlexer.l
-flex_target(StLexer stlexer.l "${CMAKE_CURRENT_BINARY_DIR}/stlexer.cpp"
-    DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/stlexer.h"
+flex_target(StLexer stlexer.l "${CMAKE_CURRENT_SOURCE_DIR}/stlexer.cpp"
+    DEFINES_FILE "${CMAKE_CURRENT_SOURCE_DIR}/stlexer.h"
 )
 
 # Bind lexer compilation to parser dependency generation steps

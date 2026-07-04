@@ -4,3 +4,4 @@ libgenrpcfs_adir=./
 libgenrpcfs_a_CPPFLAGS  = -fPIC -I ..
 
 libgenrpcfs_a_LIBADD=
+EXTRA_DIST=CMakeLists.txt

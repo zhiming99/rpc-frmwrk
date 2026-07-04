@@ -27,10 +27,10 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include "lvalvar.h"
 #include "stclsids.h"
-#include "parsrctx.h"
 #include "stlexer.h"
+#include "parsrctx.h"
+#include "lvalvar.h"
 #include "stparser.h"
 using namespace rpcf;
 

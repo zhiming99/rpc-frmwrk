@@ -1,4 +1,4 @@
-EXTRA_DIST=updconst.sh stscript.y stlexer.l stparser.y 
+EXTRA_DIST=updconst.sh stscript.y stlexer.l stparser.y CMakeLists.txt
 
 
 check_PROGRAMS=rpcfstc

@@ -24,3 +24,4 @@ ifsvrsmk_LDADD=$(iftest_LDFLAGS) libecho.la
 ifsvrsmk_CPPFLAGS=$(iftest_CPPFLAGS) -DSERVER
 
 link_dir=./
+EXTRA_DIST=CMakeLists.txt

@@ -35,7 +35,8 @@ uninstall-local:
 	if [ -d $(javawrapperdir ) ]; then pushd $(javawrapperdir); if [ -f rpcbase.jar -o -L rpcbase.jar ]; then rm rpcbase.jar;else echo bobo;fi;popd;fi
 
 rpcbasejava = JavaRpcService.java $(rpcbasedir)/JRetVal.java $(rpcbasedir)/Helpers.java $(rpcbasedir)/JavaRpcContext.java $(rpcbasedir)/JavaReqContext.java $(rpcbasedir)/RC.java $(rpcbasedir)/JavaRpcServer.java $(rpcbasedir)/JavaRpcProxy.java $(rpcbasedir)/IRpcService.java
-EXTRA_DIST = $(rpcbasejava) rpcbase.i proxy.i server.i fastrpc.i fuseif.i
+EXTRA_DIST = $(rpcbasejava) rpcbase.i proxy.i server.i fastrpc.i fuseif.i \
+CMakeLists.txt
 
 $(jarname): rpcbase_wrap.cpp $(rpcbasejava) Makefile.am
 	cpp -P -DJavaRpcService=JavaRpcServiceS -DInstType=CJavaServer -DIsServer="isServer(){ return true;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceS.java

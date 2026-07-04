@@ -7,6 +7,10 @@ project(rpcf
     LANGUAGES C CXX
 )
 
+# 2. Package Variable Mapping
+set(REV "0")
+set(DISTDIR "${PROJECT_NAME}-${PROJECT_VERSION}")
+set(PKGNAME "${DISTDIR}.tar.gz")
 
 # --- Replaces AX_CXX_COMPILE_STDCXX(11, ...) ---
 set(CMAKE_CXX_STANDARD 11)
@@ -520,56 +524,6 @@ set(BITWIDTH "${BITWIDTH}" CACHE INTERNAL "" FORCE)
 set(TSTLDFLG "${TSTLDFLG}" CACHE INTERNAL "Legacy test linkage template profile")
 
 # ==============================================================================
-# --- Part 18: File Configuration & Generation (Replaces AC_CONFIG_FILES) ---
-# ==============================================================================
-
-# 1. --- Core pkg-config file generation ---
-# Replaces: rpcf.pc inside AC_CONFIG_FILES
-# This reads 'rpcf.pc.in' and generates a tailored 'rpcf.pc' inside your build directory.
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/rpcf.pc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/rpcf.pc"
-    @ONLY
-)
-
-# 2. --- Script, Dockerfile, and Configuration File Substitutions ---
-# Replaces all non-Makefile items in your AC_CONFIG_FILES list.
-# For these to compile, make sure to append a '.in' extension to their real files
-# (e.g., rename 'updcfg.py' to 'updcfg.py.in' if it contains @VARIABLE@ hooks).
-
-set(CONFIG_FILES
-    "tools/Dockerfile"
-    "tools/Dockerfile.arm"
-    "tools/updcfg.py"
-    "tools/buildall-fed.sh"
-    "tools/buildall-deb.sh"
-    "tools/buildall-rasp.sh"
-    "bldpkg/control"
-    "bldpkg/rules"
-    "bldpkg/rpcf.spec"
-    "bldpkg/rpcf.install"
-    "bldpkg/rpcf-dev.install"
-    "bldpkg/blddpkg.sh"
-    "python/setup.py"
-    "monitor/oinit/setup.py"
-    "monitor/oinit/oinit.spec"
-    "monitor/client/python/build_deb.sh"
-    "monitor/client/python/build_rpm.sh"
-    "monitor/client/python/appmancli/setup.py"
-    "monitor/client/python/appmancli/pyproject.toml"
-    "monitor/client/js/appmoncli/Makefile.skel"
-)
-
-foreach(FILE IN LISTS CONFIG_FILES)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${FILE}.in")
-        configure_file(
-            "${CMAKE_CURRENT_SOURCE_DIR}/${FILE}.in"
-            "${CMAKE_CURRENT_BINARY_DIR}/${FILE}"
-            @ONLY
-        )
-    endif()
-endforeach()
-# ==============================================================================
 # --- Part 19: Conditionals Validation & String Substitutions ---
 # ==============================================================================
 
@@ -775,7 +729,7 @@ if(ENABLE_JAVA)
     set(JAVA_RPMPKGS   "apache-commons-cli ")
     
     # Restored to normal single-bracket standard shell scripting syntax for clarity
-    set(JAVA_RPMPOST   "pushd %{_libdir}/rpcf;if [ -f rpcbase-\${VERSION}.jar ];then rm -f rpcbase.jar; ln -s rpcbase-\${VERSION}.jar rpcbase.jar;fi;if [ -f appmancli-\${VERSION}.jar ];then rm -f appmancli.jar;")
+    set(JAVA_RPMPOST   "pushd %{_libdir}/rpcf;if [[ -f rpcbase-${VERSION2}.jar ]];then rm -f rpcbase.jar; ln -s rpcbase-${VERSION2}.jar rpcbase.jar;fi;if [[ -f appmancli-${VERSION2}.jar ]];then rm -f appmancli.jar; ln -s appmancli-${VERSION2}.jar appmancli.jar;fi;popd;")
     set(JAVA_RPMPOSTUN "pushd %{_libdir}/rpcf;rm -f rpcbase.jar appmancli.jar;popd;")
     
     set(JAVA_DEBLIBS   "default-jdk-headless | openjdk-11-jdk-headless | openjdk-8-jdk-headless, swig, libcommons-cli-java, ")
@@ -988,6 +942,72 @@ set(BUILD_MAC     "${BUILD_MAC}"     CACHE INTERNAL "Targeting macOS platform")
 set(CXXFLAGS      "${CXXFLAGS}"      CACHE INTERNAL "" FORCE)
 
 # ==============================================================================
+# --- Part 18: File Configuration & Generation (Replaces AC_CONFIG_FILES) ---
+# ==============================================================================
+set(PACKAGE_NAME "${PROJECT_NAME}")
+set(PACKAGE_BUGREPORT "woodhead99@gmail.com" )
+set(VERSION "${PROJECT_VERSION}")
+
+if(NOT CMAKE_LIBRARY_ARCHITECTURE)
+    execute_process(
+        COMMAND dpkg-architecture -qDEB_HOST_MULTIARCH
+        OUTPUT_VARIABLE DEB_HOST_MULTIARCH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+else()
+    set(DEB_HOST_MULTIARCH "${CMAKE_LIBRARY_ARCHITECTURE}")
+endif()
+
+# 1. --- Core pkg-config file generation ---
+# Replaces: rpcf.pc inside AC_CONFIG_FILES
+# This reads 'rpcf.pc.in' and generates a tailored 'rpcf.pc' inside your build directory.
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/rpcf.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/rpcf.pc"
+    @ONLY
+)
+
+# 2. --- Script, Dockerfile, and Configuration File Substitutions ---
+# Replaces all non-Makefile items in your AC_CONFIG_FILES list.
+# For these to compile, make sure to append a '.in' extension to their real files
+# (e.g., rename 'updcfg.py' to 'updcfg.py.in' if it contains @VARIABLE@ hooks).
+
+set(CONFIG_FILES
+    "tools/Dockerfile"
+    "tools/Dockerfile.arm"
+    "tools/updcfg.py"
+    "tools/buildall-fed.sh"
+    "tools/buildall-deb.sh"
+    "tools/buildall-rasp.sh"
+    "bldpkg/control"
+    "bldpkg/rules"
+    "bldpkg/rpcf.spec"
+    "bldpkg/rpcf.install"
+    "bldpkg/rpcf-dev.install"
+    "bldpkg/rpcf-static.install"
+    "bldpkg/blddpkg.sh"
+    "python/setup.py"
+    "monitor/oinit/setup.py"
+    "monitor/oinit/oinit.spec"
+    "monitor/client/python/build_deb.sh"
+    "monitor/client/python/build_rpm.sh"
+    "monitor/client/python/appmancli/setup.py"
+    "monitor/client/python/appmancli/pyproject.toml"
+    "monitor/client/js/appmoncli/Makefile.skel"
+)
+
+foreach(FILE IN LISTS CONFIG_FILES)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${FILE}.in")
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/${FILE}.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/${FILE}"
+            @ONLY
+        )
+    endif()
+endforeach()
+
+# ==============================================================================
 # --- FINALIZATION GENERATION STEP ---
 # ==============================================================================
 
@@ -1054,11 +1074,6 @@ include(GNUInstallDirs)
 install(FILES rpcf.pc 
         DESTINATION ${CMAKE_INSTALL_DATADIR}/pkgconfig)
 
-# 2. Package Variable Mapping
-set(REV "0")
-set(DISTDIR "${PROJECT_NAME}-${PROJECT_VERSION}")
-set(PKGNAME "${DISTDIR}.tar.gz")
-
 # Replicates the Autotools $(subst -,_,...) string replacement for Debian naming conventions
 string(REPLACE "-" "_" DEBTAR "${DISTDIR}")
 set(DEBTAR "${DEBTAR}.orig.tar.gz")
@@ -1066,14 +1081,13 @@ set(DEBTAR "${DEBTAR}.orig.tar.gz")
 # 3. Custom 'deb' Target
 # Replicates the original shell script behavior exactly using CMake-native commands
 add_custom_target(deb
-    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target package_source
-    COMMAND echo "dist done"
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target dist
+    COMMAND echo "dist package is built"
     COMMAND ${CMAKE_COMMAND} -E rename "${PKGNAME}" "bldpkg/${DEBTAR}"
     COMMAND ${CMAKE_COMMAND} -E chdir bldpkg ${CMAKE_COMMAND} -E tar zxf "${DEBTAR}"
     COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
     COMMAND ${CMAKE_COMMAND} -E rename "bldpkg/${DISTDIR}" "bldpkg/${DISTDIR}-${REV}"
-    COMMAND ${CMAKE_COMMAND} --build bldpkg --target deb_rpcf
-            -- DESTDIR=${CMAKE_BINARY_DIR}/bldpkg/${DISTDIR}-${REV}/debian/${PROJECT_NAME}
+    COMMAND ${CMAKE_COMMAND} --build bldpkg --target deb_rpcf -- DESTDIR=./bldpkg/${DISTDIR}-${REV}/debian/${PROJECT_NAME}
     COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building Debian package..."
@@ -1098,7 +1112,7 @@ set(CMAKE_SKIP_INSTALL_RPATH ON)
 
 # the custom target 'dist'
 add_custom_target(dist
-    COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/collect_files.sh" "${CMAKE_BINARY_DIR}/${PKGNAME}"
+    COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/collect_files.sh" "${CMAKE_BINARY_DIR}/${PKGNAME}" "${DISTDIR}"
         && echo "Successfully generated distribution package ${CMAKE_BINARY_DIR}/${PKGNAME}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     VERBATIM

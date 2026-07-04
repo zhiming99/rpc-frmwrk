@@ -11,3 +11,4 @@ endif
 if ENABLE_JS
 SUBDIRS += js/appmoncli
 endif
+EXTRA_DIST=CMakeLists.txt

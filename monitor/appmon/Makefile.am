@@ -55,7 +55,7 @@ endif
 #appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)
 #appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 
-EXTRA_DIST=appmon.ridl upddesc.py rpcfctl_cn.md
+EXTRA_DIST=appmon.ridl upddesc.py rpcfctl_cn.md CMakeLists.txt
 
 noinst_LIBRARIES=libappmon.a
 libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStoresvr.cpp \

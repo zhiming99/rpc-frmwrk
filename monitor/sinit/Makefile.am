@@ -32,3 +32,4 @@ librpcfenc_la_LIBADD+= -L/usr/local/lib -lgmssl
 librpcfenc_la_CPPFLAGS+= -DGMSSL
 endif
 
+EXTRA_DIST=CMakeLists.txt

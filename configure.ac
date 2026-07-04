@@ -418,6 +418,7 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rpcf.spec
                  bldpkg/rpcf.install
                  bldpkg/rpcf-dev.install
+                 bldpkg/rpcf-static.install
                  bldpkg/blddpkg.sh
                  examples/Makefile
                  test/Makefile

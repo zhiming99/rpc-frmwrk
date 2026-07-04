@@ -37,5 +37,5 @@
 timespec st_time_to_timespec(const char* text);
 uint64_t ParseStTimeToUnix(const char* input);
 std::string TranslateSTString(const std::string& input);
-ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx );
-ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx );
+ObjPtr ParsePeriAddr( const char* szText, CSTParserContext* pCtx );
+ObjPtr ParseRpcfAddr( const char* szText, CSTParserContext* pCtx );

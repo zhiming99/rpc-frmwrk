@@ -1,7 +1,8 @@
 # Define the main target for building the Python wheel package
 .PHONY: all clean distclean install uninstall
 
-EXTRA_DIST=appmancli/AppManagercli.py appmancli/maincli.py pyproject.toml.in appmancli/apptimer.py setup.py.in
+EXTRA_DIST=appmancli/AppManagercli.py appmancli/maincli.py pyproject.toml.in \
+appmancli/apptimer.py setup.py.in CMakeLists.txt
 
 top_dir=$(abs_top_srcdir)
 ridlfile=$(top_dir)/monitor/appmon/appmon.ridl
