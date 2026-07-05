@@ -71,7 +71,7 @@ set(PACKAGING_COMMAND "if [[ \"${CMAKE_BUILD_TYPE}\" == \"Debug\" ]]; then make 
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/dist/appmon.js"
     # Replicate tracking configurations from source into binary playground
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
+    #COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/webpack.config.js" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/maincli.js" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/AppMonitorcli.js" "${CMAKE_CURRENT_BINARY_DIR}/"
@@ -126,7 +126,7 @@ add_dependencies(appmonui appmon_js_bundle)
 set(PACKAGING_RELEASE "make -f Makefile.skel release && tar zcf '${TARBALL_OUTPUT}' ${files_to_package} dist/*" )
 set(PACKAGING_DEBUG "make -f Makefile.skel debug && tar zcf '${TARBALL_OUTPUT}' ${files_to_package} dist/*" )
 add_custom_target(package_appmonui
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
+    #COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND bash -lc "$PACKAGING_RELEASE"
     VERBATIM
     DEPENDS generate_appmon_js_cli
@@ -135,7 +135,7 @@ add_custom_target(package_appmonui
 )
 
 add_custom_target(dbg-package_appmonui
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
+    #COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/Makefile.skel" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND bash -lc "$PACKAGING_DEBUG"
     VERBATIM
     DEPENDS generate_appmon_js_cli

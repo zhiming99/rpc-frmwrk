@@ -11,6 +11,7 @@ project(rpcf
 set(REV "0")
 set(DISTDIR "${PROJECT_NAME}-${PROJECT_VERSION}")
 set(PKGNAME "${DISTDIR}.tar.gz")
+set(PACKAGE_URL "${PROJECT_HOMEPAGE_URL}")
 
 # =====================================================================
 # GLOBAL INTERCEPTOR: Automatically version every shared library
@@ -1139,7 +1140,7 @@ endif()
 find_program(AUTOCONF_EXE NAMES autoconf)
 find_program(AUTOMAKE_EXE NAMES automake)
 find_program(DPKG_BUILD_EXE NAMES dpkg-buildpackage)
-find_program(RPM_BUILD_EXE NAMES rpm-build)
+find_program(RPM_BUILD_EXE NAMES rpmbuild)
 
 # 4. Final approval: Must have both the tools AND the right OS host
 if(IS_IDEAL_DEB_HOST AND AUTOCONF_EXE AND AUTOMAKE_EXE AND DPKG_BUILD_EXE)
@@ -1173,8 +1174,7 @@ add_custom_target(deb
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building Debian package..."
 )
-endif()
-if(AUTOTOOLS_RPM_AVAILABLE)
+elseif(AUTOTOOLS_RPM_AVAILABLE)
 # 4. Custom 'rpm' Target
 add_custom_target(rpm
     COMMAND ${CMAKE_COMMAND} --build bldpkg --target rpm_rpcf

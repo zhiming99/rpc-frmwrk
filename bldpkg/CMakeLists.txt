@@ -31,7 +31,7 @@ endif()
 # ==============================================================================
 set(DEB_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/${DISTDIR}-${REV}")
 set(SETUP_DEBMETA "arch=\$(dpkg --print-architecture);\
-bash ${CMAKE_CURRENT_SOURCE_DIR}/blddpkg.sh '${DEB_BUILD_DIR}' '\${DESTDIR}' '${PACKAGE_NAME}_${VERSION}-${REV}_\${arch}' '${CMAKE_INSTALL_PREFIX}' '${ena_python}' '${ena_js}' '${ena_java}' ")
+bash ${CMAKE_CURRENT_BINARY_DIR}/blddpkg.sh '${DEB_BUILD_DIR}' '\${DESTDIR}' '${PACKAGE_NAME}_${VERSION}-${REV}_\${arch}' '${CMAKE_INSTALL_PREFIX}' '${ena_python}' '${ena_js}' '${ena_java}' ")
 
 set(CREATE_CHANGE_LOG "cd '${DEB_BUILD_DIR}' && \
 DEBEMAIL='zhiming <woodhead99@gmail.com>' dch --create -v '${VERSION}-${REV}' --package '${PACKAGE_NAME}' '${PACKAGE_NAME}-${VERSION}-${REV} released' ")
@@ -93,15 +93,15 @@ add_custom_target(deb_rpcf
 # Handle nested component deb building blocks conditionally matching flags
 if(ENABLE_JS)
     add_custom_command(TARGET deb_rpcf POST_BUILD
-        COMMAND ${CMAKE_COMMAND} --build "${PROJECT_BINARY_DIR}/monitor/oinit" --target deb_oinit
-        COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${PROJECT_BINARY_DIR}/monitor/oinit/output/python3-oinit_${VERSION}*.deb ${CMAKE_CURRENT_BINARY_DIR}/"
+        COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}/monitor/oinit" --target deb_oinit
+        COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_BINARY_DIR}/monitor/oinit/output/python3-oinit_${VERSION}*.deb ${CMAKE_CURRENT_BINARY_DIR}/"
         COMMENT "Consolidating conditional monitor oinit Debian artifacts"
     )
 endif()
 
 add_custom_command(TARGET deb_rpcf POST_BUILD
-    COMMAND ${CMAKE_COMMAND} --build "${PROJECT_BINARY_DIR}/monitor/client/python" --target deb_python_appmoncli
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${PROJECT_BINARY_DIR}/monitor/client/python/output/python3-appmoncli_${VERSION}*.deb ${CMAKE_CURRENT_BINARY_DIR}/"
+    COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}/monitor/client/python" --target deb_python_appmoncli
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_BINARY_DIR}/monitor/client/python/output/python3-appmoncli_${VERSION}*.deb ${CMAKE_CURRENT_BINARY_DIR}/"
     COMMENT "Consolidating client appmoncli Python Debian artifacts"
 )
 
@@ -114,8 +114,8 @@ add_custom_target(rpm_rpcf
     COMMAND rpmdev-setuptree
     
     # Leverages your root configuration CPack source targets instead of 'make dist'
-    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target package_source
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${PROJECT_BINARY_DIR}/rpcf-${VERSION}-src.tar.gz \$ENV{HOME}/rpmbuild/SOURCES/${PACKAGE_NAME}-${VERSION}.tar.gz || cp ${PROJECT_BINARY_DIR}/${PACKAGE_NAME}-${VERSION}.tar.gz \$ENV{HOME}/rpmbuild/SOURCES/"
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target package_source
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_BINARY_DIR}/rpcf-${VERSION}-src.tar.gz \$ENV{HOME}/rpmbuild/SOURCES/${PACKAGE_NAME}-${VERSION}.tar.gz || cp ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}-${VERSION}.tar.gz \$ENV{HOME}/rpmbuild/SOURCES/"
     
     # Fire internal spec custom build script passing host configurations parameters
     # Replaces: host_cpu parameter with CMAKE_SYSTEM_PROCESSOR or platform mapping
@@ -128,15 +128,15 @@ add_custom_target(rpm_rpcf
 # Handle nested component rpm building blocks conditionally matching flags
 if(ENABLE_JS)
     add_custom_command(TARGET rpm_rpcf POST_BUILD
-        COMMAND ${CMAKE_COMMAND} --build "${PROJECT_BINARY_DIR}/monitor/oinit" --target rpm_oinit
-        COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${PROJECT_BINARY_DIR}/monitor/oinit/output/python3-oinit-${VERSION}*.rpm ${CMAKE_CURRENT_BINARY_DIR}/"
+        COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}/monitor/oinit" --target rpm_oinit
+        COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_BINARY_DIR}/monitor/oinit/output/python3-oinit-${VERSION}*.rpm ${CMAKE_CURRENT_BINARY_DIR}/"
         COMMENT "Consolidating conditional monitor oinit RPM artifacts"
     )
 endif()
 
 add_custom_command(TARGET rpm_rpcf POST_BUILD
-    COMMAND ${CMAKE_COMMAND} --build "${PROJECT_BINARY_DIR}/monitor/client/python" --target rpm_python_appmancli
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${PROJECT_BINARY_DIR}/monitor/client/python/output/python3-appmoncli-${VERSION}*.rpm ${CMAKE_CURRENT_BINARY_DIR}/"
+    COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}/monitor/client/python" --target rpm_python_appmancli
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_BINARY_DIR}/monitor/client/python/output/python3-appmoncli-${VERSION}*.rpm ${CMAKE_CURRENT_BINARY_DIR}/"
     COMMENT "Consolidating client appmoncli Python RPM artifacts"
 )
 

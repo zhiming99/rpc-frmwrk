@@ -35,7 +35,7 @@ add_custom_target(wheel
     
     # Replicates: cp *.py rpmpkg/oinit; mv rpmpkg/oinit/setup.py rpmpkg/; ...
     # Assumes setup.py is generated previously or tracked in source tree
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/setup.py "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/setup.py "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/oinitdesc.json "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/"
     
     # Run directory globbing shell fallback for multi-file extensions securely
@@ -71,7 +71,8 @@ add_custom_target(deb_oinit
     VERBATIM
     
     # Consolidate outputs
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/python3-oinit_${VERSION2}-${REV}_*.deb ${CMAKE_BINARY_DIR}/bldpkg/"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/output"
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/python3-oinit_${VERSION2}-${REV}_*.deb ${CMAKE_CURRENT_BINARY_DIR}/output/"
     COMMAND ${CMAKE_COMMAND} -E echo "deb package is generated in 'output' directory."
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generating Debian packages (.deb)"
@@ -92,7 +93,7 @@ add_custom_target(rpm_oinit
     
     # Deploy source wheel to SOURCES root
     COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_CURRENT_BINARY_DIR}/output/*.whl $ENV{HOME}/oinitrpm/SOURCES/"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/oinit.spec "$ENV{HOME}/oinitrpm/SPECS/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/oinit.spec "$ENV{HOME}/oinitrpm/SPECS/"
     
     # Run rpmbuild configurations
     COMMAND ${CMAKE_COMMAND} -E env bash -c "cd $ENV{HOME}/oinitrpm && rpmbuild -bb --define \"_topdir \`pwd\`\" SPECS/oinit.spec && cp ./RPMS/noarch/*.rpm ${CMAKE_CURRENT_BINARY_DIR}/"

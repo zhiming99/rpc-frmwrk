@@ -85,8 +85,8 @@ set(EXPORT_LICENSE "if ! grep 'dynamic = ' pyproject.toml; then python3 -c \"imp
 add_custom_command(
     OUTPUT "${WHEEL_OUTPUT}"
     # Synchronize setup templates into the workspace
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml" "${CMAKE_CURRENT_BINARY_DIR}/"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/setup.py" "${CMAKE_CURRENT_BINARY_DIR}/"
+    #COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml" "${CMAKE_CURRENT_BINARY_DIR}/"
+    #COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/setup.py" "${CMAKE_CURRENT_BINARY_DIR}/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${top_dir}/LICENSE" "${CMAKE_CURRENT_BINARY_DIR}/LICENSE"
     
     # Process dynamic pyproject configurations matching modern requirements
