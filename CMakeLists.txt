@@ -1096,28 +1096,6 @@ install(FILES rpcf.pc
 string(REPLACE "-" "_" DEBTAR "${DISTDIR}")
 set(DEBTAR "${DEBTAR}.orig.tar.gz")
 
-# 3. Custom 'deb' Target
-# Replicates the original shell script behavior exactly using CMake-native commands
-add_custom_target(deb
-    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target dist
-    COMMAND echo "dist package is built"
-    COMMAND ${CMAKE_COMMAND} -E rename "${PKGNAME}" "bldpkg/${DEBTAR}"
-    COMMAND ${CMAKE_COMMAND} -E chdir bldpkg ${CMAKE_COMMAND} -E tar zxf "${DEBTAR}"
-    COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
-    COMMAND ${CMAKE_COMMAND} -E rename "bldpkg/${DISTDIR}" "bldpkg/${DISTDIR}-${REV}"
-    COMMAND ${CMAKE_COMMAND} --build bldpkg --target deb_rpcf -- DESTDIR=./bldpkg/${DISTDIR}-${REV}/debian/${PROJECT_NAME}
-    COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Building Debian package..."
-)
-
-# 4. Custom 'rpm' Target
-add_custom_target(rpm
-    COMMAND ${CMAKE_COMMAND} --build bldpkg --target rpm_rpcf
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Building RPM package..."
-)
-
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -1136,3 +1114,73 @@ add_custom_target(dist
     VERBATIM
 )
 
+# =====================================================================
+# building deb/rpm package
+# =====================================================================
+set(IS_IDEAL_DEB_HOST FALSE)
+set(IS_IDEAL_RPM_HOST FALSE)
+
+# 1. Check if we are running on a Linux platform
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    # 2. Inspect the system's OS identification file
+    if(EXISTS "/etc/os-release")
+        file(READ "/etc/os-release" OS_RELEASE_CONTENT)
+        
+        # Check if the OS ID matches debian, ubuntu, or raspbian
+        if(OS_RELEASE_CONTENT MATCHES "ID=(debian|ubuntu|raspbian)")
+            set(IS_IDEAL_DEB_HOST TRUE)
+        elseif(OS_RELEASE_CONTENT MATCHES "ID=(fedora|centos|redhat)")
+            set(IS_IDEAL_RPM_HOST TRUE)
+        endif()
+    endif()
+endif()
+
+# 3. Query the standard tool dependencies
+find_program(AUTOCONF_EXE NAMES autoconf)
+find_program(AUTOMAKE_EXE NAMES automake)
+find_program(DPKG_BUILD_EXE NAMES dpkg-buildpackage)
+find_program(RPM_BUILD_EXE NAMES rpm-build)
+
+# 4. Final approval: Must have both the tools AND the right OS host
+if(IS_IDEAL_DEB_HOST AND AUTOCONF_EXE AND AUTOMAKE_EXE AND DPKG_BUILD_EXE)
+    set(AUTOTOOLS_DEB_AVAILABLE TRUE)
+else()
+    set(AUTOTOOLS_DEB_AVAILABLE FALSE)
+endif()
+
+if(IS_IDEAL_RPM_HOST AND AUTOCONF_EXE AND AUTOMAKE_EXE AND RPM_BUILD_EXE)
+    set(AUTOTOOLS_RPM_AVAILABLE TRUE)
+else()
+    set(AUTOTOOLS_RPM_AVAILABLE FALSE)
+endif()
+
+# =====================================================================
+# DEFINE TARGETS
+# =====================================================================
+if(AUTOTOOLS_DEB_AVAILABLE)
+
+# 3. Custom 'deb' Target
+# Replicates the original shell script behavior exactly using CMake-native commands
+add_custom_target(deb
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target dist
+    COMMAND echo "dist package is built"
+    COMMAND ${CMAKE_COMMAND} -E rename "${PKGNAME}" "bldpkg/${DEBTAR}"
+    COMMAND ${CMAKE_COMMAND} -E chdir bldpkg ${CMAKE_COMMAND} -E tar zxf "${DEBTAR}"
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
+    COMMAND ${CMAKE_COMMAND} -E rename "bldpkg/${DISTDIR}" "bldpkg/${DISTDIR}-${REV}"
+    COMMAND ${CMAKE_COMMAND} --build bldpkg --target deb_rpcf -- DESTDIR=./bldpkg/${DISTDIR}-${REV}/debian/${PROJECT_NAME}
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Building Debian package..."
+)
+endif()
+if(AUTOTOOLS_RPM_AVAILABLE)
+# 4. Custom 'rpm' Target
+add_custom_target(rpm
+    COMMAND ${CMAKE_COMMAND} --build bldpkg --target rpm_rpcf
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Building RPM package..."
+)
+endif()
+
+include(CPack)
