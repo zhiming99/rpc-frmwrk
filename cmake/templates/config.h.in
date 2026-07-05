@@ -1,0 +1,77 @@
+pragma once
+
+#define PACKAGE_NAME "@PROJECT_NAME@"
+#define PACKAGE_VERSION "@PROJECT_VERSION@"
+#define PACKAGE_URL "@PROJECT_HOMEPAGE_URL@"
+
+/* These will be defined as 1 or 0 by CMake depending on user flags */
+#cmakedefine01 ENABLE_SSL
+#cmakedefine01 ENABLE_TESTCASES
+#cmakedefine01 ENABLE_KRB5
+#cmakedefine01 ENABLE_GMSSL
+#cmakedefine01 ENABLE_FUSE3
+#cmakedefine01 ENABLE_JAVA
+#cmakedefine01 ENABLE_PYTHON
+#cmakedefine01 ENABLE_JS
+
+/* Atomic and System Header Checks */
+#cmakedefine HAVE_LIBatomic 1
+#cmakedefine HAVE_ARPA_INET_H 1
+#cmakedefine HAVE_FCNTL_H 1
+#cmakedefine HAVE_NETINET_IN_H 1
+#cmakedefine HAVE_STDLIB_H 1
+#cmakedefine HAVE_STRING_H 1
+#cmakedefine HAVE_SYS_SOCKET_H 1
+#cmakedefine HAVE_SYS_TIME_H 1
+#cmakedefine HAVE_UNISTD_H 1
+#cmakedefine HAVE_LZ4_H 1
+#cmakedefine HAVE_DBUS_DBUS_H 1
+#cmakedefine HAVE_GLIB_H 1
+#cmakedefine HAVE_JSON_JSON_H 1
+#cmakedefine HAVE_CPPUNIT_UI_TEXT_TESTRUNNER_H 1
+#cmakedefine HAVE_LIBINTL_H 1
+#cmakedefine HAVE_LIMITS_H 1
+#cmakedefine HAVE_NETDB_H 1
+#cmakedefine HAVE_MALLOC_H 1
+#cmakedefine HAVE_STDDEF_H 1
+#cmakedefine HAVE_SYS_IOCTL_H 1
+
+/* Type Definitions Compatibility */
+#cmakedefine HAVE_OFF_T 1
+#cmakedefine HAVE_SSIZE_T 1
+#cmakedefine HAVE_PTRDIFF_T 1
+#cmakedefine HAVE_STDBOOL_H 1
+
+/* Standard Library Function Checks */
+#cmakedefine HAVE_ALLOCA_H
+#cmakedefine HAVE_ERROR_AT_LINE
+#cmakedefine HAVE_STRTOD
+#cmakedefine HAVE_CLOCK_GETTIME
+#cmakedefine HAVE_MEMMOVE
+#cmakedefine HAVE_FTRUNCATE
+#cmakedefine HAVE_GETCWD
+#cmakedefine HAVE_GETTIMEOFDAY
+#cmakedefine HAVE_INET_NTOA
+#cmakedefine HAVE_MEMSET
+#cmakedefine HAVE_REALPATH
+#cmakedefine HAVE_SOCKET
+#cmakedefine HAVE_STRERROR
+#cmakedefine HAVE_STRTOL
+#cmakedefine HAVE_STRCASECMP
+#cmakedefine HAVE_STRCHR
+#cmakedefine HAVE_STRTOUL
+#cmakedefine HAVE_STRTOULL
+
+/* Integer Types Presence Guards */
+#cmakedefine HAVE_INT16_T
+#cmakedefine HAVE_INT32_T
+#cmakedefine HAVE_INT64_T
+#cmakedefine HAVE_INT8_T
+#cmakedefine HAVE_MODE_T
+#cmakedefine HAVE_UINT16_T
+#cmakedefine HAVE_UINT32_T
+#cmakedefine HAVE_UINT64_T
+#cmakedefine HAVE_UINT8_T
+
+/* Architecture Detection Flags */
+#cmakedefine ARM
