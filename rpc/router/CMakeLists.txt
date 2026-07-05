@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_rpcrouter LANGUAGES C CXX)
+#project(rpcf_rpcrouter LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, sysconfdir, mandir)
 include(GNUInstallDirs)
@@ -57,14 +57,14 @@ if(ENABLE_FUSE3)
 endif()
 
 # Replaces: librtfiles_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(rtfiles PROPERTIES 
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(rtfiles PROPERTIES 
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Replaces: librtfiles_la_LIBADD
 find_package(Threads REQUIRED)
-target_link_directories(rtfiles PRIVATE "${CMAKE_SOURCE_DIR}/3rd_party")
+target_link_directories(rtfiles PRIVATE "${CMAKE_BINARY_DIR}/3rd_party")
 target_link_libraries(rtfiles PRIVATE
     appmancli     # Native targets reference mapping instead of physical .la paths
     rpc
@@ -107,11 +107,11 @@ endif()
 
 # Replaces: rpcrouter_LDADD
 target_link_directories(rpcrouter PRIVATE
-    "${CMAKE_SOURCE_DIR}/combase"
-    "${CMAKE_SOURCE_DIR}/ipc"
-    "${CMAKE_SOURCE_DIR}/rpc"
-    "${CMAKE_SOURCE_DIR}/3rd_party"
-    "${CMAKE_SOURCE_DIR}/fuse"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/rpc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
+    "${CMAKE_BINARY_DIR}/fuse"
 )
 
 target_link_libraries(rpcrouter PRIVATE

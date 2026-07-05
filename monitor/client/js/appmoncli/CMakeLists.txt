@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_appmoncli_js LANGUAGES NONE)
+#project(rpcf_appmoncli_js LANGUAGES NONE)
 
 # Expose standard directory variables (maps sysconfdir)
 include(GNUInstallDirs)

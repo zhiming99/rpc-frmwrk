@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(monitor LANGUAGES NONE)
+#project(monitor LANGUAGES NONE)
 
 # ==============================================================================
 # 1. Base Subdirectories

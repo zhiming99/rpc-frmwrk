@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_pics LANGUAGES NONE)
+#project(rpcf_pics LANGUAGES NONE)
 
 # ------------------------------------------------------------------------------
 # EXTRA_DIST Emulation via Explicit File Installation (Optional)

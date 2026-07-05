@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_logger LANGUAGES C CXX)
+#project(rpcf_logger LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, sysconfdir, includedir, mandir)
 include(GNUInstallDirs)
@@ -44,14 +44,14 @@ if(OFFSET_MACRO)
 endif()
 
 # Replaces: liblogcli_la_LDFLAGS= -version-info @VERSION2@
-set_target_properties(logcli PROPERTIES 
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(logcli PROPERTIES 
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Replaces: liblogcli_la_LIBADD
 find_package(Threads REQUIRED)
-target_link_directories(logcli PRIVATE "${PROJECT_SOURCE_DIR}/3rd_party")
+target_link_directories(logcli PRIVATE "${CMAKE_BINARY_DIR}/3rd_party")
 target_link_libraries(logcli PRIVATE
     ipc       # Native targets reference matching internal layouts
     combase
@@ -89,9 +89,9 @@ endif()
 
 # Replaces: rpcf_logger_LDADD
 target_link_directories(rpcf_logger PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
 )
 target_link_libraries(rpcf_logger PRIVATE
     ipc
@@ -125,9 +125,9 @@ endif()
 
 # Replaces: rpcf_sendlog_LDADD
 target_link_directories(rpcf_sendlog PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
 )
 target_link_libraries(rpcf_sendlog PRIVATE
     logcli        # Local library reference dependency

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(smoketest LANGUAGES C CXX)
+#project(smoketest LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir)
 include(GNUInstallDirs)

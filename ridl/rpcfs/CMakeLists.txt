@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(genrpcfs LANGUAGES C CXX)
+#project(genrpcfs LANGUAGES C CXX)
 
 # ==============================================================================
 # 1. Define Static Library Target

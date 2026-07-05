@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_java LANGUAGES C CXX)
+#project(rpcf_java LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, etc.)
 include(GNUInstallDirs)
@@ -23,7 +23,7 @@ set(swig_fuse_src "")
 
 if(ENABLE_FUSE3)
     set(fuse3_macro "-DFUSE3")
-    set(fuse3_inc "${PROJECT_SOURCE_DIR}/../fuse")
+    set(fuse3_inc "${CMAKE_CURRENT_SOURCE_DIR}/../fuse")
     set(fuse3_lib "fuseif") # Refers to native target name instead of .la
     set(swig_fuse_src "fuseif.i")
 endif()
@@ -68,13 +68,12 @@ add_custom_command(
 # ==============================================================================
 add_library(rpcbaseJNI SHARED "${CMAKE_CURRENT_BINARY_DIR}/rpcbase_wrap.cpp")
 
-message(STATUS "The fuse3 cflags are: ${fuse3_inc}")
+message(STATUS "haha,The fuse3 cflags are: ${fuse3_inc}")
 # Native Preprocessor compiler configuration definitions and search layouts
 target_include_directories(rpcbaseJNI PRIVATE
-    ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${PROJECT_SOURCE_DIR}/ipc
-    ${PROJECT_SOURCE_DIR}/combase
+    ${CMAKE_SOURCE_DIR}/ipc
+    ${CMAKE_SOURCE_DIR}/combase
     ${JNI_INCLUDE_DIRS}
     ${fuse3_inc}
 )
@@ -83,19 +82,20 @@ if(ENABLE_FUSE3)
     target_compile_definitions(rpcbaseJNI PRIVATE FUSE3)
 endif()
 
-set_target_properties(rpcbaseJNI PROPERTIES 
-    POSITION_INDEPENDENT_CODE ON
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(rpcbaseJNI PROPERTIES 
+#    POSITION_INDEPENDENT_CODE ON
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Linkage specifications mapping
 find_package(Threads REQUIRED)
 target_link_directories(rpcbaseJNI PRIVATE
-    ${PROJECT_SOURCE_DIR}/combase
-    ${PROJECT_SOURCE_DIR}/ipc
-    ${PROJECT_SOURCE_DIR}/3rd_party
+    ${CMAKE_BINARY_DIR}/combase
+    ${CMAKE_BINARY_DIR}/ipc
+    ${CMAKE_BINARY_DIR}/3rd_party
 )
+
 target_link_libraries(rpcbaseJNI PRIVATE
     ${COMMON_LINK}
     ipc       # Native target tracking names instead of .la assets

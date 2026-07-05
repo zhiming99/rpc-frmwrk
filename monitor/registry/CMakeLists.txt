@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_registry LANGUAGES C CXX)
+#project(rpcf_registry LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, sysconfdir, includedir)
 include(GNUInstallDirs)
@@ -41,14 +41,14 @@ if(OFFSET_MACRO)
 endif()
 
 # Replaces: libregfs_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(regfs PROPERTIES 
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(regfs PROPERTIES 
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Replaces: libregfs_la_LIBADD
 find_package(Threads REQUIRED)
-target_link_directories(regfs PRIVATE "${CMAKE_SOURCE_DIR}/3rd_party")
+target_link_directories(regfs PRIVATE "${CMAKE_BINARY_DIR}/3rd_party")
 target_link_libraries(regfs PRIVATE
     combase # Target linking instead of .la asset references
     Threads::Threads
@@ -70,9 +70,9 @@ set(BINARY_LIBS
 )
 
 set(BINARY_LINK_DIRS
-    "${CMAKE_SOURCE_DIR}/combase"
-    "${CMAKE_SOURCE_DIR}/ipc"
-    "${CMAKE_SOURCE_DIR}/3rd_party"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
 )
 
 # --- Target: regfsmnt ---

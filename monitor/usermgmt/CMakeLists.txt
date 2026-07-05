@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_usermgmt LANGUAGES NONE) # No C/C++ compilation required here
+#project(rpcf_usermgmt LANGUAGES NONE) # No C/C++ compilation required here
 
 # Expose standard directory variables (maps bindir, mandir)
 include(GNUInstallDirs)

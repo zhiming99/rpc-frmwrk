@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_examples LANGUAGES NONE) # Verification & source sample directory, no local C++ compilation
+#project(rpcf_examples LANGUAGES NONE) # Verification & source sample directory, no local C++ compilation
 
 # Expose standard directory variables (maps sysconfdir)
 include(GNUInstallDirs)

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_oa2check LANGUAGES C CXX)
+#project(rpcf_oa2check LANGUAGES C CXX)
 
 # Expose standard directory variables (maps sysconfdir)
 include(GNUInstallDirs)

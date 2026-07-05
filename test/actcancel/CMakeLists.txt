@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(actcancel LANGUAGES C CXX)
+#project(actcancel LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, sysconfdir)
 include(GNUInstallDirs)
@@ -24,10 +24,10 @@ add_library(actc SHARED
 target_include_directories(actc PRIVATE ${include_ipcdir})
 
 # Replaces: libactc_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(actc PROPERTIES 
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(actc PROPERTIES 
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Native link dependencies (handles -lpthread and -ldl cleanly across platforms)
 find_package(Threads REQUIRED)

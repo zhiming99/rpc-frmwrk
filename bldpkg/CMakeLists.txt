@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_bldpkg LANGUAGES NONE)
+#project(rpcf_bldpkg LANGUAGES NONE)
 
 # Expose standard directory layout variables (maps prefix, bindir, libdir, etc.)
 include(GNUInstallDirs)
@@ -100,7 +100,7 @@ if(ENABLE_JS)
 endif()
 
 add_custom_command(TARGET deb_rpcf POST_BUILD
-    COMMAND ${CMAKE_COMMAND} --build "${PROJECT_BINARY_DIR}/monitor/client/python" --target deb_python_appmancli
+    COMMAND ${CMAKE_COMMAND} --build "${PROJECT_BINARY_DIR}/monitor/client/python" --target deb_python_appmoncli
     COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${PROJECT_BINARY_DIR}/monitor/client/python/output/python3-appmoncli_${VERSION}*.deb ${CMAKE_CURRENT_BINARY_DIR}/"
     COMMENT "Consolidating client appmoncli Python Debian artifacts"
 )

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(monitor_client LANGUAGES NONE)
+#project(monitor_client LANGUAGES NONE)
 
 # ==============================================================================
 # 1. Base Subdirectories (SUBDIRS=cpp/appmancli)

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_js LANGUAGES NONE) # No C/C++ compilation needed here
+#project(rpcf_js LANGUAGES NONE) # No C/C++ compilation needed here
 
 # Expose standard directory variables (maps libdir)
 include(GNUInstallDirs)

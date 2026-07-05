@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_tests LANGUAGES C CXX)
+#project(rpcf_tests LANGUAGES C CXX)
 
 # ==============================================================================
 # 1. Base Test Subdirectories (SUBDIRS = iftest btinrt helloworld)
