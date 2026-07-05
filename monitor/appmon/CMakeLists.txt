@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_appmon LANGUAGES C CXX)
+#project(rpcf_appmon LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, sysconfdir, includedir, mandir)
 include(GNUInstallDirs)
@@ -145,9 +145,9 @@ endif()
 # Set up link dependency maps
 find_package(Threads REQUIRED)
 target_link_directories(appmonsvr PRIVATE
-    "${CMAKE_SOURCE_DIR}/combase"
-    "${CMAKE_SOURCE_DIR}/ipc"
-    "${CMAKE_SOURCE_DIR}/3rd_party"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
 )
 
 target_link_libraries(appmonsvr PRIVATE

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_sinit LANGUAGES C CXX)
+#project(rpcf_sinit LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, mandir)
 include(GNUInstallDirs)
@@ -33,11 +33,11 @@ if(OFFSET_MACRO) # Inherited from master or prior scope configurations
 endif()
 
 # Replaces: librpcfenc_la_LDFLAGS=-rdynamic -version-info @VERSION2@
-set_target_properties(rpcfenc PROPERTIES 
-    ENABLE_EXPORTS ON
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(rpcfenc PROPERTIES 
+#    ENABLE_EXPORTS ON
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Handle dynamic OpenSSL and GMSSL extensions conditionally
 if(ENABLE_OPENSSL)
@@ -47,7 +47,6 @@ endif()
 
 if(ENABLE_GMSSL)
     target_compile_definitions(rpcfenc PRIVATE GMSSL)
-    target_link_directories(rpcfenc PRIVATE "/usr/local/lib")
     target_link_libraries(rpcfenc PRIVATE gmssl)
 endif()
 
@@ -76,9 +75,9 @@ endif()
 # Replaces: sinit_LDADD
 find_package(Threads REQUIRED)
 target_link_directories(sinit PRIVATE
-    ${PROJECT_SOURCE_DIR}/3rd_party
-    ${PROJECT_SOURCE_DIR}/combase
-    ${PROJECT_SOURCE_DIR}/ipc
+    ${CMAKE_BINARY_DIR}/3rd_party
+    ${CMAKE_BINARY_DIR}/combase
+    ${CMAKE_BINARY_DIR}/ipc
 )
 target_link_libraries(sinit PRIVATE
     rpcfenc        # Internal target link resolution instead of .la references

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_python LANGUAGES C CXX)
+#project(rpcf_python LANGUAGES C CXX)
 
 # Include the standard module that provides CMAKE_INSTALL_FULL_LIBDIR
 include(GNUInstallDirs)

@@ -12,6 +12,24 @@ set(REV "0")
 set(DISTDIR "${PROJECT_NAME}-${PROJECT_VERSION}")
 set(PKGNAME "${DISTDIR}.tar.gz")
 
+# =====================================================================
+# GLOBAL INTERCEPTOR: Automatically version every shared library
+# =====================================================================
+macro(add_library _target)
+    # Forward parameters to create the tracking target
+    _add_library(${_target} ${ARGN})
+
+    get_target_property(_target_type ${_target} TYPE)
+    if(_target_type STREQUAL "SHARED_LIBRARY")
+        set_target_properties(${_target} PROPERTIES
+            VERSION "0.${PROJECT_VERSION_PATCH}.${PROJECT_VERSION_MINOR}"
+            SOVERSION "${PROJECT_VERSION_MAJOR}"
+        )
+    endif()
+endmacro()
+
+
+
 # --- Replaces AX_CXX_COMPILE_STDCXX(11, ...) ---
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

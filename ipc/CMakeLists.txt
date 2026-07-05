@@ -44,13 +44,13 @@ target_include_directories(ipc PRIVATE
 
 # 5. --- Library Target Properties & Versioning (libipc_la_LDFLAGS) ---
 # Parses your colon-separated VERSION2 tracking string into a clean layout properties map
-string(REPLACE ":" "." SO_VERSION "${VERSION2}")
+#string(REPLACE ":" "." SO_VERSION "${VERSION2}")
 
-set_target_properties(ipc PROPERTIES
-    VERSION "${PROJECT_VERSION}"
-    SOVERSION "${SO_VERSION}"
-    OUTPUT_NAME "ipc"
-)
+#set_target_properties(ipc PROPERTIES
+#    VERSION "${PROJECT_VERSION}"
+#    SOVERSION "${SO_VERSION}"
+#    OUTPUT_NAME "ipc"
+#)
 
 # 6. --- Link Dependencies & Target Libraries (libipc_la_LIBADD) ---
 # We bypass relative path lookup variables entirely and bind straight to the 'combase' target.

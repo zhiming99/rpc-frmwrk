@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_appmancli_java LANGUAGES NONE)
+#project(rpcf_appmancli_java LANGUAGES NONE)
 
 # Expose standard directory variables (maps libdir)
 include(GNUInstallDirs)

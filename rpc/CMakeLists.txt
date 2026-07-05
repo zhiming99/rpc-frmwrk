@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_rpc LANGUAGES C CXX)
+#project(rpcf_rpc LANGUAGES C CXX)
 
 # Expose standard directory variables (maps libdir, sysconfdir)
 include(GNUInstallDirs)
@@ -50,17 +50,12 @@ add_library(rpc SHARED ${librpc_la_SOURCES})
 target_include_directories(rpc PRIVATE ${include_ipcdir})
 set_target_properties(rpc PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Replaces: librpc_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(rpc PROPERTIES
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
 
 # Replaces: librpc_la_LIBADD= ... -lpthread -ldl
 find_package(Threads REQUIRED)
 target_link_directories(rpc PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
 )
 target_link_libraries(rpc PRIVATE
     combase # Target reference name instead of .la links

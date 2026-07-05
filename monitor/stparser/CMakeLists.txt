@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_stparser LANGUAGES C CXX)
+#project(rpcf_stparser LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir)
 include(GNUInstallDirs)
@@ -87,7 +87,7 @@ target_include_directories(rpcfstc PRIVATE
 set_target_properties(rpcfstc PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Setup master link maps target hooks resolution 
-target_link_directories(rpcfstc PRIVATE "${PROJECT_SOURCE_DIR}/combase")
+target_link_directories(rpcfstc PRIVATE "${CMAKE_BINARY_DIR}/combase")
 target_link_libraries(rpcfstc PRIVATE 
     combase # Target reference name from your architecture instead of .la links
 )

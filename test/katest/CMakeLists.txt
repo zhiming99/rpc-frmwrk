@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(katest LANGUAGES C CXX)
+#project(katest LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, sysconfdir)
 include(GNUInstallDirs)
@@ -25,10 +25,10 @@ target_include_directories(kasvr PRIVATE ${include_ipcdir})
 set_target_properties(kasvr PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Replaces: libkasvr_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(kasvr PROPERTIES 
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(kasvr PROPERTIES 
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Native link dependencies (handles -lpthread and -ldl cleanly across platforms)
 find_package(Threads REQUIRED)

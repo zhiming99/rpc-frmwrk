@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_sslport LANGUAGES C CXX)
+#project(rpcf_sslport LANGUAGES C CXX)
 
 # Expose standard directory variables (maps libdir)
 include(GNUInstallDirs)
@@ -29,18 +29,18 @@ target_include_directories(sslpt PRIVATE
 set_target_properties(sslpt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Replaces: libsslpt_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(sslpt PROPERTIES
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(sslpt PROPERTIES
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Replaces: libsslpt_la_LIBADD
 find_package(Threads REQUIRED)
 target_link_directories(sslpt PRIVATE
-    "${PROJECT_SOURCE_DIR}/combase"
-    "${PROJECT_SOURCE_DIR}/rpc"
-    "${PROJECT_SOURCE_DIR}/ipc"
-    "${PROJECT_SOURCE_DIR}/3rd_party"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/rpc"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
 )
 
 target_link_libraries(sslpt PRIVATE

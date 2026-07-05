@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(ridl LANGUAGES C CXX)
+#project(ridl LANGUAGES C CXX)
 
 # Expose standard directory layout variables (maps bindir, sysconfdir, etc.)
 include(GNUInstallDirs)
@@ -126,10 +126,10 @@ endif()
 # ==============================================================================
 # Specify explicit tracking link directories if search paths are missed
 target_link_directories(ridlc PRIVATE
-    ${PROJECT_SOURCE_DIR}/combase
-    ${PROJECT_SOURCE_DIR}/ipc
-    ${PROJECT_SOURCE_DIR}/3rd_party
-    ${PROJECT_SOURCE_DIR}/debug64/
+    ${CMAKE_BINARY_DIR}/combase
+    ${CMAKE_BINARY_DIR}/ipc
+    ${CMAKE_BINARY_DIR}/3rd_party
+    ${CMAKE_BINARY_DIR}/debug64/
 )
 
 # Bind downstream libraries to the target executable framework

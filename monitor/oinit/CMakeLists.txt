@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_oinit LANGUAGES NONE)
+#project(rpcf_oinit LANGUAGES NONE)
 
 # Include standard directory layout configurations (maps mandir, libdir)
 include(GNUInstallDirs)
@@ -61,16 +61,17 @@ add_custom_target(deb_oinit
     # Synchronize debian scripts layout
     COMMAND ${CMAKE_COMMAND} -E env bash -c "cp -r ${CMAKE_CURRENT_SOURCE_DIR}/debian/* ${CMAKE_CURRENT_BINARY_DIR}/debpkg/debian/"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/debpkg/oinit"
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_BINARY_DIR}/debpkg/oinit/ && cp ${CMAKE_CURRENT_SOURCE_DIR}/oinitdesc.json ${CMAKE_CURRENT_BINARY_DIR}/debpkg/oinit/ && cp ${CMAKE_CURRENT_SOURCE_DIR}/Makefile.deb ${CMAKE_CURRENT_BINARY_DIR}/debpkg/Makefile && cp ${CMAKE_CURRENT_SOURCE_DIR}/*.md ${CMAKE_CURRENT_BINARY_DIR}/debpkg/oinit/"
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_SOURCE_DIR}/*.md ${CMAKE_CURRENT_BINARY_DIR}/debpkg/oinit/"
+    COMMAND bash -lc "cp ${CMAKE_CURRENT_SOURCE_DIR}/oinitdesc.json ${CMAKE_CURRENT_BINARY_DIR}/debpkg/oinit/"
+    COMMAND bash -lc "cp ${CMAKE_CURRENT_SOURCE_DIR}/Makefile.deb ${CMAKE_CURRENT_BINARY_DIR}/debpkg/Makefile" 
     COMMAND ${CMAKE_COMMAND} -E env bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/debpkg/oinit/setup.py ${CMAKE_CURRENT_BINARY_DIR}/debpkg/ || true"
     
     # Execute dpkg-buildpackage pipelines
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cd ${CMAKE_CURRENT_BINARY_DIR}/debpkg && DEBEMAIL=\"\${PACKAGE_BUGREPORT}\" DEBFULLNAME=\"zhiming\" dch --create -v \${VERSION}-\${rev} --package python3-oinit \"python3-oinit-\${VERSION}-\${rev} released\" && dpkg-buildpackage -us -uc"
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "cd ${CMAKE_CURRENT_BINARY_DIR}/debpkg && DEBEMAIL=\"${PACKAGE_BUGREPORT}\" DEBFULLNAME=\"zhiming\" dch --create -v ${VERSION}-${REV} --package python3-oinit \"python3-oinit-${VERSION}-${REV} released\" && dpkg-buildpackage -us -uc"
+    VERBATIM
     
     # Consolidate outputs
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/output"
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "rm -f ${CMAKE_CURRENT_BINARY_DIR}/output/python3-oinit*deb || true"
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/../python3-oinit* ${CMAKE_CURRENT_BINARY_DIR}/output/ || true"
+    COMMAND ${CMAKE_COMMAND} -E env bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/python3-oinit_${VERSION2}-${REV}_*.deb ${CMAKE_BINARY_DIR}/bldpkg/"
     COMMAND ${CMAKE_COMMAND} -E echo "deb package is generated in 'output' directory."
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generating Debian packages (.deb)"

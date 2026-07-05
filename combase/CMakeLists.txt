@@ -45,11 +45,11 @@ set(RPCF_COMBASE_HEADERS
 # It parses the colon-separated VERSION2 string we created (e.g., 0:9:0) into a clean minor version.
 string(REPLACE ":" "." SO_VERSION "${VERSION2}")
 
-set_target_properties(combase PROPERTIES
-    VERSION "${PROJECT_VERSION}"
-    SOVERSION "${SO_VERSION}"
-    OUTPUT_NAME "combase"
-)
+#set_target_properties(combase PROPERTIES
+#    VERSION "${PROJECT_VERSION}"
+#    SOVERSION "${SO_VERSION}"
+#    OUTPUT_NAME "combase"
+#)
 
 find_package(Threads REQUIRED)
 # 5. --- Link Dependencies & Target Libraries (libcombase_la_LIBADD) ---

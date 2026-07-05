@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_wsport LANGUAGES C CXX)
+#project(rpcf_wsport LANGUAGES C CXX)
 
 # Expose standard directory variables (maps libdir)
 include(GNUInstallDirs)
@@ -32,19 +32,19 @@ target_include_directories(wspt PRIVATE
 set_target_properties(wspt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Replaces: libwspt_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(wspt PROPERTIES
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(wspt PROPERTIES
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Replaces: libwspt_la_LIBADD
 find_package(Threads REQUIRED)
 target_link_directories(wspt PRIVATE
-    "${CMAKE_SOURCE_DIR}/combase"
-    "${CMAKE_SOURCE_DIR}/rpc"
-    "${CMAKE_SOURCE_DIR}/ipc"
-    "${CMAKE_SOURCE_DIR}/3rd_party"
-    "${CMAKE_CURRENT_SOURCE_DIR}/wsproto"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/rpc"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
+    "${CMAKE_CURRENT_BINARY_DIR}/wsproto"
 )
 
 target_link_libraries(wspt PRIVATE

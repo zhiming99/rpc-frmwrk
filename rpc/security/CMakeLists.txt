@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_security LANGUAGES C CXX)
+#project(rpcf_security LANGUAGES C CXX)
 
 # Expose standard directory variables (maps libdir, sysconfdir)
 include(GNUInstallDirs)
@@ -89,18 +89,18 @@ endif()
 set_target_properties(auth PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Replaces: libauth_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(auth PROPERTIES
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(auth PROPERTIES
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Replaces: libauth_la_LIBADD
 find_package(Threads REQUIRED)
 target_link_directories(auth PRIVATE
-    "${CMAKE_SOURCE_DIR}/combase"
-    "${CMAKE_SOURCE_DIR}/rpc"
-    "${CMAKE_SOURCE_DIR}/ipc"
-    "${CMAKE_SOURCE_DIR}/3rd_party"
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/rpc"
+    "${CMAKE_BINARY_DIR}/ipc"
+    "${CMAKE_BINARY_DIR}/3rd_party"
 )
 
 target_link_libraries(auth PRIVATE

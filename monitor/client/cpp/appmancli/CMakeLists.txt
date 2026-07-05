@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_appmancli LANGUAGES C CXX)
+#project(rpcf_appmancli LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, includedir, mandir)
 include(GNUInstallDirs)
@@ -88,13 +88,13 @@ target_include_directories(appmancli PRIVATE
 set_target_properties(appmancli PROPERTIES 
     POSITION_INDEPENDENT_CODE ON
     ENABLE_EXPORTS ON # Replaces: -rdynamic
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
 )
 
 # Libraries link resolution configuration dependencies hooks mapping
 find_package(Threads REQUIRED)
-target_link_directories(appmancli PRIVATE "${PROJECT_SOURCE_DIR}/3rd_party")
+target_link_directories(appmancli PRIVATE "${CMAKE_BINARY_DIR}/3rd_party")
 target_link_libraries(appmancli PRIVATE
     regfs     # Target references matching local dependencies instead of .la links
     ipc
@@ -131,9 +131,9 @@ endif()
 
 # Replaces: apptimer_LDADD
 target_link_directories(apptimer PRIVATE
-    ${PROJECT_SOURCE_DIR}/3rd_party
-    ${PROJECT_SOURCE_DIR}/combase
-    ${PROJECT_SOURCE_DIR}/ipc
+    ${CMAKE_BINARY_DIR}/3rd_party
+    ${CMAKE_BINARY_DIR}/combase
+    ${CMAKE_BINARY_DIR}/ipc
 )
 target_link_libraries(apptimer PRIVATE
     appmancli

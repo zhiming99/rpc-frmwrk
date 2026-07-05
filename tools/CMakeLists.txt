@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(rpcf_tools LANGUAGES NONE) # Scripting & utility target, no direct C/C++ compilation
+#project(rpcf_tools LANGUAGES NONE) # Scripting & utility target, no direct C/C++ compilation
 
 # Expose standard directory layout variables (maps bindir, libdir, sysconfdir, localedir)
 include(GNUInstallDirs)

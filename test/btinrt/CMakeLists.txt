@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(btinrt LANGUAGES C CXX)
+#project(btinrt LANGUAGES C CXX)
 
 # Expose standard directory variables (maps bindir, libdir, sysconfdir)
 include(GNUInstallDirs)
@@ -25,10 +25,10 @@ target_include_directories(btinrt PRIVATE ${include_ipcdir})
 set_target_properties(btinrt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Replaces: libbtinrt_la_LDFLAGS=-version-info @VERSION2@
-set_target_properties(btinrt PROPERTIES 
-    VERSION "${VERSION2}"
-    SOVERSION "${VERSION2}"
-)
+#set_target_properties(btinrt PROPERTIES 
+#    VERSION "${VERSION2}"
+#    SOVERSION "${VERSION2}"
+#)
 
 # Native link dependencies (handles -lpthread and -ldl cleanly across platforms)
 find_package(Threads REQUIRED)

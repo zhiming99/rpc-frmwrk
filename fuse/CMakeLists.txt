@@ -29,12 +29,12 @@ if(NOT "${OFFSET_MACRO}" STREQUAL "")
 endif()
 
 # Apply version properties mapping matching Libtool parameters
-string(REPLACE ":" "." SO_VERSION "${VERSION2}")
-set_target_properties(fuseif PROPERTIES
-    VERSION "${PROJECT_VERSION}"
-    SOVERSION "${SO_VERSION}"
-    OUTPUT_NAME "fuseif"
-)
+#string(REPLACE ":" "." SO_VERSION "${VERSION2}")
+#set_target_properties(fuseif PROPERTIES
+#    VERSION "${PROJECT_VERSION}"
+#    SOVERSION "${SO_VERSION}"
+#    OUTPUT_NAME "fuseif"
+#)
 
 # Bind package dependencies using clean target definitions
 target_link_libraries(fuseif PRIVATE
