@@ -7,7 +7,7 @@ include(GNUInstallDirs)
 # ==============================================================================
 # 1. Base Variables Mapping (Inherits from Master Scope)
 # ==============================================================================
-set(combase_dir "${PROJECT_SOURCE_DIR}/combase")
+set(combase_dir "${CMAKE_SOURCE_DIR}/combase")
 
 # ==============================================================================
 # 2. Bison & Flex Parser Generation Tools
@@ -33,8 +33,8 @@ add_custom_command(
 )
 
 # Emulate flex rule: flex --header-file=stlexer.h -o stlexer.cpp stlexer.l
-flex_target(StLexer stlexer.l "${CMAKE_CURRENT_SOURCE_DIR}/stlexer.cpp"
-    DEFINES_FILE "${CMAKE_CURRENT_SOURCE_DIR}/stlexer.h"
+flex_target(StLexer stlexer.l "${CMAKE_CURRENT_BINARY_DIR}/stlexer.cpp"
+    DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/stlexer.h"
 )
 
 # Bind lexer compilation to parser dependency generation steps
@@ -58,6 +58,7 @@ set(dep_files
 
 # Consolidate target blueprint files list
 set(rpcfstc_SOURCES
+    ${dep_files}
     ${BISON_StParser_OUTPUTS}
     ${FLEX_StLexer_OUTPUTS}
     "${CMAKE_CURRENT_BINARY_DIR}/stparser.cpp.hook" # Enforces the script hook sequencing
@@ -80,8 +81,7 @@ add_executable(rpcfstc ${rpcfstc_SOURCES})
 target_include_directories(rpcfstc PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${combase_dir}"
-    "${PROJECT_SOURCE_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/include"
 )
 
 set_target_properties(rpcfstc PROPERTIES POSITION_INDEPENDENT_CODE ON)

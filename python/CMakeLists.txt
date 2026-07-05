@@ -123,7 +123,7 @@ install(CODE "
         set(RUN_SUFFIX \" \$ENV{SUDO_USER}\")
     endif()
 
-    execute_process(COMMAND \${RUN_PREFIX} \"${Python3_EXECUTABLE} setup.py bdist_wheel\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+    execute_process(COMMAND \${RUN_PREFIX} \"${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py bdist_wheel\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
 
     # Dynamic lookup resolution matching 'ls -1t dist | head -n 1'
     file(GLOB WHEEL_FILES RELATIVE \"${CMAKE_CURRENT_SOURCE_DIR}/dist\" \"${CMAKE_CURRENT_SOURCE_DIR}/dist/*.whl\")
