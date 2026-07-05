@@ -25,7 +25,8 @@ bison_target(StParser stparser.y "${CMAKE_CURRENT_BINARY_DIR}/stparser.cpp"
 # Hook up bash script execution context directly following the Bison processing step
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/stparser.cpp.hook"
-    COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/updconst.sh"
+    COMMAND bash -lc "bash ${CMAKE_CURRENT_SOURCE_DIR}/updconst.sh \"${CMAKE_CURRENT_BINARY_DIR}\""
+    VERBATIM
     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/stparser.cpp.hook"
     DEPENDS ${BISON_StParser_OUTPUTS}
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
