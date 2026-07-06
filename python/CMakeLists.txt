@@ -10,6 +10,12 @@ include(GNUInstallDirs)
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
 # Emulates the shell importlib machinery execution via native CMake properties
+execute_process(
+    COMMAND python3 -c "import importlib.machinery; print(importlib.machinery.EXTENSION_SUFFIXES[0], end='')"
+    OUTPUT_VARIABLE Python3_EXTENSION_SUFFIX
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 set(PYTHON_EXT1 "rpcbase${Python3_EXTENSION_SUFFIX}")
 set(PYTHON_EXT "${PYTHON_EXT1}.${VERSION}") # Assumes ${VERSION} comes from your master file
 
@@ -65,9 +71,12 @@ endif()
 if(SIPBUILD OR SIPVER EQUAL 5)
     set(BUILD_COMMANDS
         COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh ${CMAKE_INSTALL_FULL_LIBDIR}
-        COMMAND ${CMAKE_COMMAND} -E env CXXFLAGS="" ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild
+        COMMAND bash -lc "CC=gcc CXX=g++ CXXFLAGS= ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild"
+        VERBATIM
         COMMAND ${CMAKE_COMMAND} -E rm -f rpcf/rpcbase*.so*
-        COMMAND ${CMAKE_COMMAND} -E copy ./sipbuild/${PYTHON_EXT1} rpcf/${PYTHON_EXT}
+        COMMAND bash -lc "sofile=$(find ./sipbuild -name ${PYTHON_EXT1});if not test -z \"$sofile\"; then cp $sofile rpcf; cd rpcf;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}; fi"
+        VERBATIM
+        #COMMAND ${CMAKE_COMMAND} -E copy ./sipbuild/${PYTHON_EXT1} rpcf/${PYTHON_EXT}
     )
 elseif(SIP4 OR SIPVER EQUAL 4)
     set(ARMBUILD "0")

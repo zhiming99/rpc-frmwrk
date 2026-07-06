@@ -5,11 +5,6 @@ cmake_minimum_required(VERSION 3.18)
 include(GNUInstallDirs)
 
 # ==============================================================================
-# 1. Subdirectories (SUBDIRS= rpcfs .)
-# ==============================================================================
-add_subdirectory(rpcfs)
-
-# ==============================================================================
 # 2. Bison & Flex Parser Generation Tools
 # ==============================================================================
 find_package(BISON REQUIRED)
@@ -29,6 +24,15 @@ flex_target(RidlLexer ridlc.lex "${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp"
 # Bind lexer compilation to parser dependency generation
 add_flex_bison_dependency(RidlLexer RidlParser)
 
+add_custom_target(generate_ridl_parser
+    DEPENDS ${BISON_RidlParser_OUTPUTS}
+)
+
+# ==============================================================================
+# Subdirectories (SUBDIRS= rpcfs .)
+# ==============================================================================
+add_subdirectory(rpcfs)
+
 # ==============================================================================
 # 3. Dynamic Template & Configuration File Generation (sed rules)
 # ==============================================================================
@@ -47,14 +51,14 @@ foreach(tpl_file mktpl mktplsvr mktplcli)
     string(REPLACE "@BITWIDTH@" "${BITWIDTH}" TPL_CONTENT "${TPL_CONTENT}")
     
     # Write processed script to the binary build folder
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${tpl_file}" "${TPL_CONTENT}")
+    file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/${tpl_file}" "${TPL_CONTENT}")
 endforeach()
 
 # Emulate synccfg.py generation rules
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/synccfg.py.in" SYNC_CONTENT)
 string(REPLACE "@SRCCFG@" "${ridlc_confdir}/echodesc.json" SYNC_CONTENT "${SYNC_CONTENT}")
 string(REPLACE "@BINPATH@" "${CMAKE_INSTALL_FULL_BINDIR}/rpcf" SYNC_CONTENT "${SYNC_CONTENT}")
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/synccfg.py" "${SYNC_CONTENT}")
+file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/synccfg.py" "${SYNC_CONTENT}")
 
 # ==============================================================================
 # 4. Define Executable Target (ridlc)
@@ -73,6 +77,7 @@ set(ridlc_SOURCES
 )
 
 add_executable(ridlc ${ridlc_SOURCES})
+add_dependencies(ridlc generate_ridl_parser)
 
 # ==============================================================================
 # 5. Compiler & Preprocessor Definitions (ridlc_CPPFLAGS)
@@ -159,10 +164,10 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/JVariant.java
     
     # Generated Assets from the Binary Folder
-    ${CMAKE_CURRENT_BINARY_DIR}/mktpl
-    ${CMAKE_CURRENT_BINARY_DIR}/mktplsvr
-    ${CMAKE_CURRENT_BINARY_DIR}/mktplcli
-    ${CMAKE_CURRENT_BINARY_DIR}/synccfg.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/mktpl
+    ${CMAKE_CURRENT_SOURCE_DIR}/mktplsvr
+    ${CMAKE_CURRENT_SOURCE_DIR}/mktplcli
+    ${CMAKE_CURRENT_SOURCE_DIR}/synccfg.py
     
     DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
 )

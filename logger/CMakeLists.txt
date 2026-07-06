@@ -76,6 +76,7 @@ add_executable(rpcf_logger
 target_include_directories(rpcf_logger PRIVATE 
     ${LOGGER_COMMON_INCLUDES}
     "${CMAKE_SOURCE_DIR}/monitor/client/cpp/appmancli"
+    "${CMAKE_BINARY_DIR}/monitor/client/cpp/appmancli"
 )
 
 set_target_properties(rpcf_logger PROPERTIES 
