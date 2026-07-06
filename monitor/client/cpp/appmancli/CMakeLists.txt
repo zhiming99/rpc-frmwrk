@@ -28,6 +28,7 @@ set(GENERATED_OUTPUTS
     "${CMAKE_CURRENT_BINARY_DIR}/appmonstruct.h"
 )
 
+set_source_files_properties(${GENERATED_OUTPUTS} PROPERTIES GENERATED TRUE )
 set(RIDLC_OPTIONS "ridlc --sync_mode IAppStore=async_p --sync_mode IUserManager=async_p --services=AppManager,SimpleAuth --client -slO \"${CMAKE_CURRENT_BINARY_DIR}\" ${mon_dir}/appmon/appmon.ridl" )
 # Replicates: appmon.ridl target step cleanly inside the binary output workspace
 add_custom_command(
@@ -63,13 +64,9 @@ add_library(appmancli SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/maincli.cpp     # Tracked as source in part 1
     ${CMAKE_CURRENT_SOURCE_DIR}/AppManagercli.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SimpleAuthcli.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/appmon.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/appmonstruct.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/IAppStorecli.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/IDataProducercli.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/IUserManagercli.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/AppManagercli.h
     ${CMAKE_CURRENT_SOURCE_DIR}/SimpleAuthcli.h
+    ${GENERATED_OUTPUTS}
 )
 
 # Enforce generation step triggers early during compilation pipelines

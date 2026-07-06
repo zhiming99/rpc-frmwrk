@@ -17,6 +17,7 @@ endif()
 # Replicate broad compile parameters array block
 set(APPMON_BASE_INCLUDES
     "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
     "${CMAKE_SOURCE_DIR}/monitor/registry"
     "${CMAKE_SOURCE_DIR}/monitor/sinit"
     "${CMAKE_SOURCE_DIR}/include"
@@ -63,6 +64,11 @@ add_custom_command(
         "${CMAKE_CURRENT_SOURCE_DIR}/AppManagersvr.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/AppManagersvr.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/mainsvr.cpp"
+        "${CMAKE_CURRENT_BINARY_DIR}/"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_BINARY_DIR}/../client/cpp/appmancli/IAppStorecli.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/../client/cpp/appmancli/IDataProducercli.h"
         "${CMAKE_CURRENT_BINARY_DIR}/"
 
     # Execute internal IDL tool compiler mapping environments
@@ -127,7 +133,10 @@ endif()
 add_executable(appmonsvr ${appmonsvr_SOURCES})
 add_dependencies(appmonsvr generate_appmon_svr)
 
-target_include_directories(appmonsvr PRIVATE ${APPMON_BASE_INCLUDES})
+target_include_directories(appmonsvr PRIVATE
+    "${APPMON_BASE_INCLUDES}"
+    )
+
 set_target_properties(appmonsvr PROPERTIES 
     POSITION_INDEPENDENT_CODE ON
     ENABLE_EXPORTS ON # Replaces: -rdynamic inside appmonsvr_LDFLAGS

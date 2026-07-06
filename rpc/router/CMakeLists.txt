@@ -44,6 +44,7 @@ add_library(rtfiles SHARED ${librtfiles_la_SOURCES})
 target_include_directories(rtfiles PRIVATE 
     ${ROUTER_COMMON_INCLUDES}
     "${CMAKE_SOURCE_DIR}/monitor/client/cpp/appmancli"
+    "${CMAKE_BINARY_DIR}/monitor/client/cpp/appmancli"
 )
 set_target_properties(rtfiles PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

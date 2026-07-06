@@ -72,9 +72,10 @@ target_include_directories(auth PRIVATE
     "${CMAKE_SOURCE_DIR}/combase"
     "${CMAKE_SOURCE_DIR}/3rd_party"
     "${CMAKE_SOURCE_DIR}/monitor/appmon"
-    "${CMAKE_SOURCE_DIR}/monitor/client/cpp/appmancli"
     "${CMAKE_SOURCE_DIR}/monitor/sinit"
     "${CMAKE_SOURCE_DIR}/monitor/registry"
+    "${CMAKE_SOURCE_DIR}/monitor/client/cpp/appmancli"
+    "${CMAKE_BINARY_DIR}/monitor/client/cpp/appmancli"
 )
 
 # Apply dynamic compilation scope macro blocks

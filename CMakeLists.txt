@@ -1183,4 +1183,59 @@ add_custom_target(rpm
 )
 endif()
 
+set(DEB_PKG_NAME     "${PROJECT_NAME}")
+set(DEB_PKG_VER      "${PROJECT_VERSION}")    # Automatically pulls 0.9.0
+set(DEB_PKG_REV      "${REV}")                     # Debian package revision
+string(TOLOWER "${CMAKE_HOST_SYSTEM_PROCESSOR}" ARCH_RAW)
+
+if(ARCH_RAW STREQUAL "x86_64" OR ARCH_RAW STREQUAL "amd64")
+    set(DEB_PKG_ARCH "amd64")
+elseif(ARCH_RAW STREQUAL "i386" OR ARCH_RAW STREQUAL "i686" OR ARCH_RAW STREQUAL "x86")
+    set(DEB_PKG_ARCH "i386")
+elseif(ARCH_RAW STREQUAL "aarch64" OR ARCH_RAW STREQUAL "arm64")
+    set(DEB_PKG_ARCH "arm64")
+elseif(ARCH_RAW MATCHES "^arm")
+    set(DEB_PKG_ARCH "armhf")
+else()
+    # Fallback to the raw string if it is an uncommon architecture
+    set(DEB_PKG_ARCH "${ARCH_RAW}")
+endif()
+message(STATUS "Mapped Debian package architecture: ${DEB_PKG_ARCH}")
+# =====================================================================
+# DYNAMIC LINUX DISTRO SUFFIX DETECTION (e.g., d13, u22)
+# =====================================================================
+# Set a baseline safe fallback if we aren't compiling on a standard Linux machine
+set(DEB_PKG_DISTRO "d13")
+
+if(EXISTS "/etc/os-release")
+    # 1. Load the raw system release definition content
+    file(READ "/etc/os-release" OS_RELEASE_CONTENT)
+    
+    # 2. Extract the lowercase ID field (e.g., ID=debian or ID=ubuntu)
+    if(OS_RELEASE_CONTENT MATCHES "ID=([a-zA-Z0-9_-]+)")
+        set(DISTRO_RAW_ID "${CMAKE_MATCH_1}")
+    endif()
+    
+    # 3. Extract the major version index number string (e.g., VERSION_ID="13" or VERSION_ID="22.04")
+    if(OS_RELEASE_CONTENT MATCHES "VERSION_ID=\"?([0-9]+)")
+        set(DISTRO_VERSION_NUM "${CMAKE_MATCH_1}")
+    endif()
+
+    # 4. If both variables parsed successfully, build your token
+    if(DISTRO_RAW_ID AND DISTRO_VERSION_NUM)
+        # Extract the very first letter of the distribution name (Index 0, length 1)
+        string(SUBSTRING "${DISTRO_RAW_ID}" 0 1 DISTRO_FIRST_LETTER)
+        
+        # Merge them cleanly together
+        set(DEB_PKG_DISTRO "${DISTRO_FIRST_LETTER}${DISTRO_VERSION_NUM}")
+    endif()
+endif()
+
+message(STATUS "Automatically computed distribution token: ${DEB_PKG_DISTRO}")
+
+set(CPACK_DEBIAN_FILE_NAME "${DEB_PKG_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}.deb")
+set(CPACK_PACKAGE_NAME "${DEB_PKG_NAME}")
+set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${DEB_PKG_ARCH}")
+set(CPACK_DEBIAN_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
+
 include(CPack)
