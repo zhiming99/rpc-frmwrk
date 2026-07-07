@@ -20,10 +20,7 @@ add_library(hellowrd SHARED
     ifsvr.h
 )
 
-target_link_directories(hellowrd PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(hellowrd PRIVATE ${TSTCFG_LINK_DIR})
 
 # Replaces: libhellowrd_la_CPPFLAGS=$(iftest_CPPFLAGS)
 target_include_directories(hellowrd PRIVATE ${include_ipcdir})
@@ -53,6 +50,7 @@ target_compile_definitions(hwclismk PRIVATE CLIENT)
 target_include_directories(hwclismk PRIVATE ${include_ipcdir})
 set_target_properties(hwclismk PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(hwclismk PRIVATE ${TSTLDFLG} hellowrd)
+target_link_directories(hwclismk PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 add_executable(hwsvrsmk iftest.cpp iftest.h)
@@ -60,6 +58,7 @@ target_compile_definitions(hwsvrsmk PRIVATE SERVER)
 target_include_directories(hwsvrsmk PRIVATE ${include_ipcdir})
 set_target_properties(hwsvrsmk PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(hwsvrsmk PRIVATE ${TSTLDFLG} hellowrd)
+target_link_directories(hwsvrsmk PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

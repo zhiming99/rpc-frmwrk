@@ -20,10 +20,7 @@ add_library(btinrt SHARED
     btinrtsvr.h
 )
 
-target_link_directories(btinrt PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(btinrt PRIVATE ${TSTCFG_LINK_DIR})
 
 # Replaces: libbtinrt_la_CPPFLAGS=$(btinrt_CPPFLAGS)
 target_include_directories(btinrt PRIVATE ${include_ipcdir})
@@ -56,6 +53,7 @@ set_target_properties(btinrtcli PROPERTIES
     ENABLE_EXPORTS ON # Replaces: -rdynamic
 )
 target_link_libraries(btinrtcli PRIVATE ${TSTLDFLG} btinrt)
+target_link_directories(btinrtcli PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 add_executable(btinrtsvr btinrtst.cpp btinrtst.h)
@@ -66,6 +64,7 @@ set_target_properties(btinrtsvr PROPERTIES
     ENABLE_EXPORTS ON # Replaces: -rdynamic
 )
 target_link_libraries(btinrtsvr PRIVATE ${TSTLDFLG} btinrt)
+target_link_directories(btinrtsvr PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

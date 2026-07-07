@@ -20,10 +20,7 @@ add_library(inproc SHARED
     inprocsvr.h
 )
 
-target_link_directories(inproc PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(inproc PRIVATE ${TSTCFG_LINK_DIR})
 # Replaces: libinproc_la_CPPFLAGS=$(inproc_CPPFLAGS)
 target_include_directories(inproc PRIVATE ${include_ipcdir})
 set_target_properties(inproc PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -56,6 +53,7 @@ target_link_libraries(inproctst PRIVATE
     inproc 
     Threads::Threads
 )
+target_link_directories(inproctst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

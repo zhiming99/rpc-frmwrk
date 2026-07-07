@@ -20,6 +20,7 @@ add_library(sfsvr SHARED
     sfsvr.h
 )
 
+target_link_directories(sfsvr PRIVATE ${TSTCFG_LINK_DIR})
 target_link_directories(sfsvr PRIVATE
     "${CMAKE_BINARY_DIR}/combase"
     "${CMAKE_BINARY_DIR}/ipc"
@@ -52,6 +53,7 @@ target_compile_definitions(sfclitst PRIVATE CLIENT)
 target_include_directories(sfclitst PRIVATE ${include_ipcdir})
 set_target_properties(sfclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(sfclitst PRIVATE ${TSTLDFLG} sfsvr Threads::Threads)
+target_link_directories(sfclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 # Replaces: sfsvrtst_SOURCES= sftest.cpp Readme.txt (omitted text file from compile targets)
@@ -60,6 +62,7 @@ target_compile_definitions(sfsvrtst PRIVATE SERVER)
 target_include_directories(sfsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(sfsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(sfsvrtst PRIVATE ${TSTLDFLG} sfsvr Threads::Threads)
+target_link_directories(sfsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

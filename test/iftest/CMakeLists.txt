@@ -39,10 +39,7 @@ target_link_libraries(echo PRIVATE
     ${CMAKE_DL_LIBS}
 )
 
-target_link_directories(echo PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(echo PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 3. Executable Program Targets (ifclismk & ifsvrsmk)
@@ -54,6 +51,7 @@ target_compile_definitions(ifclismk PRIVATE CLIENT)
 target_include_directories(ifclismk PRIVATE ${include_ipcdir})
 set_target_properties(ifclismk PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(ifclismk PRIVATE ${TSTLDFLG} echo)
+target_link_directories(ifclismk PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 add_executable(ifsvrsmk iftest.cpp iftest.h)
@@ -61,6 +59,7 @@ target_compile_definitions(ifsvrsmk PRIVATE SERVER)
 target_include_directories(ifsvrsmk PRIVATE ${include_ipcdir})
 set_target_properties(ifsvrsmk PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(ifsvrsmk PRIVATE ${TSTLDFLG} echo)
+target_link_directories(ifsvrsmk PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

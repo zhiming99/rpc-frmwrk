@@ -20,10 +20,7 @@ add_library(stmsvr SHARED
     stmsvr.h
 )
 
-target_link_directories(stmsvr PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(stmsvr PRIVATE ${TSTCFG_LINK_DIR})
 # Replaces: libstmsvr_la_CPPFLAGS=$(stmtest_CPPFLAGS)
 target_include_directories(stmsvr PRIVATE ${include_ipcdir})
 set_target_properties(stmsvr PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -51,6 +48,7 @@ add_executable(stmclitst stmtest.cpp stmtest.h)
 target_compile_definitions(stmclitst PRIVATE CLIENT)
 target_include_directories(stmclitst PRIVATE ${include_ipcdir})
 set_target_properties(stmclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_directories(stmclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # Replaces: ext_linkopt=-Wl,-rpath -Wl,$(libdir)/rpcf
 # CMake handles RPATH automatically. We add the target installation RPATH explicitly.
@@ -66,6 +64,7 @@ target_compile_definitions(stmsvrtst PRIVATE SERVER)
 target_include_directories(stmsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(stmsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(stmsvrtst PRIVATE ${TSTLDFLG} stmsvr Threads::Threads)
+target_link_directories(stmsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines
