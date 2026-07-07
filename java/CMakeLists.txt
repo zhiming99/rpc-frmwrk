@@ -68,7 +68,6 @@ add_custom_command(
 # ==============================================================================
 add_library(rpcbaseJNI SHARED "${CMAKE_CURRENT_BINARY_DIR}/rpcbase_wrap.cpp")
 
-message(STATUS "haha,The fuse3 cflags are: ${fuse3_inc}")
 # Native Preprocessor compiler configuration definitions and search layouts
 target_include_directories(rpcbaseJNI PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
