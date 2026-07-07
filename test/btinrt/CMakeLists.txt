@@ -20,6 +20,11 @@ add_library(btinrt SHARED
     btinrtsvr.h
 )
 
+target_link_directories(btinrt PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
+
 # Replaces: libbtinrt_la_CPPFLAGS=$(btinrt_CPPFLAGS)
 target_include_directories(btinrt PRIVATE ${include_ipcdir})
 set_target_properties(btinrt PROPERTIES POSITION_INDEPENDENT_CODE ON)

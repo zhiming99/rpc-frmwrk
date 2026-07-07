@@ -39,6 +39,11 @@ target_link_libraries(echo PRIVATE
     ${CMAKE_DL_LIBS}
 )
 
+target_link_directories(echo PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
+
 # ==============================================================================
 # 3. Executable Program Targets (ifclismk & ifsvrsmk)
 # ==============================================================================

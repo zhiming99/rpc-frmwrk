@@ -20,6 +20,11 @@ add_library(evtst SHARED
     evtsvr.h
 )
 
+target_link_directories(evtst PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
+
 # Replaces: libevtst_la_CPPFLAGS=$(evtest_CPPFLAGS)
 target_include_directories(evtst PRIVATE ${include_ipcdir})
 set_target_properties(evtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
