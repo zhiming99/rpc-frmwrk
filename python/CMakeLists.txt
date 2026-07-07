@@ -67,11 +67,37 @@ else()
     set(LINK_FUSE "0")
 endif()
 
+set(TARGET_CONF_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml.tmpl")
+
+if(EXISTS "${TARGET_CONF_FILE}")
+    # 1. Read the raw file content
+    file(READ "${TARGET_CONF_FILE}" FILE_CONTENTS)
+
+    # 2. Define your new absolute library directory path variable
+    set(NEW_LIB_DIR "${CMAKE_BINARY_DIR}/monitor/stparser")
+
+    # 3. Perform a regular expression replacement on the line
+    # Matches 'library-dirs = [' followed by any characters up to the matching ']'
+    string(REGEX REPLACE
+        "library-dirs[ \t]*=[ \t]*[^\r\n]*[\r\n]"
+        "library-dirs = [\"${CMAKE_BINARY_DIR}/combase\", \"${CMAKE_BINARY_DIR}/ipc\",\"${CMAKE_BINARY_DIR}/fuse\"]\n"
+        MODIFIED_CONTENTS
+        "${FILE_CONTENTS}"
+    )
+
+    # 4. Write the clean, updated string back to the file
+    file(WRITE "${TARGET_CONF_FILE}.1" "${MODIFIED_CONTENTS}")
+    message(STATUS "Successfully updated pyproject.toml.tmpl.")
+else()
+    message(FATAL_ERROR "Configuration file missing: ${TARGET_CONF_FILE}")
+endif()
+
+
 # Match your SIP version runtime conditional pipelines
 if(SIPBUILD OR SIPVER EQUAL 5)
     set(BUILD_COMMANDS
-        COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh ${CMAKE_INSTALL_FULL_LIBDIR}
-        COMMAND bash -lc "CC=gcc CXX=g++ CXXFLAGS= ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild"
+        COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh "${CMAKE_INSTALL_FULL_LIBDIR}" "${TARGET_CONF_FILE}.1"
+        COMMAND bash -lc "CXXFLAGS= ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild"
         VERBATIM
         COMMAND ${CMAKE_COMMAND} -E rm -f rpcf/rpcbase*.so*
         COMMAND bash -lc "sofile=$(find ./sipbuild -name ${PYTHON_EXT1});if not test -z \"$sofile\"; then cp $sofile rpcf; cd rpcf;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}; fi"
