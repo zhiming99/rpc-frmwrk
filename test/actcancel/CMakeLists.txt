@@ -20,6 +20,10 @@ add_library(actc SHARED
     actcsvr.h
 )
 
+target_link_directories(actc PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
 # Replaces: libactc_la_CPPFLAGS=$(actc_CPPFLAGS)
 target_include_directories(actc PRIVATE ${include_ipcdir})
 

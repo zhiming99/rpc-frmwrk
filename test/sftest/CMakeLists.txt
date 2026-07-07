@@ -20,6 +20,10 @@ add_library(sfsvr SHARED
     sfsvr.h
 )
 
+target_link_directories(sfsvr PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
 # Replaces: libsfsvr_la_CPPFLAGS=$(sftest_CPPFLAGS)
 target_include_directories(sfsvr PRIVATE ${include_ipcdir})
 set_target_properties(sfsvr PROPERTIES POSITION_INDEPENDENT_CODE ON)

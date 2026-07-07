@@ -20,6 +20,10 @@ add_library(stmsvr SHARED
     stmsvr.h
 )
 
+target_link_directories(stmsvr PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
 # Replaces: libstmsvr_la_CPPFLAGS=$(stmtest_CPPFLAGS)
 target_include_directories(stmsvr PRIVATE ${include_ipcdir})
 set_target_properties(stmsvr PROPERTIES POSITION_INDEPENDENT_CODE ON)

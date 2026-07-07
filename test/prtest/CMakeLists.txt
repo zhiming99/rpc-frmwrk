@@ -20,6 +20,10 @@ add_library(prsvr SHARED
     prsvr.h
 )
 
+target_link_directories(prsvr PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
 # Replaces: libprsvr_la_CPPFLAGS=$(prtest_CPPFLAGS)
 target_include_directories(prsvr PRIVATE ${include_ipcdir})
 set_target_properties(prsvr PROPERTIES POSITION_INDEPENDENT_CODE ON)

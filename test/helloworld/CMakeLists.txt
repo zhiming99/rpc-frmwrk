@@ -20,6 +20,11 @@ add_library(hellowrd SHARED
     ifsvr.h
 )
 
+target_link_directories(hellowrd PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
+
 # Replaces: libhellowrd_la_CPPFLAGS=$(iftest_CPPFLAGS)
 target_include_directories(hellowrd PRIVATE ${include_ipcdir})
 set_target_properties(hellowrd PROPERTIES POSITION_INDEPENDENT_CODE ON)

@@ -16,6 +16,10 @@ set(include_ipcdir "${PROJECT_SOURCE_DIR}/ipc")
 # Replaces: smktest_PROGRAMS=smoketest
 add_executable(smoketest main.cpp)
 
+target_link_directories(smoketest PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
 # Replaces: smoketest_CPPFLAGS=$(smktest_CPPFLAGS)
 target_include_directories(smoketest PRIVATE ${include_ipcdir})
 set_target_properties(smoketest PROPERTIES POSITION_INDEPENDENT_CODE ON)

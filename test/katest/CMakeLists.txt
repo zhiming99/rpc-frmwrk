@@ -20,6 +20,10 @@ add_library(kasvr SHARED
     kasvr.h
 )
 
+target_link_directories(kasvr PRIVATE
+    "${CMAKE_BINARY_DIR}/combase"
+    "${CMAKE_BINARY_DIR}/ipc"
+)
 # Replaces: libkasvr_la_CPPFLAGS=$(katest_CPPFLAGS)
 target_include_directories(kasvr PRIVATE ${include_ipcdir})
 set_target_properties(kasvr PROPERTIES POSITION_INDEPENDENT_CODE ON)
