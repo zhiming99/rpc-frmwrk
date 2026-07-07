@@ -24,9 +24,7 @@ add_library(ascsvr SHARED
 target_include_directories(ascsvr PRIVATE ${include_ipcdir})
 set_target_properties(ascsvr PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_link_directories(ascsvr PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
+target_link_directories(ascsvr PRIVATE ${TSTCFG_LINK_DIR})
 )         
 # Replaces: libascsvr_la_LDFLAGS=-version-info @VERSION2@
 #set_target_properties(ascsvr PROPERTIES 
@@ -52,6 +50,7 @@ target_compile_definitions(asynclitst PRIVATE CLIENT)
 target_include_directories(asynclitst PRIVATE ${include_ipcdir})
 set_target_properties(asynclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(asynclitst PRIVATE ${TSTLDFLG} ascsvr)
+target_link_directories(asynclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 add_executable(asyncsvrtst asynctest.cpp asynctest.h)
@@ -59,6 +58,7 @@ target_compile_definitions(asyncsvrtst PRIVATE SERVER)
 target_include_directories(asyncsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(asyncsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(asyncsvrtst PRIVATE ${TSTLDFLG} ascsvr)
+target_link_directories(asyncsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

@@ -20,10 +20,7 @@ add_library(evtst SHARED
     evtsvr.h
 )
 
-target_link_directories(evtst PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(evtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # Replaces: libevtst_la_CPPFLAGS=$(evtest_CPPFLAGS)
 target_include_directories(evtst PRIVATE ${include_ipcdir})
@@ -53,6 +50,7 @@ target_compile_definitions(evtclitst PRIVATE CLIENT)
 target_include_directories(evtclitst PRIVATE ${include_ipcdir})
 set_target_properties(evtclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(evtclitst PRIVATE ${TSTLDFLG} evtst)
+target_link_directories(evtclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 add_executable(evtsvrtst evtest.cpp evtest.h)
@@ -60,6 +58,7 @@ target_compile_definitions(evtsvrtst PRIVATE SERVER)
 target_include_directories(evtsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(evtsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(evtsvrtst PRIVATE ${TSTLDFLG} evtst)
+target_link_directories(evtsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

@@ -20,10 +20,7 @@ add_library(kasvr SHARED
     kasvr.h
 )
 
-target_link_directories(kasvr PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(kasvr PRIVATE ${TSTCFG_LINK_DIR})
 # Replaces: libkasvr_la_CPPFLAGS=$(katest_CPPFLAGS)
 target_include_directories(kasvr PRIVATE ${include_ipcdir})
 set_target_properties(kasvr PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -52,6 +49,7 @@ target_compile_definitions(kaclitst PRIVATE CLIENT)
 target_include_directories(kaclitst PRIVATE ${include_ipcdir})
 set_target_properties(kaclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(kaclitst PRIVATE ${TSTLDFLG} kasvr)
+target_link_directories(kaclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 add_executable(kasvrtst katest.cpp katest.h)
@@ -59,6 +57,7 @@ target_compile_definitions(kasvrtst PRIVATE SERVER)
 target_include_directories(kasvrtst PRIVATE ${include_ipcdir})
 set_target_properties(kasvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(kasvrtst PRIVATE ${TSTLDFLG} kasvr)
+target_link_directories(kasvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines

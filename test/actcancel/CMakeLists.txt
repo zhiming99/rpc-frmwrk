@@ -20,10 +20,8 @@ add_library(actc SHARED
     actcsvr.h
 )
 
-target_link_directories(actc PRIVATE
-    "${CMAKE_BINARY_DIR}/combase"
-    "${CMAKE_BINARY_DIR}/ipc"
-)
+target_link_directories(actc PRIVATE ${TSTCFG_LINK_DIR})
+
 # Replaces: libactc_la_CPPFLAGS=$(actc_CPPFLAGS)
 target_include_directories(actc PRIVATE ${include_ipcdir})
 
@@ -51,6 +49,7 @@ target_compile_definitions(actclitst PRIVATE CLIENT)
 target_include_directories(actclitst PRIVATE ${include_ipcdir})
 set_target_properties(actclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(actclitst PRIVATE ${TSTLDFLG} actc)
+target_link_directories(actclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
 add_executable(actcsvrtst actctest.cpp actctest.h)
@@ -58,6 +57,7 @@ target_compile_definitions(actcsvrtst PRIVATE SERVER)
 target_include_directories(actcsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(actcsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(actcsvrtst PRIVATE ${TSTLDFLG} actc)
+target_link_directories(actcsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
 # 4. Installation Routines
