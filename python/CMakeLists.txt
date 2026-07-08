@@ -99,8 +99,8 @@ if(SIPBUILD OR SIPVER EQUAL 5)
         COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh "${CMAKE_INSTALL_FULL_LIBDIR}" "${TARGET_CONF_FILE}.1"
         COMMAND bash -lc "CXXFLAGS= ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild"
         VERBATIM
-        COMMAND ${CMAKE_COMMAND} -E rm -f rpcf/rpcbase*.so*
-        COMMAND bash -lc "sofile=$(find ./sipbuild -name ${PYTHON_EXT1});if not test -z \"$sofile\"; then cp $sofile rpcf; cd rpcf;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}; fi"
+        COMMAND bash -lc "sofile=`find ./sipbuild -name ${PYTHON_EXT1}`\;if [ ! -z \"\${sofile}\" ]\; then rm rpcf/rpcbase*.so*\;cp \${sofile} rpcf\;\
+cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
         VERBATIM
         #COMMAND ${CMAKE_COMMAND} -E copy ./sipbuild/${PYTHON_EXT1} rpcf/${PYTHON_EXT}
     )
@@ -128,15 +128,15 @@ elseif(SIP4 OR SIPVER EQUAL 4)
             DBGBUILD=${DBGBUILD}
             ARMBUILD=${ARMBUILD}
             ${Python3_EXECUTABLE} build-4.9.py ${CMAKE_INSTALL_FULL_LIBDIR}
-        COMMAND ${CMAKE_COMMAND} -E rm -f rpcf/rpcbase*.so*
-        COMMAND ${CMAKE_COMMAND} -E copy ./sip4build/rpcbase.so rpcf/${PYTHON_EXT}
+        COMMAND bash -lc "rm rpcf/rpcbase*.so*\;cp ./sip4build/rpcbase.so rpcf/${PYTHON_EXT1}\;\
+cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
     )
 endif()
 
 # Common symlink routine appended onto target array block
-list(APPEND BUILD_COMMANDS
-    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PYTHON_EXT} rpcf/${PYTHON_EXT1}
-)
+#list(APPEND BUILD_COMMANDS
+#    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PYTHON_EXT} rpcf/${PYTHON_EXT1}
+#)
 
 add_custom_target(rpcf_all ALL ${BUILD_COMMANDS} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
