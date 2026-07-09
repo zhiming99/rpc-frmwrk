@@ -33,7 +33,7 @@ elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
 endif()
 
 if(pipopt)
-    message(STATUS "Warning: break-system-packages enabled")
+    message(STATUS "Warning: break-system-packages enabled in directory python/appmancli")
 endif()
 
 # ==============================================================================
