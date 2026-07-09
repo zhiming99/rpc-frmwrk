@@ -1090,7 +1090,7 @@ add_custom_target(extra_dist_files SOURCES
 # 1. dist_pkgconfig_DATA=rpcf.pc
 # Installs your generated or existing .pc file to the standard pkgconfig location
 include(GNUInstallDirs)
-install(FILES rpcf.pc 
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/rpcf.pc 
         DESTINATION ${CMAKE_INSTALL_DATADIR}/pkgconfig)
 
 # Replicates the Autotools $(subst -,_,...) string replacement for Debian naming conventions
@@ -1237,5 +1237,8 @@ set(CPACK_DEBIAN_FILE_NAME "${DEB_PKG_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_
 set(CPACK_PACKAGE_NAME "${DEB_PKG_NAME}")
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${DEB_PKG_ARCH}")
 set(CPACK_DEBIAN_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER ${PACKAGE_BUGREPORT} )
+set(CPACK_DEBIAN_PACKAGE_DEPENDS 
+    "dbus-daemon, dbus-bin, fuse3, openssl, expect, libcommons-cli-java,  python3-numpy, python3-pip, bash, attr, procps, python3-urwid, locales")
 
 include(CPack)

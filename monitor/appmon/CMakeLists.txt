@@ -45,7 +45,6 @@ set(GENERATED_SERVER_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/IAppStoreExsvr.h"
 )
 
-message(STATUS "current working dir ${CMAKE_CURRENT_BINARY_DIR}")
 set(RIDLC_COMMAND "ridlc --server -sO.  ${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl" )
 add_custom_command(
     OUTPUT ${GENERATED_SERVER_FILES}
@@ -193,7 +192,7 @@ install(FILES
 
 # Deploy application configuration descriptors and reference source model schemas
 install(FILES 
-    appmondesc.json 
+    ${CMAKE_CURRENT_BINARY_DIR}/appmondesc.json 
     appmon.ridl 
     DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
 )

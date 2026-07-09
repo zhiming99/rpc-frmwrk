@@ -73,9 +73,6 @@ if(EXISTS "${TARGET_CONF_FILE}")
     # 1. Read the raw file content
     file(READ "${TARGET_CONF_FILE}" FILE_CONTENTS)
 
-    # 2. Define your new absolute library directory path variable
-    set(NEW_LIB_DIR "${CMAKE_BINARY_DIR}/monitor/stparser")
-
     # 3. Perform a regular expression replacement on the line
     # Matches 'library-dirs = [' followed by any characters up to the matching ']'
     string(REGEX REPLACE
@@ -102,7 +99,6 @@ if(SIPBUILD OR SIPVER EQUAL 5)
         COMMAND bash -lc "sofile=`find ./sipbuild -name ${PYTHON_EXT1}`\;if [ ! -z \"\${sofile}\" ]\; then rm rpcf/rpcbase*.so*\;cp \${sofile} rpcf\;\
 cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
         VERBATIM
-        #COMMAND ${CMAKE_COMMAND} -E copy ./sipbuild/${PYTHON_EXT1} rpcf/${PYTHON_EXT}
     )
 elseif(SIP4 OR SIPVER EQUAL 4)
     set(ARMBUILD "0")
@@ -133,32 +129,59 @@ cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
     )
 endif()
 
-# Common symlink routine appended onto target array block
-#list(APPEND BUILD_COMMANDS
-#    COMMAND ${CMAKE_COMMAND} -E create_symlink ${PYTHON_EXT} rpcf/${PYTHON_EXT1}
-#)
-
 add_custom_target(rpcf_all ALL ${BUILD_COMMANDS} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Execute the python script and capture the stdout
+# 1. Check if running inside a Python virtual environment (venv)
+execute_process(
+    COMMAND python3 -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')"
+    OUTPUT_VARIABLE IS_VENV
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# 2. Define the new arguments based on the venv status
+if("${IS_VENV}" STREQUAL "false")
+    # Replacement for 'setup.py bdist_wheel' when NO venv is active
+    set(WHEEL_BUILD_ARGS -m build ${CMAKE_CURRENT_BINARY_DIR} --wheel --no-isolation --outdir dist/)
+else()
+    # Replacement for 'setup.py bdist_wheel' when inside a venv
+    set(WHEEL_BUILD_ARGS -m pip wheel ${CMAKE_CURRENT_BINARY_DIR} --no-deps --no-build-isolation -w dist/)
+endif()
 
 # ==============================================================================
 # 4. Installation Script Triggers
 # ==============================================================================
+set(CMAKE_VERBOSE_MAKEFILE ON)
 install(CODE "
     # Staging Context Check (Emulating DESTDIR verification structures)
+
     if(NOT \"\$ENV{DESTDIR}\" STREQUAL \"\")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E copy rpcf/${PYTHON_EXT} ./${PYTHON_EXT}.bak WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E copy rpcf/${PYTHON_EXT} ./${PYTHON_EXT}.bak
+            WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+
         set(symdir \"${CMAKE_CURRENT_SOURCE_DIR}/../bldpkg/symlibs/dbgsyms\")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory \${symdir})
-        execute_process(COMMAND bash ./stripsym.sh rpcf/${PYTHON_EXT} \${symdir} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory \"\${symdir}\")
+
+        execute_process(COMMAND bash ./stripsym.sh rpcf/${PYTHON_EXT} \"\${symdir}\"
+            WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
     endif()
 
     # User Privilege Management Blocks 
     if(NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
         set(RUN_PREFIX su -c)
-        set(RUN_SUFFIX \" \$ENV{SUDO_USER}\")
+        set(RUN_SUFFIX \"\$ENV{SUDO_USER}\")
     endif()
 
-    execute_process(COMMAND \${RUN_PREFIX} \"${Python3_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py bdist_wheel\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+    execute_process(COMMAND ${CMAKE_COMMAND} -E
+        rm -rf \"${CMAKE_CURRENT_BINARY_DIR}/rpcf\")
+
+    execute_process(COMMAND ${CMAKE_COMMAND} -E
+        create_symlink \"${CMAKE_CURRENT_SOURCE_DIR}/rpcf\" \"${CMAKE_CURRENT_BINARY_DIR}/rpcf\")
+
+    execute_process(
+        COMMAND \${RUN_PREFIX} \"${Python3_EXECUTABLE}\" ${WHEEL_BUILD_ARGS} \${RUN_SUFFIX}
+        WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
+        )
 
     # Dynamic lookup resolution matching 'ls -1t dist | head -n 1'
     file(GLOB WHEEL_FILES RELATIVE \"${CMAKE_CURRENT_SOURCE_DIR}/dist\" \"${CMAKE_CURRENT_SOURCE_DIR}/dist/*.whl\")
@@ -170,7 +193,14 @@ install(CODE "
         execute_process(COMMAND \${RUN_PREFIX} \"pip3 install ${pipopt} --force-reinstall ${useropt} ./dist/\${pkg}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
     else()
         execute_process(COMMAND ${CMAKE_COMMAND} -E rename ./${PYTHON_EXT}.bak rpcf/${PYTHON_EXT} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different ./dist/\${pkg} \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\" WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"
+            WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
+        )        
+        execute_process(COMMAND bash -lc \"echo haha i am here;pwd;ls -l --color ./dist\"
+            WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E
+             copy_if_different ./dist/\${pkg} \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\" WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
         execute_process(COMMAND bash blddpkg.sh \"${CMAKE_CURRENT_SOURCE_DIR}/../\" \"${CMAKE_INSTALL_FULL_LIBDIR}\" ./dist/\${pkg} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
     endif()
 ")

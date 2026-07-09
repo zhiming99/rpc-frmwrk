@@ -63,7 +63,7 @@ string(SUBSTRING "${OS_NAME}" 0 1 oid)
 string(REGEX REPLACE "\\..*" "" MAJOR_VERSION "${OS_VERSION}")
 set(debian_ver "${oid}${MAJOR_VERSION}")
 
-set(CHECK_DESTDIR "\ if [ -z \"\${DESTDIR}\" ]; then echo 'Error: DESTDIR environment variable must be explicitly defined when triggering package staging targets.'; exit 1; fi")
+set(CHECK_DESTDIR "if [ -z \"\${DESTDIR}\" ]; then echo 'Error: DESTDIR environment variable must be explicitly defined when triggering package staging targets.'; exit 1; fi")
 set(COPY_DEBS "echo debian OS version is ${OS_VERSION}; \
 if compgen -G '*.deb' > /dev/null; then for i in *.deb; do mv \$i \${i%%.deb}.${debian_ver}.deb; done; fi;\
 if compgen -G '*.ddeb' > /dev/null; then for i in *.ddeb; do mv \$i \${i%%.ddeb}.${debian_ver}.ddeb; done; fi ")

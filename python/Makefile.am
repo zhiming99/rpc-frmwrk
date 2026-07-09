@@ -62,6 +62,7 @@ genpipopt:
 # check if venv is enabled, and supress --user option if venv is active.
 IS_VENV := $(shell python3 -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')")
 useropt := $(if $(filter false,$(IS_VENV)),--user,)
+command := $(if $(filter false,$(IS_VENV)),python3 -m build --wheel --no-isolation --outdir dist/ .,pip wheel . --no-deps --no-build-isolation -w dist/ )
 
 install: genpipopt
 	@if [ "x$(DESTDIR)" != "x" ];then \
