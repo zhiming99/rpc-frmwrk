@@ -29,7 +29,7 @@ set(GENERATED_OUTPUTS
 )
 
 set_source_files_properties(${GENERATED_OUTPUTS} PROPERTIES GENERATED TRUE )
-set(RIDLC_OPTIONS "ridlc --sync_mode IAppStore=async_p --sync_mode IUserManager=async_p --services=AppManager,SimpleAuth --client -slO \"${CMAKE_CURRENT_BINARY_DIR}\" ${mon_dir}/appmon/appmon.ridl" )
+#set(RIDLC_OPTIONS "ridlc --sync_mode IAppStore=async_p --sync_mode IUserManager=async_p --services=AppManager,SimpleAuth --client -slO \"${CMAKE_CURRENT_BINARY_DIR}\" ${mon_dir}/appmon/appmon.ridl" )
 # Replicates: appmon.ridl target step cleanly inside the binary output workspace
 add_custom_command(
     OUTPUT ${GENERATED_OUTPUTS}
@@ -40,7 +40,9 @@ add_custom_command(
         "${top_dir}/ridl/drvtpl.json" "${top_dir}/ridl/odesctpl2.json" "${top_dir}/ridl/synccfg.py"
         "${CMAKE_CURRENT_BINARY_DIR}/"
 
-    COMMAND bash -lc "${RIDLC_OPTIONS}"
+    COMMAND $<TARGET_FILE:ridlc> --sync_mode IAppStore=async_p --sync_mode IUserManager=async_p --services=AppManager,SimpleAuth --client -slO "${CMAKE_CURRENT_BINARY_DIR}" "${mon_dir}/appmon/appmon.ridl"
+
+    #COMMAND bash -lc "${RIDLC_OPTIONS}"
     DEPENDS "${mon_dir}/appmon/appmon.ridl" ridlc
         
     # Purge intermediate boilerplate setup files safely
@@ -48,7 +50,6 @@ add_custom_command(
         "${CMAKE_CURRENT_BINARY_DIR}/mktpl" "${CMAKE_CURRENT_BINARY_DIR}/mktplsvr" 
         "${CMAKE_CURRENT_BINARY_DIR}/mktplcli" "${CMAKE_CURRENT_BINARY_DIR}/odesctpl2.json" 
         "${CMAKE_CURRENT_BINARY_DIR}/drvtpl.json" "${CMAKE_CURRENT_BINARY_DIR}/synccfg.py"
-    DEPENDS "${mon_dir}/appmon/appmon.ridl"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Compiling AppMonitor IDL Interfaces via ridlc"
 )
