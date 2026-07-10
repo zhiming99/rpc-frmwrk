@@ -43,6 +43,8 @@ set(GENERATED_PY_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/appmancli/__init__.py"
     "${CMAKE_CURRENT_BINARY_DIR}/appmancli/AppManagerclibase.py"
     "${CMAKE_CURRENT_BINARY_DIR}/appmancli/appmonstructs.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/appmancli/AppManagercli.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/appmancli/maincli.py"
 )
 
 set(RIDLC_COMMAND "ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  ${mon_dir}/appmon/appmon.ridl" )
@@ -113,7 +115,7 @@ add_custom_command(
 )
 
 add_custom_target(appmancli_wheel ALL DEPENDS "${WHEEL_OUTPUT}")
-add_dependencies(appmancli_wheel generate_appman_py_cli ridlc)
+add_dependencies(appmancli_wheel generate_appman_py_cli ridlc combase ipc)
 
 # ==============================================================================
 # 4. Installation Script Triggers (install: and uninstall:)

@@ -27,6 +27,7 @@ set_target_properties(smoketest PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # Replaces: smoketest_LDADD=$(smktest_LDFLAGS)
 target_link_libraries(smoketest PRIVATE 
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
+    combase ipc
 )
 
 # ==============================================================================

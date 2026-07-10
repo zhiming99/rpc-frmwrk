@@ -37,6 +37,7 @@ target_link_libraries(inproc PRIVATE
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
     ${CMAKE_DL_LIBS}
+    ipc combase
 )
 
 # ==============================================================================
@@ -52,6 +53,7 @@ target_link_libraries(inproctst PRIVATE
     ${TSTLDFLG} 
     inproc 
     Threads::Threads
+    ipc combase
 )
 target_link_directories(inproctst PRIVATE ${TSTCFG_LINK_DIR})
 

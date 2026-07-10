@@ -41,6 +41,7 @@ target_link_libraries(sfsvr PRIVATE
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
     ${CMAKE_DL_LIBS}
+    ipc combase
 )
 
 # ==============================================================================
@@ -52,7 +53,7 @@ add_executable(sfclitst sftest.cpp sftest.h)
 target_compile_definitions(sfclitst PRIVATE CLIENT)
 target_include_directories(sfclitst PRIVATE ${include_ipcdir})
 set_target_properties(sfclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(sfclitst PRIVATE ${TSTLDFLG} sfsvr Threads::Threads)
+target_link_libraries(sfclitst PRIVATE ${TSTLDFLG} sfsvr Threads::Threads ipc combase)
 target_link_directories(sfclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
@@ -61,7 +62,7 @@ add_executable(sfsvrtst sftest.cpp)
 target_compile_definitions(sfsvrtst PRIVATE SERVER)
 target_include_directories(sfsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(sfsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(sfsvrtst PRIVATE ${TSTLDFLG} sfsvr Threads::Threads)
+target_link_libraries(sfsvrtst PRIVATE ${TSTLDFLG} sfsvr Threads::Threads ipc combase)
 target_link_directories(sfsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================

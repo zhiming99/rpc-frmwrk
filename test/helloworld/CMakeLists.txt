@@ -38,6 +38,7 @@ target_link_libraries(hellowrd PRIVATE
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
     ${CMAKE_DL_LIBS}
+    ipc combase
 )
 
 # ==============================================================================
@@ -49,7 +50,7 @@ add_executable(hwclismk iftest.cpp iftest.h)
 target_compile_definitions(hwclismk PRIVATE CLIENT)
 target_include_directories(hwclismk PRIVATE ${include_ipcdir})
 set_target_properties(hwclismk PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(hwclismk PRIVATE ${TSTLDFLG} hellowrd)
+target_link_libraries(hwclismk PRIVATE ${TSTLDFLG} hellowrd ipc combase)
 target_link_directories(hwclismk PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
@@ -57,7 +58,7 @@ add_executable(hwsvrsmk iftest.cpp iftest.h)
 target_compile_definitions(hwsvrsmk PRIVATE SERVER)
 target_include_directories(hwsvrsmk PRIVATE ${include_ipcdir})
 set_target_properties(hwsvrsmk PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(hwsvrsmk PRIVATE ${TSTLDFLG} hellowrd)
+target_link_libraries(hwsvrsmk PRIVATE ${TSTLDFLG} hellowrd ipc combase)
 target_link_directories(hwsvrsmk PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
