@@ -63,7 +63,7 @@ add_custom_command(
         
     # Execute internal IDL tool compiler mapping environments
     COMMAND $<TARGET_FILE:ridlc> --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  "${mon_dir}/appmon/appmon.ridl"
-    DEPENDS "${mon_dir}/appmon/appmon.ridl" ridlc
+    DEPENDS "${mon_dir}/appmon/appmon.ridl"
         
     # override
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -102,7 +102,7 @@ add_custom_command(
     COMMAND bash -lc "${EXPORT_LICENSE}"
     VERBATIM
     # Compile the final distribution wheel packager target
-    COMMAND ${PYTHON_BUILD_CMD}
+    #COMMAND ${PYTHON_BUILD_CMD}
     COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_CURRENT_BINARY_DIR}/LICENSE"
     
     # Export package to central tracking distributions workspace (../dist)
