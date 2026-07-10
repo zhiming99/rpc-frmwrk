@@ -38,6 +38,7 @@ target_link_libraries(btinrt PRIVATE
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
     ${CMAKE_DL_LIBS}
+    ipc combase
 )
 
 # ==============================================================================
@@ -52,7 +53,7 @@ set_target_properties(btinrtcli PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     ENABLE_EXPORTS ON # Replaces: -rdynamic
 )
-target_link_libraries(btinrtcli PRIVATE ${TSTLDFLG} btinrt)
+target_link_libraries(btinrtcli PRIVATE ${TSTLDFLG} btinrt ipc combase)
 target_link_directories(btinrtcli PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
@@ -63,7 +64,7 @@ set_target_properties(btinrtsvr PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     ENABLE_EXPORTS ON # Replaces: -rdynamic
 )
-target_link_libraries(btinrtsvr PRIVATE ${TSTLDFLG} btinrt)
+target_link_libraries(btinrtsvr PRIVATE ${TSTLDFLG} btinrt ipc combase)
 target_link_directories(btinrtsvr PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================

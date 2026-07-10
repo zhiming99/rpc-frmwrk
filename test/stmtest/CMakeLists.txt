@@ -37,6 +37,7 @@ target_link_libraries(stmsvr PRIVATE
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
     ${CMAKE_DL_LIBS}
+    ipc combase
 )
 
 # ==============================================================================
@@ -55,7 +56,7 @@ target_link_directories(stmclitst PRIVATE ${TSTCFG_LINK_DIR})
 set_target_properties(stmclitst PROPERTIES 
     INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}/rpcf"
 )
-target_link_libraries(stmclitst PRIVATE ${TSTLDFLG} stmsvr Threads::Threads)
+target_link_libraries(stmclitst PRIVATE ${TSTLDFLG} stmsvr Threads::Threads ipc combase)
 
 # --- Server Binary ---
 # Replaces: stmsvrtst_SOURCES=stmtest.cpp Readme.txt (omitted text file from compile targets)
@@ -63,7 +64,7 @@ add_executable(stmsvrtst stmtest.cpp)
 target_compile_definitions(stmsvrtst PRIVATE SERVER)
 target_include_directories(stmsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(stmsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(stmsvrtst PRIVATE ${TSTLDFLG} stmsvr Threads::Threads)
+target_link_libraries(stmsvrtst PRIVATE ${TSTLDFLG} stmsvr Threads::Threads ipc combase)
 target_link_directories(stmsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================

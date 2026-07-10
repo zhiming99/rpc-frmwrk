@@ -37,6 +37,7 @@ target_link_libraries(kasvr PRIVATE
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
     ${CMAKE_DL_LIBS}
+    ipc combase
 )
 
 # ==============================================================================
@@ -48,7 +49,7 @@ add_executable(kaclitst katest.cpp katest.h)
 target_compile_definitions(kaclitst PRIVATE CLIENT)
 target_include_directories(kaclitst PRIVATE ${include_ipcdir})
 set_target_properties(kaclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(kaclitst PRIVATE ${TSTLDFLG} kasvr)
+target_link_libraries(kaclitst PRIVATE ${TSTLDFLG} kasvr ipc combase)
 target_link_directories(kaclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
@@ -56,7 +57,7 @@ add_executable(kasvrtst katest.cpp katest.h)
 target_compile_definitions(kasvrtst PRIVATE SERVER)
 target_include_directories(kasvrtst PRIVATE ${include_ipcdir})
 set_target_properties(kasvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(kasvrtst PRIVATE ${TSTLDFLG} kasvr)
+target_link_libraries(kasvrtst PRIVATE ${TSTLDFLG} kasvr ipc combase)
 target_link_directories(kasvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================

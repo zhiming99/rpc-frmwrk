@@ -37,7 +37,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(ascsvr PRIVATE 
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
-    ${CMAKE_DL_LIBS}
+    ${CMAKE_DL_LIBS} ipc combase
 )
 
 # ==============================================================================
@@ -49,7 +49,7 @@ add_executable(asynclitst asynctest.cpp asynctest.h)
 target_compile_definitions(asynclitst PRIVATE CLIENT)
 target_include_directories(asynclitst PRIVATE ${include_ipcdir})
 set_target_properties(asynclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(asynclitst PRIVATE ${TSTLDFLG} ascsvr)
+target_link_libraries(asynclitst PRIVATE ${TSTLDFLG} ascsvr ipc combase)
 target_link_directories(asynclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
@@ -57,7 +57,7 @@ add_executable(asyncsvrtst asynctest.cpp asynctest.h)
 target_compile_definitions(asyncsvrtst PRIVATE SERVER)
 target_include_directories(asyncsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(asyncsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(asyncsvrtst PRIVATE ${TSTLDFLG} ascsvr)
+target_link_libraries(asyncsvrtst PRIVATE ${TSTLDFLG} ascsvr ipc combase)
 target_link_directories(asyncsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================

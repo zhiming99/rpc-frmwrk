@@ -4,6 +4,7 @@ set( TSTCFG_LINK_DIR
     "${CMAKE_BINARY_DIR}/combase"
     "${CMAKE_BINARY_DIR}/ipc"
 )
+
 # ==============================================================================
 # 1. Base Test Subdirectories (SUBDIRS = iftest btinrt helloworld)
 # ==============================================================================

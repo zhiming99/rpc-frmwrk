@@ -37,6 +37,7 @@ target_link_libraries(prsvr PRIVATE
     ${TSTLDFLG} # Maps from @TSTLDFLG@ via your master scope
     Threads::Threads
     ${CMAKE_DL_LIBS}
+    ipc combase
 )
 
 # ==============================================================================
@@ -48,7 +49,7 @@ add_executable(prclitst prtest.cpp prtest.h)
 target_compile_definitions(prclitst PRIVATE CLIENT)
 target_include_directories(prclitst PRIVATE ${include_ipcdir})
 set_target_properties(prclitst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(prclitst PRIVATE ${TSTLDFLG} prsvr)
+target_link_libraries(prclitst PRIVATE ${TSTLDFLG} prsvr ipc combase)
 target_link_directories(prclitst PRIVATE ${TSTCFG_LINK_DIR})
 
 # --- Server Binary ---
@@ -56,7 +57,7 @@ add_executable(prsvrtst prtest.cpp prtest.h)
 target_compile_definitions(prsvrtst PRIVATE SERVER)
 target_include_directories(prsvrtst PRIVATE ${include_ipcdir})
 set_target_properties(prsvrtst PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(prsvrtst PRIVATE ${TSTLDFLG} prsvr)
+target_link_libraries(prsvrtst PRIVATE ${TSTLDFLG} prsvr ipc combase)
 target_link_directories(prsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 
 # ==============================================================================
