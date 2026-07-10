@@ -105,7 +105,7 @@ add_library(appmon STATIC
     ${CMAKE_CURRENT_BINARY_DIR}/IAppStoreExsvr.cpp
 )
 
-add_dependencies(appmon generate_appmon_svr)
+add_dependencies(appmon generate_appmon_svr ridlc)
 target_include_directories(appmon PRIVATE ${APPMON_BASE_INCLUDES})
 set_target_properties(appmon PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -130,7 +130,7 @@ if(ENABLE_FUSE3)
 endif()
 
 add_executable(appmonsvr ${appmonsvr_SOURCES})
-add_dependencies(appmonsvr generate_appmon_svr)
+add_dependencies(appmonsvr generate_appmon_svr ridlc)
 
 target_include_directories(appmonsvr PRIVATE
     "${APPMON_BASE_INCLUDES}"

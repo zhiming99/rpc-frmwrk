@@ -101,7 +101,7 @@ add_custom_command(
 
 # Global custom target wrapper to force integration inside default target blocks
 add_custom_target(appmancli_jar ALL DEPENDS "${JAR_OUTPUT_FILE}")
-add_dependencies(appmancli_jar generate_appman_java_cli)
+add_dependencies(appmancli_jar generate_appman_java_cli rpcbase_jar ridlc)
 
 # ==============================================================================
 # 4. Staging & Installation Routines

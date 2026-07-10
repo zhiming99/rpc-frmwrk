@@ -70,7 +70,7 @@ add_library(appmancli SHARED
 )
 
 # Enforce generation step triggers early during compilation pipelines
-add_dependencies(appmancli generate_appmon_cli)
+add_dependencies(appmancli generate_appmon_cli ridlc)
 
 # Target compiler configurations and flags management mapping
 target_include_directories(appmancli PRIVATE
@@ -144,7 +144,7 @@ target_link_libraries(apptimer PRIVATE
 )
 
 # Establish sequencing to verify local library compiles entirely prior to executable builds
-add_dependencies(apptimer appmancli)
+add_dependencies(apptimer appmancli ridlc)
 
 # ==============================================================================
 # 5. Installation Routines

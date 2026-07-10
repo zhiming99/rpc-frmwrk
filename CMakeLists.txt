@@ -88,7 +88,6 @@ if(NOT ENABLE_SSL)
 endif()
 
 # --- Configuration Options (Autotools 'if' toggles) ---
-option(ENABLE_FUSE3  "Enable FUSE3 support"  OFF)
 option(SIPBUILD      "Enable SIP build"      OFF)
 option(SIP4          "Enable SIP4 support"    OFF)
 option(ENABLE_PYTHON "Enable Python bindings" OFF)
@@ -204,24 +203,23 @@ endif()
 
 # 2. --- Verify lz4 (Mandatory) ---
 # Replaces AC_CHECK_LIB([lz4], ...)
-pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET liblz4)
+pkg_check_modules(LZ4 IMPORTED_TARGET liblz4)
 if(NOT LZ4_FOUND)
     # Fallback in case pkg-config package name is just 'lz4'
     pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET lz4)
 else()
     include_directories(${LZ4_INCLUDE_DIRS})
-endif()
-
-if(LZ4_FOUND)
     # Replaces AC_DEFINE([HAVE_LIBlz4], [1])
     set(HAVE_LIBlz4 1)
-else()
+endif()
+
+if(NOT LZ4_FOUND)
     message(FATAL_ERROR "****** lz4 was not found ******")
 endif()
 
 # 3. --- Verify jsoncpp (Optional/Permissive) ---
 # Replaces AC_CHECK_LIB([jsoncpp], ...) which lacked an error fallback
-pkg_check_modules(JSONCPP IMPORTED_TARGET jsoncpp)
+pkg_check_modules(JSONCPP REQUIRED IMPORTED_TARGET jsoncpp)
 if(JSONCPP_FOUND)
     # Replaces AC_DEFINE([HAVE_LIBjsoncpp], [1])
     set(HAVE_LIBjsoncpp 1)
