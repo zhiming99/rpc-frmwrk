@@ -106,7 +106,7 @@ add_custom_command(
 )
 
 add_custom_target(appmancli_wheel ALL DEPENDS "${WHEEL_OUTPUT}")
-add_dependencies(appmancli_wheel generate_appman_py_cli)
+add_dependencies(appmancli_wheel generate_appman_py_cli ridlc)
 
 # ==============================================================================
 # 4. Installation Script Triggers (install: and uninstall:)

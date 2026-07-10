@@ -90,7 +90,7 @@ add_custom_command(
 )
 
 add_custom_target(appmon_js_bundle DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/dist/appmon.js")
-add_dependencies(appmon_js_bundle generate_appmon_js_cli)
+add_dependencies(appmon_js_bundle generate_appmon_js_cli ridlc)
 
 # ==============================================================================
 # 4. Target "all" Archive Construction (appmonui.tar.gz)
