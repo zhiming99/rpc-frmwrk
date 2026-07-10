@@ -96,7 +96,7 @@ if(SIPBUILD OR SIPVER EQUAL 5)
         COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh "${CMAKE_INSTALL_FULL_LIBDIR}" "${TARGET_CONF_FILE}.1"
         COMMAND bash -lc "CXXFLAGS= ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild"
         VERBATIM
-        COMMAND bash -lc "sofile=`find ./sipbuild -name ${PYTHON_EXT1}`\;if [ ! -z \"\${sofile}\" ]\; then rm rpcf/rpcbase*.so*\;cp \${sofile} rpcf\;\
+        COMMAND bash -lc "sofile=`find ./sipbuild -name ${PYTHON_EXT1}`\;if [ ! -z \"\${sofile}\" ]\; then rm -f rpcf/rpcbase*.so*\;cp \${sofile} rpcf\;\
 cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
         VERBATIM
     )
@@ -124,7 +124,7 @@ elseif(SIP4 OR SIPVER EQUAL 4)
             DBGBUILD=${DBGBUILD}
             ARMBUILD=${ARMBUILD}
             ${Python3_EXECUTABLE} build-4.9.py ${CMAKE_INSTALL_FULL_LIBDIR}
-        COMMAND bash -lc "rm rpcf/rpcbase*.so*\;cp ./sip4build/rpcbase.so rpcf/${PYTHON_EXT1}\;\
+        COMMAND bash -lc "rm -f rpcf/rpcbase*.so*\;cp ./sip4build/rpcbase.so rpcf/${PYTHON_EXT1}\;\
 cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
     )
 endif()
