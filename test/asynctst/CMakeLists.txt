@@ -25,7 +25,7 @@ target_include_directories(ascsvr PRIVATE ${include_ipcdir})
 set_target_properties(ascsvr PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_link_directories(ascsvr PRIVATE ${TSTCFG_LINK_DIR})
-)         
+
 # Replaces: libascsvr_la_LDFLAGS=-version-info @VERSION2@
 #set_target_properties(ascsvr PROPERTIES 
 #    VERSION "${VERSION2}"
