@@ -35,7 +35,6 @@ foreach(_file ${auto_files})
     list(APPEND GENERATED_JS_FILES "${CMAKE_CURRENT_BINARY_DIR}/${_file}")
 endforeach()
 
-set(RIDLC_COMMAND "ridlc --noreadme --services=AppMonitor -sJO . ${ridl_file}" )
 add_custom_command(
     OUTPUT ${GENERATED_JS_FILES}
     # Stage boilerplate code-generation templates securely into the binary directory
@@ -46,7 +45,7 @@ add_custom_command(
         "${CMAKE_CURRENT_BINARY_DIR}/"
         
     # Execute internal IDL tool compiler mapping environments
-    COMMAND bash -lc "${RIDLC_COMMAND}"
+    COMMAND $<TARGET_FILE:ridlc> --noreadme --services=AppMonitor -sJO . "${ridl_file}"
     DEPENDS "${ridl_file}" ridlc
 
     # Clean up intermediate configuration logs
