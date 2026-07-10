@@ -41,9 +41,8 @@ endif()
 # ==============================================================================
 set(GENERATED_PY_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/appmancli/__init__.py"
-    "${CMAKE_CURRENT_BINARY_DIR}/appmancli/AppManagercli.py"
-    "${CMAKE_CURRENT_BINARY_DIR}/appmancli/maincli.py"
-    "${CMAKE_CURRENT_BINARY_DIR}/appmancli/apptimer.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/appmancli/AppManagerclibase.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/appmancli/appmonstructs.py"
 )
 
 set(RIDLC_COMMAND "ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  ${mon_dir}/appmon/appmon.ridl" )
@@ -64,6 +63,13 @@ add_custom_command(
     COMMAND $<TARGET_FILE:ridlc> --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  "${mon_dir}/appmon/appmon.ridl"
     DEPENDS "${mon_dir}/appmon/appmon.ridl" ridlc
         
+    # override
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/AppManagercli.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/maincli.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/apptimer.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/"
+
     # Cleanup trailing tracking files
     COMMAND ${CMAKE_COMMAND} -E rm -f 
         mktpl pymktpl mktplsvr mktplcli odesctpl2.json drvtpl.json 
@@ -78,7 +84,8 @@ add_custom_target(generate_appman_py_cli DEPENDS ${GENERATED_PY_FILES})
 # ==============================================================================
 # 3. Target "all" Execution Pipeline (Wheel Packaging)
 # ==============================================================================
-set(WHEEL_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/dist/appmancli-${PACKAGE_VERSION}-py3-none-any.whl")
+set(WHEEL_NAME "appmancli-${VERSION2}-py3-none-any.whl")
+set(WHEEL_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/dist/${WHEEL_NAME}")
 
 set(EXPORT_LICENSE "if ! grep 'dynamic = ' pyproject.toml; then python3 -c \"import setuptools; v=int(setuptools.__version__.split('.')[0]); f=open('pyproject.toml', 'a'); f.write('dynamic = [\\\"license\\\"]\\n') if v>=61 else True; f.close()\"; fi")
 
@@ -123,7 +130,7 @@ install(CODE "
 
         message(STATUS \"Installing appmancli package distribution via pip3...\")
         execute_process(
-            COMMAND \${RUN_PREFIX} \"pip3 install --force-reinstall --no-deps ${pipopt} dist/appmancli*.whl\" \${RUN_SUFFIX}
+            COMMAND \${RUN_PREFIX} pip3 install --force-reinstall --no-deps ${pipopt} dist/${WHEEL_NAME} \${RUN_SUFFIX}
             WORKING_DIRECTORY \"${CMAKE_CURRENT_BINARY_DIR}\"
         )
     endif()
