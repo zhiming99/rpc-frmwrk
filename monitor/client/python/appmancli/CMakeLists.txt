@@ -61,7 +61,7 @@ add_custom_command(
         "${CMAKE_CURRENT_BINARY_DIR}/appmancli/"
         
     # Execute internal IDL tool compiler mapping environments
-    COMMAND bash -lc "${RIDLC_COMMAND}"
+    COMMAND $<TARGET_FILE:ridlc> --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  "${mon_dir}/appmon/appmon.ridl"
     DEPENDS "${mon_dir}/appmon/appmon.ridl" ridlc
         
     # Cleanup trailing tracking files
