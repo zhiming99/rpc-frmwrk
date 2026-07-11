@@ -102,7 +102,7 @@ add_custom_command(
     COMMAND bash -lc "${EXPORT_LICENSE}"
     VERBATIM
     # Compile the final distribution wheel packager target
-    #COMMAND ${PYTHON_BUILD_CMD}
+    COMMAND ${PYTHON_BUILD_CMD}
     COMMAND ${CMAKE_COMMAND} -E rm -f "${CMAKE_CURRENT_BINARY_DIR}/LICENSE"
     
     # Export package to central tracking distributions workspace (../dist)
