@@ -72,6 +72,7 @@ add_custom_command(
 
 # Add a logical dependency tracker anchor target to drive serialization hooks
 add_custom_target(generate_appman_java_cli DEPENDS ${autofiles})
+add_dependencies(generate_appman_java_cli rpcbase_jar ridlc ipc combase)
 
 # ==============================================================================
 # 3. Java Compilation & Package JAR Assembly
@@ -101,7 +102,7 @@ add_custom_command(
 
 # Global custom target wrapper to force integration inside default target blocks
 add_custom_target(appmancli_jar ALL DEPENDS "${JAR_OUTPUT_FILE}")
-add_dependencies(appmancli_jar generate_appman_java_cli rpcbase_jar ridlc)
+add_dependencies(appmancli_jar generate_appman_java_cli )
 
 # ==============================================================================
 # 4. Staging & Installation Routines

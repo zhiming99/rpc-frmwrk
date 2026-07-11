@@ -53,6 +53,11 @@ file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/appmancli")
 add_custom_command(
     OUTPUT ${GENERATED_PY_FILES}
     
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/etc/rpcf"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${top_dir}/ridl/seribase.py"
+        "${CMAKE_BINARY_DIR}/etc/rpcf/"
+
     # Stage boilerplate code-generation tracking tools securely
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${top_dir}/ridl/mktpl" "${top_dir}/ridl/mktplsvr" 
@@ -76,12 +81,15 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E rm -f 
         mktpl pymktpl mktplsvr mktplcli odesctpl2.json drvtpl.json 
         *.new appmondesc.json driver.json *.md cmdline synccfg.py
+
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/etc/rpcf"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/appmancli"
     COMMENT "Compiling Python AppMonitor interfaces via ridlc"
 )
 
 # Anchor target to verify interface dependencies execute correctly
 add_custom_target(generate_appman_py_cli DEPENDS ${GENERATED_PY_FILES})
+add_dependencies(generate_appman_py_cli ridlc combase ipc)
 
 # ==============================================================================
 # 3. Target "all" Execution Pipeline (Wheel Packaging)
@@ -115,7 +123,7 @@ add_custom_command(
 )
 
 add_custom_target(appmancli_wheel ALL DEPENDS "${WHEEL_OUTPUT}")
-add_dependencies(appmancli_wheel generate_appman_py_cli ridlc combase ipc)
+add_dependencies(appmancli_wheel generate_appman_py_cli )
 
 # ==============================================================================
 # 4. Installation Script Triggers (install: and uninstall:)

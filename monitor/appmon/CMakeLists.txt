@@ -45,7 +45,6 @@ set(GENERATED_SERVER_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/IAppStoreExsvr.h"
 )
 
-set(RIDLC_COMMAND "ridlc --server -sO.  ${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl" )
 add_custom_command(
     OUTPUT ${GENERATED_SERVER_FILES}
     # Stage boilerplate code-generation templates securely into the binary directory
@@ -71,10 +70,9 @@ add_custom_command(
         "${CMAKE_CURRENT_BINARY_DIR}/"
 
     # Execute internal IDL tool compiler mapping environments
-    COMMAND bash -lc "${RIDLC_COMMAND}"
-    VERBATIM
-    DEPENDS ridlc
-        "${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl" 
+    COMMAND $<TARGET_FILE:ridlc> --server -sO.  "${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl"
+
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/appmon.ridl" 
         "${CMAKE_SOURCE_DIR}/monitor/registry/regfsif.ridl"
         
     # Clean up intermediate tracking configuration logs
