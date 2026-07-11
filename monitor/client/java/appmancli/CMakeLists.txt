@@ -54,7 +54,7 @@ add_custom_command(
     # Fire compiler execution rules tracking library mapping configurations
     COMMAND ${CMAKE_COMMAND} -E env 
         LD_LIBRARY_PATH="${PROJECT_BINARY_DIR}/combase:${top_dir}/combase:\$ENV{LD_LIBRARY_PATH}"
-        ridlc --sync_mode IAppStore=sync 
+        $<TARGET_FILE:ridlc> --sync_mode IAppStore=sync 
         --sync_mode IDataProducer=sync 
         --services=AppManager --client --pkgname=org.rpcf.appmancli -jslO . "${ridlfile}"
         

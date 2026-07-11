@@ -130,6 +130,10 @@ cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
 endif()
 
 add_custom_target(rpcf_all ALL ${BUILD_COMMANDS} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(rpcf_all ipc combase)
+if( ENABLE_FUSE3 )
+add_dependencies(rpcf_all fuseif)
+endif()
 
 # Execute the python script and capture the stdout
 # 1. Check if running inside a Python virtual environment (venv)

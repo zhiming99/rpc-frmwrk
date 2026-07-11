@@ -54,6 +54,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/ipc)
 # --- Configuration Options (Autotools AC_ARG_ENABLE translations) ---
 
 # Replaces AC_ARG_ENABLE([ssl], ...) from Part 1
+option(ENABLE_DEBUG "Build and install the debug version image" OFF)
+
+# Replaces AC_ARG_ENABLE([ssl], ...) from Part 1
 option(ENABLE_SSL "Build and install with SSL support" ON)
 
 # Replaces AC_ARG_ENABLE([testcases], ...) from Part 1
@@ -90,7 +93,6 @@ endif()
 # --- Configuration Options (Autotools 'if' toggles) ---
 option(SIPBUILD      "Enable SIP build"      OFF)
 option(SIP4          "Enable SIP4 support"    OFF)
-option(ENABLE_PYTHON "Enable Python bindings" OFF)
 option(SWIG          "Enable SWIG generation" OFF)
 option(ENABLE_JAVA   "Enable Java bindings"   OFF)
 option(ENABLE_JS     "Enable JS support"     OFF)
@@ -431,6 +433,11 @@ set(COMMON_LINK_CPPUNIT "${COMMON_LINK_CPPUNIT}" CACHE INTERNAL "")
 set(COMMON_LINK_SSL     "${COMMON_LINK_SSL}"     CACHE INTERNAL "")
 set(COMMON_LINK_KRB5    "${COMMON_LINK_KRB5}"    CACHE INTERNAL "")
 set(COMMON_LINK_FUSE3   "${COMMON_LINK_FUSE3}"   CACHE INTERNAL "")
+if( ENABLE_DEBUG )
+    set(CPPFLAGS "-O0 -ggdb -DDEBUG -D_DEBUG=1 -fno-strict-aliasing")
+else()
+    set(CPPFLAGS "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing")
+endif()
 
 # Replaces: AC_MSG_NOTICE([the cxxflags string is ${CXXFLAGS}])
 message(STATUS "the cxxflags string is ${CXXFLAGS}")
