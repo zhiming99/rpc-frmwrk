@@ -3026,7 +3026,7 @@ EOF
 
         strMaxConns = ""
         if 'MaxConnections' in confVals :
-            strMaxConns = confVals[ 'MaxConnections']
+            strMaxConns = str( confVals[ 'MaxConnections'] )
         else :
             strMaxConns = str( 512 )
 
