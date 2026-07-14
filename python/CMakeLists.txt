@@ -22,31 +22,6 @@ set(PYTHON_EXT "${PYTHON_EXT1}.${VERSION}") # Assumes ${VERSION} comes from your
 # ==============================================================================
 # 2. Replicate Environment OS Profiling (genpipopt & IS_VENV targets)
 # ==============================================================================
-set(pipopt "")
-if(EXISTS "/etc/os-release")
-    file(READ "/etc/os-release" OS_RELEASE_CONTENT)
-    
-    # Extract ID
-    string(REGEX MATCH "ID=([^\n]+)" OS_ID_MATCH "${OS_RELEASE_CONTENT}")
-    string(REPLACE "ID=" "" OS_NAME "${CMAKE_MATCH_1}")
-    string(REPLACE "\"" "" OS_NAME "${OS_NAME}")
-    
-    # Extract VERSION_ID
-    string(REGEX MATCH "VERSION_ID=([^\n]+)" OS_VER_MATCH "${OS_RELEASE_CONTENT}")
-    string(REPLACE "VERSION_ID=" "" OS_VERSION "${CMAKE_MATCH_1}")
-    string(REPLACE "\"" "" OS_VERSION "${OS_VERSION}")
-
-    if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
-        set(pipopt "--break-system-packages")
-    elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
-        set(pipopt "--break-system-packages")
-    endif()
-endif()
-
-if(pipopt)
-    message(STATUS "Warning: break-system-packages enabled")
-endif()
-
 # Determine venv configuration mapping
 execute_process(
     COMMAND ${Python3_EXECUTABLE} -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')"
@@ -56,6 +31,28 @@ if(IS_VENV STREQUAL "false")
     set(useropt "--user")
 else()
     set(useropt "")
+endif()
+
+set(pipopt "")
+if(IS_VENV STREQUAL "false")
+    if(EXISTS "/etc/os-release")
+        file(READ "/etc/os-release" OS_RELEASE_CONTENT)
+        # Extract ID
+        string(REGEX MATCH "ID=([^\n]+)" OS_ID_MATCH "${OS_RELEASE_CONTENT}")
+        string(REPLACE "ID=" "" OS_NAME "${CMAKE_MATCH_1}")
+        string(REPLACE "\"" "" OS_NAME "${OS_NAME}")
+
+        # Extract VERSION_ID
+        string(REGEX MATCH "VERSION_ID=([^\n]+)" OS_VER_MATCH "${OS_RELEASE_CONTENT}")
+        string(REPLACE "VERSION_ID=" "" OS_VERSION "${CMAKE_MATCH_1}")
+        string(REPLACE "\"" "" OS_VERSION "${OS_VERSION}")
+
+        if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
+        set(pipopt "--break-system-packages")
+        elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
+        set(pipopt "--break-system-packages")
+        endif()
+    endif()
 endif()
 
 # ==============================================================================
@@ -196,16 +193,12 @@ install(CODE "
         message(STATUS \"Installing dist/\${pkg} via pip3...\")
         execute_process(COMMAND \${RUN_PREFIX} \"pip3 install ${pipopt} --force-reinstall ${useropt} ./dist/\${pkg}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
     else()
-        execute_process(COMMAND ${CMAKE_COMMAND} -E rename ./${PYTHON_EXT}.bak rpcf/${PYTHON_EXT} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"
             WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
         )        
-        execute_process(COMMAND bash -lc \"echo haha i am here;pwd;ls -l --color ./dist\"
-            WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
         execute_process(COMMAND ${CMAKE_COMMAND} -E
              copy_if_different ./dist/\${pkg} \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\" WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
-        execute_process(COMMAND bash blddpkg.sh \"${CMAKE_CURRENT_SOURCE_DIR}/../\" \"${CMAKE_INSTALL_FULL_LIBDIR}\" ./dist/\${pkg} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
     endif()
 ")
 
