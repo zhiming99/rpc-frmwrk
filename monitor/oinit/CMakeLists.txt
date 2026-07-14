@@ -16,37 +16,41 @@ execute_process(
 
 # Replaces: command := $(if $(filter false,$(IS_VENV)),...)
 if(IS_VENV STREQUAL "false")
-    set(PYTHON_BUILD_CMD "python3" "-m" "build" "--wheel" "--no-isolation" "--outdir" "dist/" ".")
-    set(PIP_INSTALL_OPTS "--force-reinstall" "--user" "--break-system-packages")
+    set(PYTHON_BUILD_CMD "python3 -m build --wheel --no-isolation --outdir dist/ .")
+    set(PIP_INSTALL_OPTS "--force-reinstall --user --break-system-packages")
 else()
-    set(PYTHON_BUILD_CMD "pip3" "wheel" "." "--no-deps" "--no-build-isolation" "-w" "dist/")
+    set(PYTHON_BUILD_CMD "pip3 wheel . --no-deps --no-build-isolation -w dist/")
     set(PIP_INSTALL_OPTS "")
 endif()
 
 # ==============================================================================
 # 2. Target "wheel" Custom Operation
 # ==============================================================================
-add_custom_target(wheel
-    # Replicates: clean and prepare workspace
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/output"
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/output/*.whl"
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit"
-    
-    # Replicates: cp *.py rpmpkg/oinit; mv rpmpkg/oinit/setup.py rpmpkg/; ...
-    # Assumes setup.py is generated previously or tracked in source tree
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/setup.py "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/oinitdesc.json "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/"
-    
-    # Run directory globbing shell fallback for multi-file extensions securely
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/ && cp ${CMAKE_CURRENT_SOURCE_DIR}/README* ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/ && rm -f ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/setup.py"
-    
-    # Replicates: pushd rpmpkg; $(command); cp dist/*.whl ../output; popd
-    COMMAND ${CMAKE_COMMAND} -E env bash -c "cd ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg && ${PYTHON_BUILD_CMD} && cp dist/*.whl ${CMAKE_CURRENT_BINARY_DIR}/output/"
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg"
-    COMMAND ${CMAKE_COMMAND} -E echo "wheel package is generated in 'output' directory."
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Compiling Python Wheel packages"
+add_custom_target(wheel ALL
+    # 1. Clear out stale output layers safely using native directory-wipes
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/output"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg"
+
+    # 2. Re-initialize a clean staging workspace tree
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/output"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit"
+
+    # 3. Securely stage explicit static file definitions
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_BINARY_DIR}/setup.py" "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/oinitdesc.json" "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/"
+
+    COMMAND bash -c "cp ${CMAKE_CURRENT_SOURCE_DIR}/*.py ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/ && cp ${CMAKE_CURRENT_SOURCE_DIR}/README* ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/ && rm -f ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg/oinit/setup.py"
+
+    # 5. THE FIX: Safe Compilation and Extraction Pipeline
+    COMMAND bash -c "cd ${CMAKE_CURRENT_BINARY_DIR}/rpmpkg && ${PYTHON_BUILD_CMD} && cp dist/*.whl ${CMAKE_CURRENT_BINARY_DIR}/output/"
+
+    # 6. Clean up temporary packaging staging artifacts immediately following extraction
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/rpmpkg"
+    COMMAND "${CMAKE_COMMAND}" -E echo "Success: Python wheel package successfully generated in 'output' directory."
+
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Compiling Python Wheel packages via isolated environment wrappers..."
+    VERBATIM # Ensures all quotes and spaces pass exactly as intended to the OS
 )
 
 # ==============================================================================
@@ -120,5 +124,62 @@ add_custom_target(localinst
 # ==============================================================================
 # 6. Standard Installation Hook Layout Definitions
 # ==============================================================================
-install(FILES oinit.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+if(IS_VENV STREQUAL "false")
+    set(useropt "--user")
+else()
+    set(useropt "")
+endif()
 
+set(pipopt "")
+if(IS_VENV STREQUAL "false")
+    if(EXISTS "/etc/os-release")
+        file(READ "/etc/os-release" OS_RELEASE_CONTENT)
+        # Extract ID
+        string(REGEX MATCH "ID=([^\n]+)" OS_ID_MATCH "${OS_RELEASE_CONTENT}")
+        string(REPLACE "ID=" "" OS_NAME "${CMAKE_MATCH_1}")
+        string(REPLACE "\"" "" OS_NAME "${OS_NAME}")
+
+        # Extract VERSION_ID
+        string(REGEX MATCH "VERSION_ID=([^\n]+)" OS_VER_MATCH "${OS_RELEASE_CONTENT}")
+        string(REPLACE "VERSION_ID=" "" OS_VERSION "${CMAKE_MATCH_1}")
+        string(REPLACE "\"" "" OS_VERSION "${OS_VERSION}")
+
+        if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
+        set(pipopt "--break-system-packages")
+        elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
+        set(pipopt "--break-system-packages")
+        endif()
+    endif()
+endif()
+
+install(FILES oinit.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+install(CODE "
+    # Recursively find the file generated by your custom target step above
+    file(GLOB INST_WHEELS RELATIVE \"${CMAKE_CURRENT_BINARY_DIR}/output\" \"${CMAKE_CURRENT_BINARY_DIR}/output/*.whl\")
+    
+    # User Privilege Management Blocks 
+    if(NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
+        set(RUN_PREFIX su -c)
+        set(RUN_SUFFIX \"\$ENV{SUDO_USER}\")
+    endif()
+
+    if(INST_WHEELS)
+	list(SORT INST_WHEELS COMPARE NATURAL ORDER DESCENDING)
+        list(GET INST_WHEELS 0 TARGET_WHEEL_PATH)
+        message(STATUS \"Found wheel target for packaging/installation: \${TARGET_WHEEL_PATH}\")
+        
+        # Insert your standard dynamic DESTDIR/CPack redirection block here...
+
+        if(\"\$ENV{DESTDIR}\" STREQUAL \"\")
+            message(STATUS \"Installing dist/\${TARGET_WHEEL_PATH} via pip3...\")
+            execute_process(COMMAND \${RUN_PREFIX} \"pip3 install ${pipopt} --force-reinstall ${useropt} ${CMAKE_CURRENT_BINARY_DIR}/output/\${TARGET_WHEEL_PATH}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        else()
+            execute_process(
+                COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"
+                WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
+            )        
+            execute_process(COMMAND ${CMAKE_COMMAND} -E
+                 copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/output/\${TARGET_WHEEL_PATH} \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\" WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        endif()
+    endif()
+")
