@@ -26,14 +26,21 @@ cmake_host_system_information(RESULT OS_VERSION QUERY DISTRIB_VERSION_ID)
 # PEP 668 system protection overrides for modern Debian/Ubuntu baselines
 set(pipopt "")
 
-if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
-    set(pipopt "--break-system-packages")
-elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
-    set(pipopt "--break-system-packages")
+if(IS_VENV STREQUAL "false")
+    if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
+        set(pipopt "--break-system-packages")
+    elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
+        set(pipopt "--break-system-packages")
+    endif()
 endif()
 
 if(pipopt)
     message(STATUS "Warning: break-system-packages enabled in directory python/appmancli")
+endif()
+
+set(useropt "--no-deps")
+if(IS_VENV STREQUAL "false")
+    set(useropt "${useropt} --user")
 endif()
 
 # ==============================================================================
@@ -138,11 +145,22 @@ install(CODE "
             set(RUN_SUFFIX \" \$ENV{SUDO_USER}\")
         endif()
 
-        message(STATUS \"Installing appmancli package distribution via pip3...\")
-        execute_process(
-            COMMAND \${RUN_PREFIX} pip3 install --force-reinstall --no-deps ${pipopt} dist/${WHEEL_NAME} \${RUN_SUFFIX}
-            WORKING_DIRECTORY \"${CMAKE_CURRENT_BINARY_DIR}\"
-        )
+        file(GLOB INST_WHEELS RELATIVE \"${CMAKE_CURRENT_BINARY_DIR}/dist\" \"${CMAKE_CURRENT_BINARY_DIR}/dist/*.whl\")
+        if(INST_WHEELS)
+            list(SORT INST_WHEELS COMPARE NATURAL ORDER DESCENDING)
+            list(GET INST_WHEELS 0 TARGET_WHEEL_PATH)
+            if(\"\$ENV{DESTDIR}\" STREQUAL \"\")
+                message(STATUS \"Installing dist/\${TARGET_WHEEL_PATH} via pip3...\")
+                execute_process(COMMAND \${RUN_PREFIX} \"pip3\" \"install\" \"${pipopt}\" \"--force-reinstall\" \"${useropt}\" \"dist/\${TARGET_WHEEL_PATH}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_BINARY_DIR}\")
+            else()
+                execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"
+                    WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
+                )        
+                execute_process(COMMAND ${CMAKE_COMMAND} -E
+                     copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/dist/\${TARGET_WHEEL_PATH} \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\" WORKING_DIRECTORY \"${CMAKE_CURRENT_BINARY_DIR}\")
+            endif()
+        endif()
     endif()
 ")
 
