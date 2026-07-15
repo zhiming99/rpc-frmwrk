@@ -191,7 +191,7 @@ install(CODE "
 
     if(\"\$ENV{DESTDIR}\" STREQUAL \"\")
         message(STATUS \"Installing dist/\${pkg} via pip3...\")
-        execute_process(COMMAND \${RUN_PREFIX} \"pip3 install ${pipopt} --force-reinstall ${useropt} ./dist/\${pkg}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        execute_process(COMMAND \${RUN_PREFIX} \"pip3\" \"install\" \"${pipopt}\" \"--force-reinstall\" \"${useropt}\" \"./dist/\${pkg}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
     else()
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"

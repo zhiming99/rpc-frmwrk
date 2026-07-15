@@ -164,7 +164,7 @@ install(CODE "
     endif()
 
     if(INST_WHEELS)
-	list(SORT INST_WHEELS COMPARE NATURAL ORDER DESCENDING)
+	    list(SORT INST_WHEELS COMPARE NATURAL ORDER DESCENDING)
         list(GET INST_WHEELS 0 TARGET_WHEEL_PATH)
         message(STATUS \"Found wheel target for packaging/installation: \${TARGET_WHEEL_PATH}\")
         
@@ -172,7 +172,7 @@ install(CODE "
 
         if(\"\$ENV{DESTDIR}\" STREQUAL \"\")
             message(STATUS \"Installing dist/\${TARGET_WHEEL_PATH} via pip3...\")
-            execute_process(COMMAND \${RUN_PREFIX} \"pip3 install ${pipopt} --force-reinstall ${useropt} ${CMAKE_CURRENT_BINARY_DIR}/output/\${TARGET_WHEEL_PATH}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+            execute_process(COMMAND \${RUN_PREFIX} \"pip3\" \"install\" \"${pipopt}\" \"--force-reinstall\" \"${useropt}\" \"${CMAKE_CURRENT_BINARY_DIR}/output/\${TARGET_WHEEL_PATH}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
         else()
             execute_process(
                 COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"
