@@ -1,0 +1,120 @@
+#!/bin/sh
+set -e
+
+# Automatically injected by CMake at build time
+PKG_NAME="@PACKAGE_NAME@"
+ENABLE_JS="@ENABLE_JS@"
+JS_NODE_PACKAGES="@JS_NODE_PACKAGES@"
+
+case "$1" in
+    configure)
+        echo "Processing post-installation hooks for ${PKG_NAME}..."
+
+        # =====================================================================
+        # TASK 1: Dynamic Python Wheel Installation
+        # =====================================================================
+        if [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/pip3" ]; then
+            PIP_CMD="$VIRTUAL_ENV/bin/pip3"
+            PIP_OPTS=""
+            echo "-> Detected Active Virtual Environment: $VIRTUAL_ENV"
+        elif [ -x "/opt/venv/bin/pip3" ]; then
+            PIP_CMD="/opt/venv/bin/pip3"
+            PIP_OPTS=""
+            echo "-> Detected Default System Venv: /opt/venv"
+        else
+            PIP_CMD="pip3"
+            PIP_OPTS=""
+            echo "-> Operating on Global System Python"
+
+            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3")
+            if [ -f "/usr/lib/python${PYTHON_VERSION}/EXTERNALLY-MANAGED" ] || [ -f "/usr/lib32/python${PYTHON_VERSION}/EXTERNALLY-MANAGED" ]; then
+                echo "--> Modern OS safeguard detected. Appending --break-system-packages."
+                PIP_OPTS="--break-system-packages"
+            fi
+        fi
+
+        # Detect if we are on DEB or RPM to look up files correctly
+        if command -v dpkg >/dev/null 2>&1; then
+            # Debian approach
+            WHL_FILES=$(dpkg -L "$PKG_NAME" | grep '\.whl$')
+            JAR_FILES=$(dpkg -L "$PKG_NAME" | grep '\.jar$')
+        elif command -v rpm >/dev/null 2>&1; then
+            # RPM approach [1]
+            WHL_FILES=$(rpm -ql "$PKG_NAME" | grep '\.whl$')
+            JAR_FILES=$(rpm -ql "$PKG_NAME" | grep '\.jar$')
+        else
+            # Fallback fallback if package manager query fails
+            WHL_FILES=$(find /usr/lib/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null)
+            JAR_FILES=$(find /usr/lib/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null)
+        fi
+
+        if command -v "$PIP_CMD" >/dev/null 2>&1; then
+            echo "$WHL_FILES" | while read -r whl_file; do
+                if [ -f "$whl_file" ]; then
+                    echo "-> Installing wheel: $whl_file"
+                    "$PIP_CMD" install --force-reinstall $PIP_OPTS "$whl_file"
+                fi
+            done
+        else
+            echo "Warning: pip3 command not found. Skipping wheel installation phase." >&2
+        fi
+
+
+        # =====================================================================
+        # TASK 2: Dynamic JAR Versionless Symbolic Linking
+        # =====================================================================
+        echo "Processing JAR file adjustments..."
+        echo "$JAR_FILES" | while read -r jar_path; do
+            if [ -f "$jar_path" ]; then
+                jar_dir=$(dirname "$jar_path")
+                jar_file=$(basename "$jar_path")
+                base_name=$(echo "$jar_file" | sed -E 's/-[0-9].*\.jar$/\.jar/')
+
+                if [ "$jar_file" != "$base_name" ]; then
+                    symlink_target="${jar_dir}/${base_name}"
+                    echo "-> Creating versionless symlink: $symlink_target -> $jar_file"
+                    ln -sf "$jar_file" "$symlink_target"
+                fi
+            fi
+        done
+
+
+        # =====================================================================
+        # TASK 3: Global npm Package Installation (Node.js version > 22)
+        # =====================================================================
+        # Check if the feature toggle was enabled during compilation
+        if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
+            if [ -n "$JS_NODE_PACKAGES" ]; then
+                echo "Checking npm environment for global packages..."
+                
+                if command -v npm >/dev/null 2>&1; then
+                    # Extract the major version integer safely
+                    NPM_MAJOR_VERSION=$(npm -v | cut -d. -f1)
+                    
+                    if [ "$NPM_MAJOR_VERSION" -gt 22 ]; then
+                        echo "-> npm version ${NPM_MAJOR_VERSION} satisfies requirement (> 22)."
+                        for npm_pkg in $JS_NODE_PACKAGES; do
+                            echo "-> Globally installing node package: $npm_pkg"
+                            npm install -g "$npm_pkg"
+                        done
+                    else
+                        echo "Skipping node package deployment: npm version (${NPM_MAJOR_VERSION}) is not higher than 22."
+                    fi
+                else
+                    echo "Warning: npm feature is toggled on, but 'npm' executable was not found on this system." >&2
+                fi
+            fi
+        fi
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
+

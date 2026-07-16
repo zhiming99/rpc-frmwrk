@@ -1,0 +1,75 @@
+#!/bin/sh
+set -e
+
+PKG_NAME="@PACKAGE_NAME@"
+ENABLE_JS="@ENABLE_JS@"
+JS_NODE_PACKAGES="@JS_NODE_PACKAGES@"
+PYTHON_MODULES="appmancli rpcf oinit"
+
+case "$1" in
+    remove|purge)
+        echo "Undoing post-installation tasks for ${PKG_NAME}..."
+
+        # =====================================================================
+        # UNDO TASK 3: Uninstall global npm Packages
+        # =====================================================================
+        if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
+            if [ -n "$JS_NODE_PACKAGES" ] && command -v npm >/dev/null 2>&1; then
+                NPM_MAJOR_VERSION=$(npm -v | cut -d. -f1)
+                if [ "$NPM_MAJOR_VERSION" -gt 22 ]; then
+                    for npm_pkg in $JS_NODE_PACKAGES; do
+                        echo "-> Globally removing node package: $npm_pkg"
+                        npm uninstall -g "$npm_pkg" || true
+                    done
+                fi
+            fi
+        fi
+
+        # =====================================================================
+        # UNDO TASK 1: Dynamic Python Wheel Uninstallation
+        # =====================================================================
+        if [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/pip3" ]; then
+            PIP_CMD="$VIRTUAL_ENV/bin/pip3"
+            PIP_OPTS=""
+        elif [ -x "/opt/venv/bin/pip3" ]; then
+            PIP_CMD="/opt/venv/bin/pip3"
+            PIP_OPTS=""
+        else
+            PIP_CMD="pip3"
+            PIP_OPTS=""
+            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3")
+            if [ -f "/usr/lib/python${PYTHON_VERSION}/EXTERNALLY-MANAGED" ] || [ -f "/usr/lib32/python${PYTHON_VERSION}/EXTERNALLY-MANAGED" ]; then
+                PIP_OPTS="--break-system-packages"
+            fi
+        fi
+
+        if command -v "$PIP_CMD" >/dev/null 2>&1; then
+            for mod in $PYTHON_MODULES; do
+                echo "-> Uninstalling Python module: $mod"
+                "$PIP_CMD" uninstall -y $PIP_OPTS "$mod" || true
+            done
+        fi
+
+        # =====================================================================
+        # UNDO TASK 2: Clean broken or trailing versionless JAR symlinks
+        # =====================================================================
+        echo "Cleaning trailing versionless JAR symlinks..."
+        TARGET_JAR_DIR="/usr/lib/rpcf" 
+
+        if [ -d "$TARGET_JAR_DIR" ]; then
+            find "$TARGET_JAR_DIR" -xtype l -name "*.jar" -delete
+            rmdir "$TARGET_JAR_DIR" 2>/dev/null || true
+        fi
+    ;;
+
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
+
