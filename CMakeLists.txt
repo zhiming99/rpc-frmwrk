@@ -29,8 +29,6 @@ macro(add_library _target)
     endif()
 endmacro()
 
-
-
 # --- Replaces AX_CXX_COMPILE_STDCXX(11, ...) ---
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -1247,5 +1245,30 @@ set(CPACK_DEBIAN_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER ${PACKAGE_BUGREPORT} )
 set(CPACK_DEBIAN_PACKAGE_DEPENDS 
     "dbus-daemon, dbus-bin, fuse3, openssl, expect, libcommons-cli-java,  python3-numpy, python3-pip, bash, attr, procps, python3-urwid, locales")
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst"
+    @ONLY
+)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postrm.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm"
+    @ONLY
+)
+
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA 
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm"
+)
+
+# Feed to RPM engine (Note: postrm template maps to RPM's PRE_UNINSTALL hook) [1]
+set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst")
+
+set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm")
+
 
 include(CPack)
