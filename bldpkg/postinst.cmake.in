@@ -44,8 +44,8 @@ case "$1" in
             JAR_FILES=$(rpm -ql "$PKG_NAME" | grep '\.jar$')
         else
             # Fallback fallback if package manager query fails
-            WHL_FILES=$(find /usr/lib/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null)
-            JAR_FILES=$(find /usr/lib/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null)
+            WHL_FILES=$(find /usr/local/lib/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null)
+            JAR_FILES=$(find /usr/local/lib/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null)
         fi
 
         if command -v "$PIP_CMD" >/dev/null 2>&1; then
@@ -106,6 +106,44 @@ case "$1" in
             fi
         fi
     ;;
+
+        # =====================================================================
+        # TASK 4: System-wide PATH and LD_LIBRARY_PATH configurations
+        # =====================================================================
+        echo "Configuring system-wide environment pathways..."
+
+        # 1. Update PATH via a custom profile.d shell script fragment
+        # This executes automatically whenever any user opens a login shell
+        PROFILE_SCRIPT="/etc/profile.d/rpcf.sh"
+        echo "-> Generating ${PROFILE_SCRIPT}"
+        cat << 'EOF' > "$PROFILE_SCRIPT"
+# Append custom bin paths to system PATH if they are not already present
+if [ -d "/usr/local/bin" ] && ! echo "$PATH" | grep -q "/usr/local/bin:"; then
+    PATH="$PATH:/usr/local/bin"
+fi
+if [ -d "/usr/local/bin/rpcf" ] && ! echo "$PATH" | grep -q "/usr/local/bin/rpcf"; then
+    PATH="$PATH:/usr/local/bin/rpcf"
+fi
+export PATH
+EOF
+        chmod 644 "$PROFILE_SCRIPT"
+
+
+        # 2. Update LD_LIBRARY_PATH alternative via ld.so.conf.d
+        # On Linux, appending paths to ld.so.conf is the standard, secure way
+        # to add persistent shared library lookup layers instead of using raw LD_LIBRARY_PATH
+        LD_CONF_FILE="/etc/ld.so.conf.d/rpcf.conf"
+        echo "-> Generating ${LD_CONF_FILE}"
+        cat << 'EOF' > "$LD_CONF_FILE"
+/usr/local/lib
+/usr/local/lib/rpcf
+EOF
+        chmod 644 "$LD_CONF_FILE"
+
+        # 3. Reload the dynamic linker cache to activate the new library paths immediately
+        echo "-> Refreshing dynamic linker run-time bindings cache (ldconfig)..."
+        ldconfig
+
 
     abort-upgrade|abort-remove|abort-deconfigure)
     ;;

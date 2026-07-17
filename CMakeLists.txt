@@ -45,8 +45,6 @@ set(CMAKE_INSTALL_RPATH
         "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/rpcf"
         "$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}"
         "$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}/rpcf"
-        "${CMAKE_INSTALL_FULL_LIBDIR}"
-        "${CMAKE_INSTALL_FULL_LIBDIR}/rpcf"
 )
 
 # --- Replaces AC_CONFIG_HEADERS([config.h]) ---
@@ -1280,17 +1278,11 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm")
 
-if(CPACK_GENERATOR MATCHES "DEB|RPM" )
-	set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Unified install prefix" FORCE)
-	set(CMAKE_INSTALL_SYSCONFDIR    "/etc"  CACHE PATH "System configuration" FORCE)
-else()
-	set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Unified install prefix" FORCE)
-	set(CMAKE_INSTALL_SYSCONFDIR    "/usr/local/etc"  CACHE PATH "System configuration" FORCE)
-endif()
-
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_RPM_PACKAGE_AUTOREQ ON)
 
-set(CPACK_SET_DESTDIR ON)
+if(NOT CPACK_GENERATOR STREQUAL "RPM")
+    set(CPACK_SET_DESTDIR ON)
+endif()
 
 include(CPack)
