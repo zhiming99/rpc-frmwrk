@@ -38,6 +38,17 @@ set(CMAKE_CXX_EXTENSIONS OFF) # Matches 'noext'
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
 
+# set RPATH for the binary executables and libraries.
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_INSTALL_RPATH
+        "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/rpcf"
+        "$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}"
+        "$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}/rpcf"
+        "${CMAKE_INSTALL_FULL_LIBDIR}"
+        "${CMAKE_INSTALL_FULL_LIBDIR}/rpcf"
+)
+
 # --- Replaces AC_CONFIG_HEADERS([config.h]) ---
 # Generates the file out-of-source inside your build directory
 configure_file(
@@ -1094,7 +1105,6 @@ add_custom_target(extra_dist_files SOURCES
 
 # 1. dist_pkgconfig_DATA=rpcf.pc
 # Installs your generated or existing .pc file to the standard pkgconfig location
-include(GNUInstallDirs)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/rpcf.pc 
         DESTINATION ${CMAKE_INSTALL_DATADIR}/pkgconfig)
 
@@ -1244,7 +1254,7 @@ set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${DEB_PKG_ARCH}")
 set(CPACK_DEBIAN_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER ${PACKAGE_BUGREPORT} )
 set(CPACK_DEBIAN_PACKAGE_DEPENDS 
-    "dbus-daemon, dbus-bin, fuse3, openssl, expect, libcommons-cli-java,  python3-numpy, python3-pip, bash, attr, procps, python3-urwid, locales")
+    "dbus-daemon, dbus-bin, ${FUSE3_DEBPKGS} ${OPENSSL_DEBPKGS} ${JAVA_DEBPKGS} ${PYTHON_DEBPKGS}  bash, attr, procps, python3-urwid, locales")
 
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst.cmake.in"
@@ -1270,5 +1280,17 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm")
 
+if(CPACK_GENERATOR MATCHES "DEB|RPM" )
+	set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Unified install prefix" FORCE)
+	set(CMAKE_INSTALL_SYSCONFDIR    "/etc"  CACHE PATH "System configuration" FORCE)
+else()
+	set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Unified install prefix" FORCE)
+	set(CMAKE_INSTALL_SYSCONFDIR    "/usr/local/etc"  CACHE PATH "System configuration" FORCE)
+endif()
+
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_RPM_PACKAGE_AUTOREQ ON)
+
+set(CPACK_SET_DESTDIR ON)
 
 include(CPack)

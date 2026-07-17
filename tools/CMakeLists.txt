@@ -65,6 +65,7 @@ install(PROGRAMS
 )
 
 install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/updcfg.py
     updinitcfg.py
     updwscfg.py
     krbparse.py

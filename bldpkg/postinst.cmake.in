@@ -52,7 +52,7 @@ case "$1" in
             echo "$WHL_FILES" | while read -r whl_file; do
                 if [ -f "$whl_file" ]; then
                     echo "-> Installing wheel: $whl_file"
-                    "$PIP_CMD" install --force-reinstall $PIP_OPTS "$whl_file"
+                    "$PIP_CMD" install --force-reinstall --no-deps $PIP_OPTS "$whl_file"
                 fi
             done
         else
