@@ -60,6 +60,27 @@ case "$1" in
             find "$TARGET_JAR_DIR" -xtype l -name "*.jar" -delete
             rmdir "$TARGET_JAR_DIR" 2>/dev/null || true
         fi
+
+        # =====================================================================
+        # UNDO TASK 4: Remove system-wide pathway configurations
+        # =====================================================================
+        echo "Cleaning system-wide environment pathways..."
+
+        # 1. Delete the profile.d script fragment
+        if [ -f "/etc/profile.d/rpcf.sh" ]; then
+            echo "-> Removing /etc/profile.d/rpcf.sh"
+            rm -f "/etc/profile.d/rpcf.sh"
+        fi
+
+        # 2. Delete the dynamic linker configuration fragment
+        if [ -f "/etc/ld.so.conf.d/rpcf.conf" ]; then
+            echo "-> Removing /etc/ld.so.conf.d/rpcf.conf"
+            rm -f "/etc/ld.so.conf.d/rpcf.conf"
+        fi
+
+        # 3. Re-index the dynamic linker cache to remove your paths from active memory
+        echo "-> Refreshing dynamic linker run-time bindings cache (ldconfig)..."
+        ldconfig || true
     ;;
 
     upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
