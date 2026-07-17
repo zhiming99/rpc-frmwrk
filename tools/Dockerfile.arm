@@ -21,7 +21,7 @@ libtool shtool automake autoconf autotools-dev make dbus dbus-bin python3-venv \
 libdbus-1-dev libjsoncpp-dev libkrb5-dev \
 liblz4-dev lz4 openssl libssl-dev libcppunit-dev \
 libfuse3-dev fuse3 bash net-tools procps swig cmake attr \
-libcommons-cli-java curl figlet python3-urwid gettext \
+libcommons-cli-java curl figlet gettext \
 git devscripts debhelper expect vim screen tmux iputils-ping
 
 RUN apt-get install -y default-jdk-headless || apt-get install -y openjdk-8-jdk-headless
@@ -33,7 +33,7 @@ RUN python3 -m venv /opt/venv
 # Inject the environment paths globally for all future layers and execution tasks
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN pip install --upgrade pip && pip install sip wheel numpy
+RUN pip install --upgrade pip && pip install sip wheel numpy urwid
 
 # ubuntu 22.04's official version of nodejs is outdated, lets install node 20 from nodejs'
 # site instead.
