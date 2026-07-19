@@ -54,7 +54,7 @@ case "$1" in
         # UNDO TASK 2: Clean broken or trailing versionless JAR symlinks
         # =====================================================================
         echo "Cleaning trailing versionless JAR symlinks..."
-        TARGET_JAR_DIR="/usr/lib/rpcf" 
+        TARGET_JAR_DIR="@CMAKE_INSTALL_FULL_LIBDIR@/rpcf" 
 
         if [ -d "$TARGET_JAR_DIR" ]; then
             find "$TARGET_JAR_DIR" -xtype l -name "*.jar" -delete

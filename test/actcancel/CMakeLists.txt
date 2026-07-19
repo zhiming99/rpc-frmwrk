@@ -65,11 +65,20 @@ target_link_directories(actcsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libactcdir=$(libdir)/rpcf
-install(TARGETS actc DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS actc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: actctstdir=$(bindir)/rpcf
-install(TARGETS actclitst actcsvrtst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS actclitst actcsvrtst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_actclitst_DATA= actcdesc.json to actclitstdir=$(sysconfdir)/rpcf
-install(FILES actcdesc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES actcdesc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 

@@ -1,0 +1,40 @@
+#!/bin/sh
+set -e
+
+PKG_NAME="@PACKAGE_NAME@"
+ENABLE_JS="@ENABLE_JS@"
+JS_NODE_PACKAGES="@JS_NODE_PACKAGES@"
+PYTHON_MODULES="appmancli rpcf oinit"
+
+case "$1" in
+    remove|purge)
+        echo "Undoing post-installation tasks for ${PKG_NAME}..."
+
+        # =====================================================================
+        # UNDO TASK 3: Uninstall global npm Packages
+        # =====================================================================
+        if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
+            if [ -n "$JS_NODE_PACKAGES" ] && command -v npm >/dev/null 2>&1; then
+                NPM_MAJOR_VERSION=$(npm -v | cut -d. -f1)
+                if [ "$NPM_MAJOR_VERSION" -gt 22 ]; then
+                    for npm_pkg in $JS_NODE_PACKAGES; do
+                        echo "-> Globally removing node package: $npm_pkg"
+                        npm uninstall -g "$npm_pkg" || true
+                    done
+                fi
+            fi
+        fi
+
+    ;;
+
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
+

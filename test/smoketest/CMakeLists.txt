@@ -34,5 +34,8 @@ target_link_libraries(smoketest PRIVATE
 # 3. Installation Routines
 # ==============================================================================
 # Replaces: smktestdir=$(bindir)/rpcf
-install(TARGETS smoketest DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS smoketest
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 

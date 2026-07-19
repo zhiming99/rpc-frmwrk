@@ -66,11 +66,20 @@ target_link_directories(evtsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libevtstdir=$(libdir)/rpcf
-install(TARGETS evtst DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS evtst
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: evtestdir=$(bindir)/rpcf
-install(TARGETS evtclitst evtsvrtst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS evtclitst evtsvrtst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_evtclitst_DATA= evtdesc.json to evtclitstdir=$(sysconfdir)/rpcf
-install(FILES evtdesc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES evtdesc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 

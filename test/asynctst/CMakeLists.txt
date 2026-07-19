@@ -65,11 +65,20 @@ target_link_directories(asyncsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libascsvrdir=$(libdir)/rpcf
-install(TARGETS ascsvr DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS ascsvr
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: asynctstdir=$(bindir)/rpcf
-install(TARGETS asynclitst asyncsvrtst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS asynclitst asyncsvrtst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_asynclitst_DATA= asyndesc.json to asynclitstdir=$(sysconfdir)/rpcf
-install(FILES asyndesc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES asyndesc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 
