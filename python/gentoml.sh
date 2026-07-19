@@ -28,6 +28,9 @@ if [[ -z "$2" ]]; then
     if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then
         echo generate python extention package with debug infomation
         sed -i "s:ZZZZZ:,\"-O0\", \"-ggdb\", \"-DDEBUG\", \"-UNDEBUG\":" pyproject.toml
+    else
+        echo generate release version of python extention package 
+        sed -i "s:ZZZZZ::" pyproject.toml
     fi
 elif [[ "$debugbuild" == "true" ]]; then
     echo generate python extention package with debug infomation2
