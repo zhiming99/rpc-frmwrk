@@ -65,11 +65,20 @@ target_link_directories(kasvrtst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libkasvrdir=$(libdir)/rpcf
-install(TARGETS kasvr DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS kasvr
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: katestdir=$(bindir)/rpcf
-install(TARGETS kaclitst kasvrtst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS kaclitst kasvrtst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_kaclitst_DATA= kadesc.json to kaclitstdir=$(sysconfdir)/rpcf
-install(FILES kadesc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES kadesc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 

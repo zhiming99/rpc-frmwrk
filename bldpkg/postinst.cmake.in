@@ -44,8 +44,8 @@ case "$1" in
             JAR_FILES=$(rpm -ql "$PKG_NAME" | grep '\.jar$')
         else
             # Fallback fallback if package manager query fails
-            WHL_FILES=$(find /usr/local/lib/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null)
-            JAR_FILES=$(find /usr/local/lib/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null)
+            WHL_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null)
+            JAR_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null)
         fi
 
         if command -v "$PIP_CMD" >/dev/null 2>&1; then
@@ -80,32 +80,6 @@ case "$1" in
 
 
         # =====================================================================
-        # TASK 3: Global npm Package Installation (Node.js version > 22)
-        # =====================================================================
-        # Check if the feature toggle was enabled during compilation
-        if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
-            if [ -n "$JS_NODE_PACKAGES" ]; then
-                echo "Checking npm environment for global packages..."
-                
-                if command -v npm >/dev/null 2>&1; then
-                    # Extract the major version integer safely
-                    NPM_MAJOR_VERSION=$(npm -v | cut -d. -f1)
-                    
-                    if [ "$NPM_MAJOR_VERSION" -gt 22 ]; then
-                        echo "-> npm version ${NPM_MAJOR_VERSION} satisfies requirement (> 22)."
-                        for npm_pkg in $JS_NODE_PACKAGES; do
-                            echo "-> Globally installing node package: $npm_pkg"
-                            npm install -g "$npm_pkg"
-                        done
-                    else
-                        echo "Skipping node package deployment: npm version (${NPM_MAJOR_VERSION}) is not higher than 22."
-                    fi
-                else
-                    echo "Warning: npm feature is toggled on, but 'npm' executable was not found on this system." >&2
-                fi
-            fi
-        fi
-        # =====================================================================
         # TASK 4: System-wide PATH and LD_LIBRARY_PATH configurations
         # =====================================================================
         echo "Configuring system-wide environment pathways..."
@@ -116,11 +90,11 @@ case "$1" in
         echo "-> Generating ${PROFILE_SCRIPT}"
         cat << 'EOF' > "$PROFILE_SCRIPT"
 # Append custom bin paths to system PATH if they are not already present
-if [ -d "/usr/local/bin" ] && ! echo "$PATH" | grep -q "/usr/local/bin:"; then
-    PATH="$PATH:/usr/local/bin"
+if [ -d "/usr/bin" ] && ! echo "$PATH" | grep -q "/usr/bin:"; then
+    PATH="$PATH:/usr/bin"
 fi
-if [ -d "/usr/local/bin/rpcf" ] && ! echo "$PATH" | grep -q "/usr/local/bin/rpcf"; then
-    PATH="$PATH:/usr/local/bin/rpcf"
+if [ -d "/usr/bin/rpcf" ] && ! echo "$PATH" | grep -q "/usr/bin/rpcf"; then
+    PATH="$PATH:/usr/bin/rpcf"
 fi
 export PATH
 EOF
@@ -133,8 +107,7 @@ EOF
         LD_CONF_FILE="/etc/ld.so.conf.d/rpcf.conf"
         echo "-> Generating ${LD_CONF_FILE}"
         cat << 'EOF' > "$LD_CONF_FILE"
-/usr/local/lib
-/usr/local/lib/rpcf
+@CMAKE_INSTALL_FULL_LIBDIR@/rpcf
 EOF
         chmod 644 "$LD_CONF_FILE"
 

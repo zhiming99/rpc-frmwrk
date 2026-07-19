@@ -70,11 +70,20 @@ target_link_directories(sfsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libsfsvrdir=$(libdir)/rpcf
-install(TARGETS sfsvr DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS sfsvr
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: sftestdir=$(bindir)/rpcf
-install(TARGETS sfclitst sfsvrtst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS sfclitst sfsvrtst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_sfclitst_DATA= sfdesc.json to sfclitstdir=$(sysconfdir)/rpcf
-install(FILES sfdesc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES sfdesc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 

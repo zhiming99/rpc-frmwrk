@@ -19,6 +19,7 @@ install(FILES
     hellowld.ridl
     testypes.ridl
     DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
 )
 
 # ==============================================================================

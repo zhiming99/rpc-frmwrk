@@ -65,11 +65,20 @@ target_link_directories(prsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libprsvrdir=$(libdir)/rpcf
-install(TARGETS prsvr DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS prsvr
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: prtestdir=$(bindir)/rpcf
-install(TARGETS prclitst prsvrtst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS prclitst prsvrtst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_prclitst_DATA= prdesc.json to prclitstdir=$(sysconfdir)/rpcf
-install(FILES prdesc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES prdesc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 

@@ -13,6 +13,8 @@ set(DISTDIR "${PROJECT_NAME}-${PROJECT_VERSION}")
 set(PKGNAME "${DISTDIR}.tar.gz")
 set(PACKAGE_URL "${PROJECT_HOMEPAGE_URL}")
 
+set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "Runtime")
+
 # =====================================================================
 # GLOBAL INTERCEPTOR: Automatically version every shared library
 # =====================================================================
@@ -1247,29 +1249,61 @@ endif()
 
 message(STATUS "Automatically computed distribution token: ${DEB_PKG_DISTRO}")
 
-set(CPACK_DEBIAN_FILE_NAME "${DEB_PKG_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}.deb")
-set(CPACK_PACKAGE_NAME "${DEB_PKG_NAME}")
+set(CPACK_STRIP_FILES TRUE)
+
+set(CPACK_COMPONENTS_ALL "Runtime" "Development")
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_COMPONENTS_GROUPING "ONE_PER_GROUP")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "RPC-Frmwrk System")
+set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "RPC-Frmwrk runtime and servers.")
+set(CPACK_COMPONENT_DEVELOPMENT_DESCRIPTION "Development headers, tools, and test suites for RPC-Frmwrk.")
+
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${DEB_PKG_ARCH}")
 set(CPACK_DEBIAN_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER ${PACKAGE_BUGREPORT} )
-set(CPACK_DEBIAN_PACKAGE_DEPENDS 
-    "dbus-daemon, dbus-bin, ${FUSE3_DEBPKGS} ${OPENSSL_DEBPKGS} ${JAVA_DEBPKGS} ${PYTHON_DEBPKGS}  bash, attr, procps, python3-urwid, locales")
+
 
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/runtime/postinst"
     @ONLY
 )
 
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postrm.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/runtime/postrm"
     @ONLY
 )
 
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA 
-    "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst"
-    "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm"
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst-dev.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/dev/postinst"
+    @ONLY
+)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postrm-dev.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/dev/postrm"
+    @ONLY
+)
+
+set(CPACK_DEBIAN_RUNTIME_PACKAGE_NAME "${DEB_PKG_NAME}")
+set(CPACK_DEBIAN_RUNTIME_PACKAGE_DEPENDS 
+    "dbus-daemon, dbus-bin, ${FUSE3_DEBPKGS} ${OPENSSL_DEBPKGS} ${JAVA_DEBPKGS} ${PYTHON_DEBPKGS} bash, attr, procps, python3-urwid, locales")
+set(CPACK_DEBIAN_RUNTIME_FILE_NAME "${DEB_PKG_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}.deb")
+set(CPACK_DEBIAN_RUNTIME_PACKAGE_CONTROL_EXTRA 
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/runtime/postinst"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/runtime/postrm"
+)
+
+set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME "${DEB_PKG_NAME}-dev")
+set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_DEPENDS
+    "${DEB_PKG_NAME} (= ${CPACK_PACKAGE_VERSION}), ${JS_DEBLIBS} libcppunit-dev, libdbus-1-dev, liblz4-dev, libjsoncpp-dev, ${KRB5_DEBLIBS} ${FUSE3_DEBLIBS} ${OPENSSL_DEBLIBS} ${JAVA_DEBLIBS} ${PYTHON_DEBLIBS}" 
+)
+set(CPACK_DEBIAN_DEVELOPMENT_FILE_NAME "${CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}.deb")
+set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_CONTROL_EXTRA 
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/dev/postinst"
+    "${CMAKE_CURRENT_BINARY_DIR}/debian/dev/postrm"
 )
 
 # Feed to RPM engine (Note: postrm template maps to RPM's PRE_UNINSTALL hook) [1]
@@ -1286,8 +1320,7 @@ if(NOT CPACK_GENERATOR STREQUAL "RPM")
     set(CPACK_SET_DESTDIR ON)
 endif()
 
-set(CPACK_STRIP_FILES TRUE)
-set(CPACK_DEB_COMPONENT_INSTALL ON)
 set(CPACK_RPM_COMPONENT_INSTALL ON)
+
 
 include(CPack)

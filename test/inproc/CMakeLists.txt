@@ -62,11 +62,20 @@ target_link_directories(inproctst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libinprocdir=$(libdir)/rpcf
-install(TARGETS inproc DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS inproc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: inprocdir=$(bindir)/rpcf
-install(TARGETS inproctst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS inproctst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_inproconf_DATA= inproc.json to inproconfdir=$(sysconfdir)/rpcf
-install(FILES inproc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES inproc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 

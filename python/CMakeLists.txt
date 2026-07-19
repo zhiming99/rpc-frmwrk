@@ -86,11 +86,16 @@ else()
     message(FATAL_ERROR "Configuration file missing: ${TARGET_CONF_FILE}")
 endif()
 
+if( ENABLE_DEBUG )
+    set( Debug "true" )
+else()
+    set( Debug "false" )
+endif()
 
 # Match your SIP version runtime conditional pipelines
 if(SIPBUILD OR SIPVER EQUAL 5)
     set(BUILD_COMMANDS
-        COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh "${CMAKE_INSTALL_FULL_LIBDIR}" "${TARGET_CONF_FILE}.1"
+        COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh "${CMAKE_INSTALL_FULL_LIBDIR}" "${TARGET_CONF_FILE}.1" "${Debug}"
         COMMAND bash -lc "CXXFLAGS= ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild"
         VERBATIM
         COMMAND bash -lc "sofile=`find ./sipbuild -name ${PYTHON_EXT1}`\;if [ ! -z \"\${sofile}\" ]\; then rm -f rpcf/rpcbase*.so*\;cp \${sofile} rpcf\;\

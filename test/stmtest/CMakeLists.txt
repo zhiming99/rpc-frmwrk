@@ -72,11 +72,20 @@ target_link_directories(stmsvrtst PRIVATE ${TSTCFG_LINK_DIR})
 # ==============================================================================
 
 # Replaces: libstmsvrdir=$(libdir)/rpcf
-install(TARGETS stmsvr DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf)
+install(TARGETS stmsvr
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: stmtestdir=$(bindir)/rpcf
-install(TARGETS stmclitst stmsvrtst DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf)
+install(TARGETS stmclitst stmsvrtst
+    DESTINATION ${CMAKE_INSTALL_BINDIR}/rpcf
+    COMPONENT Development
+    )
 
 # Replaces: dist_stmclitst_DATA= stmdesc.json to stmclitstdir=$(sysconfdir)/rpcf
-install(FILES stmdesc.json DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf)
+install(FILES stmdesc.json
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/rpcf
+    COMPONENT Development
+    )
 

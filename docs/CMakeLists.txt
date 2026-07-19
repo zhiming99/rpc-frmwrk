@@ -23,7 +23,8 @@ add_custom_target(documentation_files SOURCES ${DOC_FILES})
 # your system's share/doc path, you can uncomment this block:
 #
 # include(GNUInstallDirs)
-# install(FILES ${DOC_FILES}
-#     DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/rpcf
-# )
+install(FILES ${DOC_FILES}
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/rpcf
+    COMPONENT Development
+)
 
