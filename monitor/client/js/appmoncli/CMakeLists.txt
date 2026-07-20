@@ -97,6 +97,26 @@ add_dependencies(appmon_js_bundle generate_appmon_js_cli ridlc)
 set(TARBALL_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${archive_name}")
 string(REPLACE ";" " " files_to_package "${files_to_package}")
 
+# 1. Run 'npm root -g' at configuration time to catch the path
+execute_process(
+	COMMAND npm root -g
+	OUTPUT_VARIABLE NPM_ROOT_PATH
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+	ERROR_QUIET
+)
+
+# Fallback default if npm is not found or fails
+if(NOT NPM_ROOT_PATH)
+	set(NPM_ROOT_PATH "/usr/lib/node_modules")
+endif()
+
+# 2. Create the symbolic link inside CMAKE_CURRENT_BINARY_DIR
+file(CREATE_LINK 
+	"${NPM_ROOT_PATH}" 
+	"${CMAKE_CURRENT_BINARY_DIR}/node_modules" 
+	SYMBOLIC
+)
+
 add_custom_command(
     OUTPUT "${TARBALL_OUTPUT}"
     # Synchronize asset configurations into compilation environment workspace
@@ -108,7 +128,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/locales/en.json" "${CMAKE_CURRENT_BINARY_DIR}/locales/"
     
     # Replicates: tar zcf appmonui.tar.gz $(files_to_package) dist/*
-    COMMAND bash -c "tar zcf ${TARBALL_OUTPUT} ${files_to_package} dist/*"
+    COMMAND bash -c "tar --exclude='node_modules' -zcf ${TARBALL_OUTPUT} ${files_to_package} dist/*"
     VERBATIM
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/dist/appmon.js"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"

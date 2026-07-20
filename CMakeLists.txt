@@ -40,13 +40,18 @@ set(CMAKE_CXX_EXTENSIONS OFF) # Matches 'noext'
 find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
 
+# 3. --- Replaces PKG_PROG_PKG_CONFIG & PKG_INSTALLDIR ---
+# Native CMake initialization hooks for managing and outputting .pc layout configurations.
+include(FindPkgConfig)
+include(GNUInstallDirs)
+
 # set RPATH for the binary executables and libraries.
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_INSTALL_RPATH
-        "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
-        "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/rpcf"
-        "$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}"
-        "$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}/rpcf"
+        "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/rpcf"
+        "\$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}"
+        "\$ORIGIN/../../${CMAKE_INSTALL_LIBDIR}/rpcf"
 )
 
 # --- Replaces AC_CONFIG_HEADERS([config.h]) ---
@@ -550,10 +555,6 @@ set(TSTLDFLG_LIST
 # Convert our list array into a standard space-separated string required by your downstream .pc templates
 string(JOIN " " TSTLDFLG ${TSTLDFLG_LIST})
 
-# 3. --- Replaces PKG_PROG_PKG_CONFIG & PKG_INSTALLDIR ---
-# Native CMake initialization hooks for managing and outputting .pc layout configurations.
-include(FindPkgConfig)
-include(GNUInstallDirs)
 
 # 4. Global Cache Variable Registration (Replaces AC_SUBST mappings)
 set(BITWIDTH "${BITWIDTH}" CACHE INTERNAL "" FORCE)
@@ -1259,6 +1260,7 @@ set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "RPC-Frmwrk runtime and servers.")
 set(CPACK_COMPONENT_DEVELOPMENT_DESCRIPTION "Development headers, tools, and test suites for RPC-Frmwrk.")
 
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${DEB_PKG_ARCH}")
+
 set(CPACK_DEBIAN_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER ${PACKAGE_BUGREPORT} )
 
@@ -1298,7 +1300,7 @@ set(CPACK_DEBIAN_RUNTIME_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME "${DEB_PKG_NAME}-dev")
 set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_DEPENDS
-    "${DEB_PKG_NAME} (= ${CPACK_PACKAGE_VERSION}), ${JS_DEBLIBS} libcppunit-dev, libdbus-1-dev, liblz4-dev, libjsoncpp-dev, ${KRB5_DEBLIBS} ${FUSE3_DEBLIBS} ${OPENSSL_DEBLIBS} ${JAVA_DEBLIBS} ${PYTHON_DEBLIBS}" 
+    "${DEB_PKG_NAME} (= ${VERSION2}-${CPACK_DEBIAN_PACKAGE_RELEASE}), ${JS_DEBLIBS} libcppunit-dev, libdbus-1-dev, liblz4-dev, libjsoncpp-dev, ${KRB5_DEBLIBS} ${FUSE3_DEBLIBS} ${OPENSSL_DEBLIBS} ${JAVA_DEBLIBS} ${PYTHON_DEBLIBS}" 
 )
 set(CPACK_DEBIAN_DEVELOPMENT_FILE_NAME "${CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}.deb")
 set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_CONTROL_EXTRA 
@@ -1306,6 +1308,11 @@ set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_CONTROL_EXTRA
     "${CMAKE_CURRENT_BINARY_DIR}/debian/dev/postrm"
 )
 
+set(CPACK_DEBIAN_RUNTIME_PACKAGE_SHLIBDEPS_PRIVATE_DIRS
+	"${CPACK_TEMPORARY_DIRECTORY}/Runtime${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+	"${CPACK_TEMPORARY_DIRECTORY}/Runtime${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/rpcf"
+	)
+	
 # Feed to RPM engine (Note: postrm template maps to RPM's PRE_UNINSTALL hook) [1]
 set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst")
@@ -1313,7 +1320,9 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm")
 
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_RUNTIME_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_SHLIBDEPS OFF)
+
 set(CPACK_RPM_PACKAGE_AUTOREQ ON)
 
 if(NOT CPACK_GENERATOR STREQUAL "RPM")
