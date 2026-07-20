@@ -1,7 +1,7 @@
 SHELL:=/bin/bash
 release:
 	rm -rf dist;mkdir dist
-	@if [ ! -d node_modules ]; then ln -s `npm root -g`;fi
+	@if [ ! -d node_modules -a ! -L node_modules ]; then ln -s `npm root -g`;fi
 	@if [ ! -d node_modules/stream-browserify ]; then \
         echo nodejs liberies are not installed properly; \
         echo please install @JS_NODE_PACKAGES@ to `npm root -g`;\
@@ -18,7 +18,7 @@ sync:
 
 debug:
 	rm -rf dist;mkdir dist
-	@if [ ! -d node_modules ]; then ln -s `npm root -g`;fi
+	@if [ ! -d node_modules -a ! -L node_modules ]; then ln -s `npm root -g`;fi
 	@if [ ! -d node_modules/stream-browserify ]; then \
     echo nodejs liberies are not installed properly; \
     echo please install @JS_NODE_PACKAGES@ to `npm root -g`;\
