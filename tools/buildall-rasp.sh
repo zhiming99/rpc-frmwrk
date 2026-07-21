@@ -15,24 +15,14 @@ liblz4-dev openssl libssl1.1 libssl-dev libcppunit-1.14-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev bash net-tools procps swig default-jdk-headless cmake \
 libcommons-cli-java ccache curl fuse3 python3-urwid gettext
 
-echo install nodejs 18
-if ! curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash; then exit 1; fi
-if [[ -s $HOME/.nvm/nvm.sh ]]; then source $HOME/.nvm/nvm.sh;nvm install 18;fi
-
 ${SUDO} apt-get -y install sip-tools || ${SUDO} apt-get -y install sip-dev python3-sip python3-sip-dev || true
-
-for i in 1 4 5 6; do
-if ${SUDO} apt-get -y install libjsoncpp$i; then 
-    break;
-fi
-done
-if ! dpkg -l libjsoncpp$i > /dev/null; then
-    echo Error unable to install libjsoncpp
-    exit 1
-fi
 
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim
 ${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
+
+ARG NODE_MAJOR=22
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
+RUN apt-get install -y nodejs
 
 npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify
 

@@ -18,7 +18,7 @@ stlexer.cpp: stlexer.l stparser.h
 stlexer.h: stlexer.cpp
 
 stparser.cpp: stparser.y
-	bison --defines=stparser.h -Wcounterexamples --output=stparser.cpp -r all stparser.y
+	LANG=C bison --defines=stparser.h -Wcounterexamples --output=stparser.cpp -r all stparser.y
 	bash updconst.sh
 
 stparser.h: stparser.cpp

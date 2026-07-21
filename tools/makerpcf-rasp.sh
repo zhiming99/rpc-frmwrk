@@ -32,13 +32,25 @@ if [ ! -d rpc-frmwrk -o ! -f ./rpc-frmwrk/ipc/rpcif.cpp ]; then
 	popd
 fi
 
-pushd ./rpc-frmwrk; autoreconf -vfi &&
-automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`;
+if [ -z "$1" ]; then
+    pushd ./rpc-frmwrk; autoreconf -vfi &&
+    automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`;
 
-bash ./cfgsel -r
-make
+    bash ./cfgsel -r
+    make
 
-${SUDO} make install;
-popd
+    ${SUDO} make install;
+    popd
+
+elif [ "$1" == "cmake" ];then
+    pushd ${BASE}/rpc-frmwrk
+    mkdir build
+    pushd build
+    cmake ..
+    cmake --build .
+    ${SUDO} cmake --install .
+    popd
+    popd
+fi
 echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
 echo Congratulations! build complete. Please remember to run rpcfg.py to config the system.

@@ -15,9 +15,20 @@ for((i=0;i<100;i++)); do
     if git clone 'https://github.com/zhiming99/rpc-frmwrk.git'; then break; fi
 done
 popd
-pushd ${BASE}/rpc-frmwrk; libtoolize && aclocal && autoreconf -vfi && \
-automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`; popd
-pushd ${BASE}/rpc-frmwrk && bash cfgsel -r && make -j 4; popd;
-pushd ${BASE}/rpc-frmwrk; ${SUDO} make install; popd
+if [ -z "$1" ]; then
+    pushd ${BASE}/rpc-frmwrk; libtoolize && aclocal && autoreconf -vfi && \
+    automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`; popd
+    pushd ${BASE}/rpc-frmwrk && bash cfgsel -r && make -j 4; popd;
+    pushd ${BASE}/rpc-frmwrk; ${SUDO} make install; popd
+elif [ "$1" == "cmake" ];then
+    pushd ${BASE}/rpc-frmwrk
+    mkdir build
+    pushd build
+    cmake ..
+    cmake --build .
+    ${SUDO} cmake --install .
+    popd
+    popd
+fi
 echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
 echo Congratulations! build complete. Please remember to run rpcfg.py to config the system.
