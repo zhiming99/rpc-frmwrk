@@ -17,6 +17,7 @@ find_package(FLEX REQUIRED)
 
 # Emulate bison rule: bison --defines=stparser.h -Wcounterexamples --output=stparser.cpp -r all stparser.y
 # Plus the post-generation execution hook: bash updconst.sh
+set(BISON_EXECUTABLE env LANG=C LC_ALL=C ${BISON_EXECUTABLE})
 bison_target(StParser stparser.y "${CMAKE_CURRENT_BINARY_DIR}/stparser.cpp"
     DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/stparser.h"
     COMPILE_FLAGS "-Wcounterexamples -r all"
