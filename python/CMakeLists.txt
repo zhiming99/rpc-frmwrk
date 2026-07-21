@@ -185,7 +185,7 @@ install(CODE "
         create_symlink \"${CMAKE_CURRENT_SOURCE_DIR}/rpcf\" \"${CMAKE_CURRENT_BINARY_DIR}/rpcf\")
 
     execute_process(
-        COMMAND \${RUN_PREFIX} \"${Python3_EXECUTABLE}\" \"${WHEEL_BUILD_ARGS}\" \${RUN_SUFFIX}
+        COMMAND \${RUN_PREFIX} \"${Python3_EXECUTABLE}\" ${WHEEL_BUILD_ARGS} \${RUN_SUFFIX}
         WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
         )
 
