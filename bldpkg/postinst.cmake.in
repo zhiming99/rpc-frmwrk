@@ -100,7 +100,6 @@ export PATH
 EOF
         chmod 644 "$PROFILE_SCRIPT"
 
-
         # 2. Update LD_LIBRARY_PATH alternative via ld.so.conf.d
         # On Linux, appending paths to ld.so.conf is the standard, secure way
         # to add persistent shared library lookup layers instead of using raw LD_LIBRARY_PATH
