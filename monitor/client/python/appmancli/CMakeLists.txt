@@ -20,13 +20,14 @@ else()
     set(PYTHON_BUILD_CMD "pip3" "wheel" "." "--no-deps" "--no-build-isolation" "-w" "dist/")
 endif()
 
-cmake_host_system_information(RESULT OS_NAME QUERY DISTRIB_ID)
-cmake_host_system_information(RESULT OS_VERSION QUERY DISTRIB_VERSION_ID)
-
 # PEP 668 system protection overrides for modern Debian/Ubuntu baselines
 set(pipopt "")
 
 if(IS_VENV STREQUAL "false")
+    cmake_host_system_information(RESULT OS_NAME QUERY DISTRIB_ID)
+    cmake_host_system_information(RESULT OS_VERSION QUERY DISTRIB_VERSION_ID)
+    string(TOLOWER "${OS_NAME}" OS_NAME)
+
     if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
         set(pipopt "--break-system-packages")
     elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
@@ -140,9 +141,19 @@ install(CODE "
     if(\"\$ENV{LD_LIBRARY_PATH}\" MATCHES \"libfakeroot\")
         message(STATUS \"Fakeroot environment detected: skipping explicit host pip installation loop.\")
     else()
+
+        # Check if a privilege drop is requested
         if(NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
-            set(RUN_PREFIX su -c)
-            set(RUN_SUFFIX \" \$ENV{SUDO_USER}\")
+            # Check if the 'sudo' binary is installed on the system
+            find_program(SUDO_PROGRAM sudo)
+            
+            if(SUDO_PROGRAM)
+                # Case 1: SUDO_USER exists + sudo is installed
+                set(RUN_PREFIX sudo -u \"\$ENV{SUDO_USER}\")
+            else()
+                # Case 2: SUDO_USER exists + sudo is missing (Fallback to su)
+                set(RUN_PREFIX su \"\$ENV{SUDO_USER}\" -s /bin/sh --)
+            endif()
         endif()
 
         file(GLOB INST_WHEELS RELATIVE \"${CMAKE_CURRENT_BINARY_DIR}/dist\" \"${CMAKE_CURRENT_BINARY_DIR}/dist/*.whl\")
