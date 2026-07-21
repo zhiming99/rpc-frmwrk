@@ -51,7 +51,7 @@ add_custom_target(docker
 # Using configuration file generation strategies dynamically loops values into binary target locations
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/runtest.sh.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/runtest.sh"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtest.sh"
     @ONLY
 )
 
