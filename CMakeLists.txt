@@ -999,6 +999,12 @@ endif()
 # 1. --- Core pkg-config file generation ---
 # Replaces: rpcf.pc inside AC_CONFIG_FILES
 # This reads 'rpcf.pc.in' and generates a tailored 'rpcf.pc' inside your build directory.
+
+set(prefix "${CMAKE_INSTALL_PREFIX}" )
+set(exec_prefix "${CMAKE_INSTALL_FULL_BINDIR}")
+set(libdir "${CMAKE_INSTALL_FULL_LIBDIR}")
+set(includedir "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
+
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/rpcf.pc.in"
     "${CMAKE_CURRENT_BINARY_DIR}/rpcf.pc"
