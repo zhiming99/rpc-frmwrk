@@ -132,23 +132,14 @@ endif()
 
 set(pipopt "")
 if(IS_VENV STREQUAL "false")
-    if(EXISTS "/etc/os-release")
-        file(READ "/etc/os-release" OS_RELEASE_CONTENT)
-        # Extract ID
-        string(REGEX MATCH "ID=([^\n]+)" OS_ID_MATCH "${OS_RELEASE_CONTENT}")
-        string(REPLACE "ID=" "" OS_NAME "${CMAKE_MATCH_1}")
-        string(REPLACE "\"" "" OS_NAME "${OS_NAME}")
+    cmake_host_system_information(RESULT OS_NAME QUERY DISTRIB_ID)
+    cmake_host_system_information(RESULT OS_VERSION QUERY DISTRIB_VERSION_ID)
 
-        # Extract VERSION_ID
-        string(REGEX MATCH "VERSION_ID=([^\n]+)" OS_VER_MATCH "${OS_RELEASE_CONTENT}")
-        string(REPLACE "VERSION_ID=" "" OS_VERSION "${CMAKE_MATCH_1}")
-        string(REPLACE "\"" "" OS_VERSION "${OS_VERSION}")
-
-        if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
+    string(TOLOWER "${OS_NAME}" OS_NAME)
+    if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
         set(pipopt "--break-system-packages")
-        elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
+    elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
         set(pipopt "--break-system-packages")
-        endif()
     endif()
 endif()
 
@@ -159,9 +150,18 @@ install(CODE "
     
     # User Privilege Management Blocks 
     if(NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
-        set(RUN_PREFIX su -c)
-        set(RUN_SUFFIX \"\$ENV{SUDO_USER}\")
+        # Check if the 'sudo' binary is installed on the system
+        find_program(SUDO_PROGRAM sudo)
+
+        if(SUDO_PROGRAM)
+            # Case 1: SUDO_USER exists + sudo is installed
+            set(RUN_PREFIX sudo -u \"\$ENV{SUDO_USER}\")
+        else()
+            # Case 2: SUDO_USER exists + sudo is missing (Fallback to su)
+            set(RUN_PREFIX su \"\$ENV{SUDO_USER}\" -s /bin/sh --)
+        endif()
     endif()
+
 
     if(INST_WHEELS)
 	    list(SORT INST_WHEELS COMPARE NATURAL ORDER DESCENDING)
