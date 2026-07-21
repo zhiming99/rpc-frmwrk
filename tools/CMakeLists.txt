@@ -49,6 +49,9 @@ add_custom_target(docker
 # Emulate runtest.sh template substitutions
 # Replicates: sed -e 's|[@]bindir[@]... runtest.sh.in > runtest.sh
 # Using configuration file generation strategies dynamically loops values into binary target locations
+set(bindir "${CMAKE_INSTALL_FULL_BINDIR}")
+set(libdir "${CMAKE_INSTALL_FULL_LIBDIR}")
+set(sysconfdir "${CMAKE_INSTALL_FULL_SYSCONFDIR}")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/runtest.sh.in"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtest.sh"
