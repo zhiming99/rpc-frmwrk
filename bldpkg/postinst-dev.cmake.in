@@ -16,12 +16,11 @@ case "$1" in
         # Check if the feature toggle was enabled during compilation
         if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
             if [ -n "$JS_NODE_PACKAGES" ]; then
-                echo "Checking npm environment for global packages..."
+                echo "Checking nodejs environment for global packages..."
                 
-                if command -v npm >/dev/null 2>&1; then
+                if command -v nodejs >/dev/null 2>&1; then
                     # Extract the major version integer safely
-                    NPM_MAJOR_VERSION=$(npm -v | cut -d. -f1)
-                    
+                    NPM_MAJOR_VERSION=$(nodejs -v | tr -d 'v' | cut -d. -f1)
                     if [ "$NPM_MAJOR_VERSION" -gt 22 ]; then
                         echo "-> npm version ${NPM_MAJOR_VERSION} satisfies requirement (> 22)."
                         for npm_pkg in $JS_NODE_PACKAGES; do
