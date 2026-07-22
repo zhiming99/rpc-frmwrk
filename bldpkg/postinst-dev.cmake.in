@@ -20,18 +20,18 @@ case "$1" in
                 
                 if command -v nodejs >/dev/null 2>&1; then
                     # Extract the major version integer safely
-                    NPM_MAJOR_VERSION=$(nodejs -v | tr -d 'v' | cut -d. -f1)
-                    if [ "$NPM_MAJOR_VERSION" -gt 22 ]; then
-                        echo "-> npm version ${NPM_MAJOR_VERSION} satisfies requirement (> 22)."
+                    NODEJS_MAJOR_VERSION=$(nodejs -v | tr -d 'v' | cut -d. -f1)
+                    if [ "$NODEJS_MAJOR_VERSION" -gt 22 ]; then
+                        echo "-> npm version ${NODEJS_MAJOR_VERSION} satisfies requirement (> 22)."
                         for npm_pkg in $JS_NODE_PACKAGES; do
-                            echo "-> Globally installing node package: $npm_pkg"
+                            echo "-> Globally installing nodejs package: $npm_pkg"
                             npm install -g "$npm_pkg"
                         done
                     else
-                        echo "Skipping node package deployment: npm version (${NPM_MAJOR_VERSION}) is not higher than 22."
+                        echo "Skipping nodejs package deployment: nodejs version (${NODEJS_MAJOR_VERSION}) is not higher than 22."
                     fi
                 else
-                    echo "Warning: npm feature is toggled on, but 'npm' executable was not found on this system." >&2
+                    echo "Warning: nodejs feature is toggled on, but 'nodejs' executable was not found on this system." >&2
                 fi
             fi
         fi
