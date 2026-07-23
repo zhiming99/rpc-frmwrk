@@ -45,7 +45,7 @@ jobs:
       run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install
 
     - name: configure
-      run: mkdir build && cd build && cmake -DENABLE_KRB5=ON -DENABLE_JAVA=ON ..;
+      run: mkdir build && cd build && cmake -DENABLE_KRB5=ON -DENABLE_TESTCASES=ON -DENABLE_JAVA=ON ..;
     - name: make
       run: cd build && cat /proc/cpuinfo && cmake --build . -j4
     - name: install
