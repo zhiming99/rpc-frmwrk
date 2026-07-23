@@ -4,7 +4,6 @@ set -e
 PKG_NAME="@PACKAGE_NAME@"
 ENABLE_JS="@ENABLE_JS@"
 JS_NODE_PACKAGES="@JS_NODE_PACKAGES@"
-PYTHON_MODULES="appmancli rpcf oinit"
 
 case "$1" in
     remove|purge)

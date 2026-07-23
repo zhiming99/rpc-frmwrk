@@ -74,10 +74,10 @@ option(ENABLE_DEBUG "Build and install the debug version image" OFF)
 option(ENABLE_SSL "Build and install with SSL support" ON)
 
 # Replaces AC_ARG_ENABLE([testcases], ...) from Part 1
-option(ENABLE_TESTCASES "Build and install with testcases" ON)
+option(ENABLE_TESTCASES "Build and install with testcases" OFF)
 
 # Replaces AC_ARG_ENABLE([krb5], ...)
-option(ENABLE_KRB5 "Build and install with Kerberos authentication" ON)
+option(ENABLE_KRB5 "Build and install with Kerberos authentication" OFF)
 
 # Replaces AC_ARG_ENABLE([openssl], ...)
 option(ENABLE_OPENSSL "Build and install with OpenSSL" ON)
@@ -89,7 +89,7 @@ option(ENABLE_GMSSL "Build and install with GmSSL" ON)
 option(ENABLE_FUSE3 "Build and install with fuse3" ON)
 
 # Replaces AC_ARG_ENABLE([java], ...)
-option(ENABLE_JAVA "Generation of Java skeleton code" ON)
+option(ENABLE_JAVA "Generation of Java skeleton code" OFF)
 
 # Replaces AC_ARG_ENABLE([python], ...)
 option(ENABLE_PYTHON "Generation of python skeleton code" ON)
@@ -108,8 +108,6 @@ endif()
 option(SIPBUILD      "Enable SIP build"      OFF)
 option(SIP4          "Enable SIP4 support"    OFF)
 option(SWIG          "Enable SWIG generation" OFF)
-option(ENABLE_JAVA   "Enable Java bindings"   OFF)
-option(ENABLE_JS     "Enable JS support"     OFF)
 
 # ==============================================================================
 # --- Part 3: Library and Program Verification ---
@@ -810,16 +808,16 @@ set(FEATURES        "${FEATURES}"        CACHE INTERNAL "" FORCE)
 # ==============================================================================
 
 if(ENABLE_PYTHON)
-    set(PYTHON_RPMLIBS   "python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 ),")
-    set(PYTHON_RPMPKGS   "python3-pip python3-numpy ")
+    set(PYTHON_RPMLIBS   "python3-devel, python3-installer, python3-build, python3-numpy, ( sip5 or sip6 ),")
+    set(PYTHON_RPMPKGS   "python3-installer python3-numpy ")
     set(PYTHON_RPMFILES  "%{_libdir}/rpcf/*.whl")
     
     # Note the escaped '\$i' to pass the literal variable out to the RPM runtime shell script
     set(PYTHON_RPMPOST   "for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done")
     set(PYTHON_RPMPOSTUN "pip3 uninstall -y")
     
-    set(PYTHON_DEBLIBS   "python3-setuptools, python3-dev, python3-build, python3-pip, sip5-tools | sip-tools | sip-dev,")
-    set(PYTHON_DEBPKGS   "python3-numpy, python3-pip, ")
+    set(PYTHON_DEBLIBS   "python3-setuptools, python3-dev, python3-build, python3-installer, sip5-tools | sip-tools | sip-dev,")
+    set(PYTHON_DEBPKGS   "python3-numpy, python3-installer, ")
     set(PYTHON_DEBFILES  "usr/lib/*/rpcf/*.whl")
     set(PYTHON_CFGOPT    "")
     string(APPEND FEATURES "+python ")

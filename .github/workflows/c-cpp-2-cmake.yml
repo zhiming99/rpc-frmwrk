@@ -45,7 +45,7 @@ jobs:
       run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install
 
     - name: configure
-      run: mkdir build && cd build;cmake ..;
+      run: mkdir build && cd build;cmake -DENABLE_KRB5 -DENABLE_JAVA ..;
     - name: make
       run: cd build && cat /proc/cpuinfo && cmake --build . -j4
     - name: install
@@ -64,7 +64,7 @@ jobs:
     - name: install debian package tools
       run: sudo apt-get -o Acquire::Retries=3 -y install devscripts debhelper
     - name: make debian package
-      run: cd build; cpack -G DEB; sudo apt-get -y install ./rpcf_*deb ./rpcf-dev_*deb
+      run: cd build; cmake .. && cpack -G DEB; sudo apt-get -y install ./rpcf_*deb && sudo apt-get install ./rpcf-dev_*deb
     - name: upload debian packages
       uses: actions/upload-artifact@v4
       with:
