@@ -19,9 +19,9 @@ ${SUDO} apt-get -y install sip-tools python3-sipbuild || ${SUDO} apt-get -y inst
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim
 ${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
 
-ARG NODE_MAJOR=24
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
-RUN apt-get install -y nodejs
+NODE_MAJOR=24
+curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
+apt-get install -y nodejs
 
 npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify
 
