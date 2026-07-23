@@ -808,7 +808,7 @@ set(FEATURES        "${FEATURES}"        CACHE INTERNAL "" FORCE)
 # ==============================================================================
 
 if(ENABLE_PYTHON)
-    set(PYTHON_RPMLIBS   "python3-devel, python3-installer, python3-build, python3-numpy, ( sip5 or sip6 ),")
+    set(PYTHON_RPMLIBS   "python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 ),")
     set(PYTHON_RPMPKGS   "python3-installer python3-numpy ")
     set(PYTHON_RPMFILES  "%{_libdir}/rpcf/*.whl")
     
@@ -816,7 +816,7 @@ if(ENABLE_PYTHON)
     set(PYTHON_RPMPOST   "for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done")
     set(PYTHON_RPMPOSTUN "pip3 uninstall -y")
     
-    set(PYTHON_DEBLIBS   "python3-setuptools, python3-dev, python3-build, python3-installer, sip5-tools | sip-tools | sip-dev,")
+    set(PYTHON_DEBLIBS   "python3-setuptools, python3-dev, python3-build, python3-pip, sip5-tools | sip-tools | sip-dev,")
     set(PYTHON_DEBPKGS   "python3-numpy, python3-installer, ")
     set(PYTHON_DEBFILES  "usr/lib/*/rpcf/*.whl")
     set(PYTHON_CFGOPT    "")
