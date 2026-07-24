@@ -21,5 +21,13 @@ module.exports = {
         new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
         }),
+        new webpack.IgnorePlugin({
+        resourceRegExp: /^@ljharb\/tsconfig/
+        })
     ]
+    resolve: {
+        alias: {
+            '@ljharb/tsconfig': false
+        }
+    }
 }
