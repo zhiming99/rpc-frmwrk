@@ -11,7 +11,7 @@ const { KeepAliveRequest } = require("./keepalive")
 
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { messageType } = require( "../dbusmsg/constants")
-const { createHash } = require('crypto-browserify')
+// const { createHash } = require('crypto-browserify')
 
 class CFastRpcMsg
 {
@@ -536,9 +536,29 @@ class CFastRpcProxy extends CInterfaceProxy
         {
             strSuffix = this.m_strObjName;
         }
-        var shasum = createHash('sha1');
-        shasum.update( strSuffix );
-        var strSum = shasum.digest( 'hex' );
+        // var shasum = createHash('sha1');
+        // shasum.update( strSuffix );
+        // var strSum = shasum.digest( 'hex' );
+
+        // === NATIVE BROWSER CRYPTO PATCH ===
+        // 1. Convert your string into raw bytes
+        const encoder = new TextEncoder();
+        const dataBytes = encoder.encode(strSuffix);
+        
+        // 2. Perform the hardware-accelerated
+        // SHA-1 digest natively
+
+        const hashBuffer = await
+            crypto.subtle.digest('SHA-1', dataBytes);
+        
+        // 3. Re-create the standard hex string output
+        const hashArray = Array.from(
+            new Uint8Array(hashBuffer));
+
+        var strSum = hashArray.map(
+            b => b.toString(16).padStart(2, '0')).join('');
+        // ====================================
+
         var strObjInstName = strChannName +
             '_' + strSum.slice( 3 * 8, 4 * 8 ).toUpperCase();
         oParams.SetString( EnumPropId.propObjInstName,
