@@ -3,7 +3,7 @@ const { randomInt, ERROR } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumStmToken } = require("../combase/enums")
 const { IoCmd, IoMsgType, CIoMessageBase, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
 const { CInterfaceProxy } = require("./proxy")
-const { createHash } = require('crypto-browserify')
+//const { createHash } = require('crypto-browserify')
 
 exports.CIoManager = class CIoManager
 {
@@ -302,9 +302,29 @@ exports.CIoManager = class CIoManager
 
             var strToHash = "t_" + elem["DestURL"] + "_0";
 
-            var shasum = createHash('sha1');
-            shasum.update( strToHash );
-            var strSum = shasum.digest( 'hex' );
+            // var shasum = createHash('sha1');
+            // shasum.update( strToHash );
+            // var strSum = shasum.digest( 'hex' );
+
+            // === NATIVE BROWSER CRYPTO PATCH ===
+            // 1. Convert your string into raw bytes
+            const encoder = new TextEncoder();
+            const dataBytes = encoder.encode(strToHash);
+            
+            // 2. Perform the hardware-accelerated
+            // SHA-1 digest natively
+
+            const hashBuffer = await
+                crypto.subtle.digest('SHA-1', dataBytes);
+            
+            // 3. Re-create the standard hex string output
+            const hashArray = Array.from(
+                new Uint8Array(hashBuffer));
+
+            var strSum = hashArray.map(
+                b => b.toString(16).padStart(2, '0')).join('');
+            // ====================================
+
             this.m_strAppHash = 
                 strSum.slice( 3 * 8, 4 * 8 ).toUpperCase();
             var strRouterName = strAppName + "_rt_"
