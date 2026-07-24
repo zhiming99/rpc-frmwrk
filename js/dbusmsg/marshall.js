@@ -1,4 +1,4 @@
-const assert = require('assert');
+//const assert = require('assert');
 
 const parseSignature = require('./signature');
 const put = require('put');
@@ -36,6 +36,10 @@ function writeStruct(ps, tree, data) {
   return ps;
 }
 
+function assert(cond, msg = "Assertion failed") {
+  if (!cond) throw new Error(msg);
+}
+
 function write(ps, ele, data) {
   switch (ele.type) {
     case '(':
@@ -68,7 +72,7 @@ function write(ps, ele, data) {
       break;
     case 'v':
       // TODO: allow serialisation of simple types as variants, e. g 123 -> ['u', 123], true -> ['b', 1], 'abc' -> ['s', 'abc']
-      assert.equal(data.length, 2, 'variant data should be [signature, data]');
+      assert(data.length === 2, 'variant data should be [signature, data]');
       var signatureEle = {
         type: 'g',
         child: []

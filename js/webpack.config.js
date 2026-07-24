@@ -21,10 +21,5 @@ module.exports = {
         new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
         }),
-    ],
-    resolve: {
-        alias: {
-            '@ljharb/tsconfig': false
-        }
-    }
+    ]
 }
