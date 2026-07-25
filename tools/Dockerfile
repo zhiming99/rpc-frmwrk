@@ -46,7 +46,7 @@ RUN apt-get install -y nodejs || touch ${HOME}/nojs
 
 RUN cd ${HOME};for i in $(seq 1 100);do if git clone 'https://github.com/zhiming99/GmSSL.git'; then break; fi;done
 RUN cd ${HOME};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
-RUN npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify
+RUN npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify
 RUN cd ${HOME};for i in $(seq 1 100); do if git clone 'https://github.com/zhiming99/rpc-frmwrk.git';then break;fi;done
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`

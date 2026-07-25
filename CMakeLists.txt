@@ -885,7 +885,7 @@ set(JS_NODE_PACKAGES   "${JS_NODE_PACKAGES}"   CACHE INTERNAL "JavaScript node r
 # ==============================================================================
 
 # Replaces JS_NODE_PACKAGES initialization
-set(JS_NODE_PACKAGES "assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify")
+set(JS_NODE_PACKAGES "assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify")
 
 if(ENABLE_JS)
     set(JS_RPMLIBS      "npm,")
@@ -1047,6 +1047,51 @@ foreach(FILE IN LISTS CONFIG_FILES)
         )
     endif()
 endforeach()
+
+# Define the execute_with_privileges function for python package installation
+set(EXECUTE_WITH_PRIVILEGES_STRING [=[
+function(execute_with_privileges IN_WORK_DIR)
+    # ${ARGN} now captures all arguments AFTER the working directory
+    set(IN_COMMAND_LIST ${ARGN})
+
+    execute_process(COMMAND id -u OUTPUT_VARIABLE CURRENT_UID OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(CURRENT_UID EQUAL 0)
+        set(IS_ROOT TRUE)
+    else()
+        set(IS_ROOT FALSE)
+    endif()
+
+    find_program(SUDO_EXE NAMES sudo)
+    if(SUDO_EXE)
+        set(SUDO_AVAILABLE TRUE)
+    else()
+        set(SUDO_AVAILABLE FALSE)
+    endif()
+    unset(SUDO_EXE CACHE)
+
+    set(SUDO_USER_VAL "$ENV{SUDO_USER}")
+    set(FINAL_EXEC_COMMAND "")
+
+    if(IS_ROOT AND NOT "${SUDO_USER_VAL}" STREQUAL "")
+        if(SUDO_AVAILABLE)
+            set(FINAL_EXEC_COMMAND sudo -u ${SUDO_USER_VAL} ${IN_COMMAND_LIST})
+        else()
+            string(JOIN " " SU_COMMAND_STRING ${IN_COMMAND_LIST})
+            set(FINAL_EXEC_COMMAND su - ${SUDO_USER_VAL} -c "${SU_COMMAND_STRING}")
+        endif()
+    else()
+        set(FINAL_EXEC_COMMAND ${IN_COMMAND_LIST})
+    endif()
+
+    # Pass the working directory explicitly to the execution engine
+    execute_process(
+        COMMAND ${FINAL_EXEC_COMMAND}
+        WORKING_DIRECTORY "${IN_WORK_DIR}"
+        RESULT_VARIABLE EXEC_RESULT
+    )
+endfunction()
+]=])
+
 
 # ==============================================================================
 # --- FINALIZATION GENERATION STEP ---
