@@ -29,7 +29,7 @@ jobs:
     - name: pip install
       run:  pip3 install numpy wheel sip
     - name: npm install
-      run: npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash minify xxhashjs webpack webpack-cli vm events crypto-browserify stream-browserify
+      run: npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash minify xxhashjs webpack webpack-cli vm events js-sha1 stream-browserify
 
     - name: install sip
       run: sudo apt-get -y install sip-tools python3-sipbuild ||sudo apt-get -y install sip-dev python3-sip python3-sip-dev || true;
