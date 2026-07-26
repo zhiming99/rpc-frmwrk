@@ -38,36 +38,41 @@ case "$1" in
         # Detect if we are on DEB or RPM to look up files correctly
         if command -v dpkg >/dev/null 2>&1; then
             # Debian approach
-            WHL_FILES=$(dpkg -L "$PKG_NAME" | grep '\.whl$')
-            JAR_FILES=$(dpkg -L "$PKG_NAME" | grep '\.jar$')
+            WHL_FILES=$(dpkg -L "$PKG_NAME" | grep '\.whl$' || true)
+            JAR_FILES=$(dpkg -L "$PKG_NAME" | grep '\.jar$' || true)
         elif command -v rpm >/dev/null 2>&1; then
             # RPM approach [1]
-            WHL_FILES=$(rpm -ql "$PKG_NAME" | grep '\.whl$')
-            JAR_FILES=$(rpm -ql "$PKG_NAME" | grep '\.jar$')
+            WHL_FILES=$(rpm -ql "$PKG_NAME" | grep '\.whl$' || true)
+            JAR_FILES=$(rpm -ql "$PKG_NAME" | grep '\.jar$' || true)
         else
             # Fallback fallback if package manager query fails
-            WHL_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null)
-            JAR_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null)
+            WHL_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null || true)
+            JAR_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null || true)
         fi
 
-        if [ $using_installer ]; then
+        if [ "$using_installer" = "true" ]; then
             echo "$WHL_FILES" | while read -r whl_file; do
                 [ -f "$whl_file" ] || continue
                 case "$whl_file" in
-                    oinit*whl)
+                    *oinit*whl)
                     ;;
-                *)
-                    echo "->Installing the wheel files: $whl_file with python3-installer"
-                    python3 -m installer "$whl_file"
+                    *)
+                        echo "->Installing the wheel files: $whl_file with python3-installer"
+                        python3 -m installer "$whl_file"
                     ;;
                 esac
             done
         elif command -v "$PIP_CMD" >/dev/null 2>&1; then
             echo "$WHL_FILES" | while read -r whl_file; do
-                if [ -f "$whl_file" ]; then
+                [ -f "$whl_file" ] || continue
+                case "$whl_file" in
+                    *oinit*whl)
+                    ;;
+                    *)
                     echo "-> Installing wheel: $whl_file"
                     "$PIP_CMD" install --force-reinstall --no-deps $PIP_OPTS "$whl_file"
-                fi
+                    ;;
+                esac
             done
         else
             echo "Warning: pip3 command not found. Skipping wheel installation phase." >&2

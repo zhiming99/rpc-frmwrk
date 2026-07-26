@@ -41,7 +41,7 @@ endif()
 
 set(useropt "--no-deps")
 if(IS_VENV STREQUAL "false")
-    set(useropt "${useropt} --user")
+    set(useropt "${useropt}" "--user")
 endif()
 
 # ==============================================================================
@@ -137,24 +137,11 @@ add_dependencies(appmancli_wheel generate_appman_py_cli )
 # 4. Installation Script Triggers (install: and uninstall:)
 # ==============================================================================
 install(CODE "
+    ${EXECUTE_WITH_PRIVILEGES_STRING}
     # Skip deployment loops under fakeroot environments (e.g., dpkg creation runs)
     if(\"\$ENV{LD_LIBRARY_PATH}\" MATCHES \"libfakeroot\")
         message(STATUS \"Fakeroot environment detected: skipping explicit host pip installation loop.\")
     else()
-
-        # Check if a privilege drop is requested
-        if(NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
-            # Check if the 'sudo' binary is installed on the system
-            find_program(SUDO_PROGRAM sudo)
-            
-            if(SUDO_PROGRAM)
-                # Case 1: SUDO_USER exists + sudo is installed
-                set(RUN_PREFIX sudo -u \"\$ENV{SUDO_USER}\")
-            else()
-                # Case 2: SUDO_USER exists + sudo is missing (Fallback to su)
-                set(RUN_PREFIX su \"\$ENV{SUDO_USER}\" -s /bin/sh --)
-            endif()
-        endif()
 
         file(GLOB INST_WHEELS RELATIVE \"${CMAKE_CURRENT_BINARY_DIR}/dist\" \"${CMAKE_CURRENT_BINARY_DIR}/dist/*.whl\")
         if(INST_WHEELS)
@@ -162,7 +149,7 @@ install(CODE "
             list(GET INST_WHEELS 0 TARGET_WHEEL_PATH)
             if(\"\$ENV{DESTDIR}\" STREQUAL \"\")
                 message(STATUS \"Installing dist/\${TARGET_WHEEL_PATH} via pip3...\")
-                execute_process(COMMAND \${RUN_PREFIX} \"pip3\" \"install\" \"${pipopt}\" \"--force-reinstall\" \"${useropt}\" \"dist/\${TARGET_WHEEL_PATH}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_BINARY_DIR}\")
+                execute_with_privileges( \"${CMAKE_CURRENT_BINARY_DIR}\" \"pip3\" \"install\" \"${pipopt}\" \"--force-reinstall\" ${useropt} \"dist/\${TARGET_WHEEL_PATH}\" )
             else()
                 execute_process(
                     COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"

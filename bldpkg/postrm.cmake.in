@@ -3,7 +3,7 @@ set -e
 
 PKG_NAME="@PACKAGE_NAME@"
 ENABLE_JAVA="@ENABLE_JAVA@"
-PYTHON_MODULES="rpcf appmancli oinit"
+PYTHON_MODULES="rpcf appmancli"
 
 case "$1" in
     remove|purge)
@@ -30,26 +30,19 @@ case "$1" in
             using_installer=true
         fi
 
-        if [ $using_installer ]; then
+        if [ "$using_installer" = "true" ]; then
             TARGET_DIR=$(python3 -c "import sysconfig; print(sysconfig.get_path('purelib'))" 2>/dev/null)
             if [ -z "$TARGET_DIR" ] || [ ! -d "$TARGET_DIR" ]; then
                 echo "Warning: Python package directory not found. Skipping python module cleanup." >&2 
                 exit 0
             fi
             for MODULE_NAME in $PYTHON_MODULES; do
-                case $MODULE_NAME in
-                oinit*whl)
-                    ;;
-                *)
-                    if [ -d "$TARGET_DIR/$MODULE_NAME" ]; then
-                        rm -rf "$TARGET_DIR/$MODULE_NAME"
-                    fi
-                    rm -rf "$TARGET_DIR/${MODULE_NAME}"-*.dist-info
-                    rm -rf "$TARGET_DIR/__pycache__/${MODULE_NAME}"*.pyc
-                    ;;
-                esac
+                if [ -d "$TARGET_DIR/$MODULE_NAME" ]; then
+                    rm -rf "$TARGET_DIR/$MODULE_NAME"
+                fi
+                rm -rf "$TARGET_DIR/${MODULE_NAME}"-*.dist-info
+                rm -rf "$TARGET_DIR/__pycache__/${MODULE_NAME}"*.pyc
             done
-
         elif command -v "$PIP_CMD" >/dev/null 2>&1; then
             for mod in $PYTHON_MODULES; do
                 echo "-> Uninstalling Python module: $mod"

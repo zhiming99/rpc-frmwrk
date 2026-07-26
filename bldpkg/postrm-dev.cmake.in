@@ -5,6 +5,20 @@ PKG_NAME="@PACKAGE_NAME@"
 ENABLE_JS="@ENABLE_JS@"
 JS_NODE_PACKAGES="@JS_NODE_PACKAGES@"
 
+run_as_user() {
+    if [ -n "${SUDO_USER}" ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            sudo -u "${SUDO_USER}" "$@"
+        else
+            # su -c requires a single string, so we safely quote the arguments
+            printf -v cmd_str '%q ' "$@"
+            su -s /bin/sh -c "$cmd_str" -- "${SUDO_USER}"
+        fi
+    else
+        "$@"
+    fi
+}
+
 case "$1" in
     remove|purge)
         echo "Undoing post-installation tasks for ${PKG_NAME}..."
@@ -14,12 +28,11 @@ case "$1" in
         # =====================================================================
         if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
             if [ -n "$JS_NODE_PACKAGES" ] && command -v nodejs >/dev/null 2>&1; then
-                NODEJS_MAJOR_VERSION=$(nodejs -v | tr -d 'v' | cut -d. -f1)
-                if [ "$NODEJS_MAJOR_VERSION" -gt 22 ]; then
-                    for npm_pkg in $JS_NODE_PACKAGES; do
-                        echo "-> Globally removing nodejs package: $npm_pkg"
-                        npm uninstall -g "$npm_pkg" || true
-                    done
+                NODE_VERSION_STR=$(run_as_user nodejs -v)
+                NODEJS_MAJOR_VERSION=$(echo "$NODE_VERSION_STR" | tr -d 'v' | cut -d. -f1)
+                if [ "$NODEJS_MAJOR_VERSION" -gt 18 ]; then
+                    echo "-> Globally removing nodejs package: $JS_NODE_PACKAGES"
+                    run_as_user npm uninstall -g $JS_NODE_PACKAGES || true
                 fi
             fi
         fi

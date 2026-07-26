@@ -888,14 +888,14 @@ set(JS_NODE_PACKAGES   "${JS_NODE_PACKAGES}"   CACHE INTERNAL "JavaScript node r
 set(JS_NODE_PACKAGES "assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify")
 
 if(ENABLE_JS)
-    set(JS_RPMLIBS      "npm,")
+    set(JS_RPMLIBS      "npm, nodejs >= 18.0.0, ")
     set(JS_RPMFILES     "%{_libdir}/rpcf/jslib/*ZZZZZ%{_sysconfdir}/rpcf/oa2checkdesc.jsonZZZZZ%{_mandir}/man1/oinit.1.gzZZZZZ%{_sysconfdir}/rpcf/appmonui.tar.gz")
     
     # Natively substitutes the JS_NODE_PACKAGES string variable we defined in Part 24
     set(JS_RPMPOST      "echo npm -g install ${JS_NODE_PACKAGES}")
     set(JS_RPMPOSTUN    "echo npm -g remove ${JS_NODE_PACKAGES}")
     
-    set(JS_DEBLIBS      "npm,")
+    set(JS_DEBLIBS      "npm, nodejs (>= 18.0.0), ")
     set(JS_DEBDEVFILES  "usr/lib/@DEB_HOST_MULTIARCH@/rpcf/jslib/*")
     set(JS_DEBFILES     "etc/rpcf/oa2checkdesc.jsonZZZZZusr/share/man/man1/oinit.1ZZZZZetc/rpcf/appmonui.tar.gz")
     set(JS_CFGOPT       "")

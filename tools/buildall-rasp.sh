@@ -26,4 +26,4 @@ apt-get install -y nodejs
 
 npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify
 
-bash ./makerpcf-rasp.sh
+bash ./makerpcf-rasp.sh $@

@@ -26,4 +26,4 @@ apt-get install -y nodejs
 
 npm -g install @JS_NODE_PACKAGES@
 
-bash ./makerpcf-rasp.sh
+bash ./makerpcf-rasp.sh $@

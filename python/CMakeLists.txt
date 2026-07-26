@@ -151,6 +151,7 @@ endif()
 set(CMAKE_VERBOSE_MAKEFILE ON)
 install(CODE "
     # Staging Context Check (Emulating DESTDIR verification structures)
+    ${EXECUTE_WITH_PRIVILEGES_STRING}
 
     if(NOT \"\$ENV{DESTDIR}\" STREQUAL \"\")
         execute_process(COMMAND ${CMAKE_COMMAND} -E copy rpcf/${PYTHON_EXT} ./${PYTHON_EXT}.bak
@@ -163,20 +164,6 @@ install(CODE "
             WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
     endif()
 
-    # User Privilege Management Blocks 
-    if(NOT \"\$ENV{SUDO_USER}\" STREQUAL \"\")
-        # Check if the 'sudo' binary is installed on the system
-        find_program(SUDO_PROGRAM sudo)
-
-        if(SUDO_PROGRAM)
-            # Case 1: SUDO_USER exists + sudo is installed
-            set(RUN_PREFIX sudo -u \"\$ENV{SUDO_USER}\")
-        else()
-            # Case 2: SUDO_USER exists + sudo is missing (Fallback to su)
-            set(RUN_PREFIX su \"\$ENV{SUDO_USER}\" -s /bin/sh --)
-        endif()
-    endif()
-
 
     execute_process(COMMAND ${CMAKE_COMMAND} -E
         rm -rf \"${CMAKE_CURRENT_BINARY_DIR}/rpcf\")
@@ -184,9 +171,8 @@ install(CODE "
     execute_process(COMMAND ${CMAKE_COMMAND} -E
         create_symlink \"${CMAKE_CURRENT_SOURCE_DIR}/rpcf\" \"${CMAKE_CURRENT_BINARY_DIR}/rpcf\")
 
-    execute_process(
-        COMMAND \${RUN_PREFIX} \"${Python3_EXECUTABLE}\" ${WHEEL_BUILD_ARGS} \${RUN_SUFFIX}
-        WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
+    execute_with_privileges(
+        \"${CMAKE_CURRENT_SOURCE_DIR}\" \"${Python3_EXECUTABLE}\" ${WHEEL_BUILD_ARGS}
         )
 
     # Dynamic lookup resolution matching 'ls -1t dist | head -n 1'
@@ -196,7 +182,7 @@ install(CODE "
 
     if(\"\$ENV{DESTDIR}\" STREQUAL \"\")
         message(STATUS \"Installing dist/\${pkg} via pip3...\")
-        execute_process(COMMAND \${RUN_PREFIX} \"pip3\" \"install\" \"${pipopt}\" \"--force-reinstall\" \"${useropt}\" \"./dist/\${pkg}\" \${RUN_SUFFIX} WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\")
+        execute_with_privileges( \"${CMAKE_CURRENT_SOURCE_DIR}\" \"pip3\" \"install\" \"${pipopt}\" \"--force-reinstall\" \"${useropt}\" \"./dist/\${pkg}\" )
     else()
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E make_directory \"\$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_LIBDIR}/rpcf/\"

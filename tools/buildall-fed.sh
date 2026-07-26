@@ -20,4 +20,4 @@ ${SUDO} dnf -y install python3-wheel python3-numpy rpmdevtools || pip3 install w
 
 npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify
 
-bash ./makerpcf.sh
+bash ./makerpcf.sh $@

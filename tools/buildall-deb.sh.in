@@ -25,4 +25,4 @@ apt-get install -y nodejs
 
 npm -g install @JS_NODE_PACKAGES@
 
-bash ./makerpcf.sh
+bash ./makerpcf.sh $@
