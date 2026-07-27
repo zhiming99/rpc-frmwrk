@@ -74,7 +74,7 @@ option(ENABLE_DEBUG "Build and install the debug version image" OFF)
 option(ENABLE_SSL "Build and install with SSL support" ON)
 
 # Replaces AC_ARG_ENABLE([testcases], ...) from Part 1
-option(ENABLE_TESTCASES "Build and install with testcases" OFF)
+option(ENABLE_TESTCASES "Build and install with testcases" ON)
 
 # Replaces AC_ARG_ENABLE([krb5], ...)
 option(ENABLE_KRB5 "Build and install with Kerberos authentication" OFF)
@@ -166,6 +166,8 @@ if(ENABLE_PYTHON)
     else()
         set(SIP4 OFF)
     endif()
+else()
+    message( STATUS "Python support is DISABLED" )
 endif()
 
 # --- JavaScript Verification Logic ---
@@ -177,6 +179,8 @@ if(ENABLE_JS)
     if(NOT NPM_EXE AND NOT NODE_EXE)
         message(FATAL_ERROR "******Feature 'js' requires npm and node, but they were not found. Configure will abort.******")
     endif()
+else()
+    message( STATUS "JS support is DISABLED" )
 endif()
 
 # --- Java Verification Logic ---
@@ -193,6 +197,8 @@ if(ENABLE_JAVA)
     if(SWIG_EXE)
         set(SWIG ON CACHE BOOL "Enabled by SWIG discovery" FORCE)
     endif()
+else()
+    message( STATUS "Java support is DISABLED by default" )
 endif()
 
 #option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
@@ -448,6 +454,7 @@ set(COMMON_LINK_FUSE3   "${COMMON_LINK_FUSE3}"   CACHE INTERNAL "")
 if( ENABLE_DEBUG )
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build" FORCE)
     add_compile_definitions(DEBUG _DEBUG=1)
+    message( STATUS "Debug build is ENABLED" )
 else()
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build" FORCE)
     add_compile_definitions(RELEASE _DEBUG=0)
@@ -653,7 +660,7 @@ if(ENABLE_OPENSSL)
     set(OPENSSL_DEBLIBS  "libssl-dev,")
     set(OPENSSL_DEBPKGS  "openssl, expect,")
     set(OPENSSL_RPMLIBS  "openssl-devel,")
-    set(OPENSSL_RPMPKGS  "openssl expect")
+    set(OPENSSL_RPMPKGS  "openssl,expect,")
     set(ENABLE_WEBSOCK   ON)
     string(APPEND FEATURES "+openssl ")
 else()
@@ -699,7 +706,7 @@ if(ENABLE_FUSE3)
     set(FUSE3_RPMLIBS    "fuse3-devel,")
     set(FUSE3_RPMFILES   "%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcliZZZZZ%{_libdir}/rpcf/librtfiles.so*")
     set(FUSE3_RPMHEADERS "%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h")
-    set(FUSE3_RPMPKGS    "fuse3 ")
+    set(FUSE3_RPMPKGS    "fuse3, ")
     set(FUSE3_DEBFILES   "usr/bin/hostsvrZZZZZusr/bin/hostcliZZZZZusr/lib/*/rpcf/librtfiles.so*")
     set(FUSE3_DEBLIBS    " libfuse3-dev,")
     set(FUSE3_DEBHEADERS "")
@@ -761,7 +768,7 @@ endif()
 if(ENABLE_JAVA)
     set(JAVA_RPMLIBS   "(java >= 1.8.0 or java-latest-openjdk-devel), swig, apache-commons-cli, ")
     set(JAVA_RPMFILES  "%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/*.jar")
-    set(JAVA_RPMPKGS   "apache-commons-cli ")
+    set(JAVA_RPMPKGS   "apache-commons-cli, ")
     
     # Restored to normal single-bracket standard shell scripting syntax for clarity
     set(JAVA_RPMPOST   "pushd %{_libdir}/rpcf;if [[ -f rpcbase-${VERSION2}.jar ]];then rm -f rpcbase.jar; ln -s rpcbase-${VERSION2}.jar rpcbase.jar;fi;if [[ -f appmancli-${VERSION2}.jar ]];then rm -f appmancli.jar; ln -s appmancli-${VERSION2}.jar appmancli.jar;fi;popd;")
@@ -809,7 +816,7 @@ set(FEATURES        "${FEATURES}"        CACHE INTERNAL "" FORCE)
 
 if(ENABLE_PYTHON)
     set(PYTHON_RPMLIBS   "python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 ),")
-    set(PYTHON_RPMPKGS   "python3-installer python3-numpy ")
+    set(PYTHON_RPMPKGS   "python3-installer,python3-numpy,")
     set(PYTHON_RPMFILES  "%{_libdir}/rpcf/*.whl")
     
     # Note the escaped '\$i' to pass the literal variable out to the RPM runtime shell script
@@ -1256,48 +1263,34 @@ string(TOLOWER "${CMAKE_HOST_SYSTEM_PROCESSOR}" ARCH_RAW)
 
 if(ARCH_RAW STREQUAL "x86_64" OR ARCH_RAW STREQUAL "amd64")
     set(DEB_PKG_ARCH "amd64")
+    set(RPM_PKG_ARCH "x86_64")
 elseif(ARCH_RAW STREQUAL "i386" OR ARCH_RAW STREQUAL "i686" OR ARCH_RAW STREQUAL "x86")
     set(DEB_PKG_ARCH "i386")
+    set(RPM_PKG_ARCH "i386")
 elseif(ARCH_RAW STREQUAL "aarch64" OR ARCH_RAW STREQUAL "arm64")
     set(DEB_PKG_ARCH "arm64")
+    set(RPM_PKG_ARCH "aarch64")
 elseif(ARCH_RAW MATCHES "^arm")
     set(DEB_PKG_ARCH "armhf")
+    set(RPM_PKG_ARCH "armhf")
 else()
     # Fallback to the raw string if it is an uncommon architecture
     set(DEB_PKG_ARCH "${ARCH_RAW}")
+    set(RPM_PKG_ARCH "${ARCH_RAW}")
 endif()
-message(STATUS "Mapped Debian package architecture: ${DEB_PKG_ARCH}")
+message(STATUS "Mapped package architecture: ${DEB_PKG_ARCH}")
 # =====================================================================
 # DYNAMIC LINUX DISTRO SUFFIX DETECTION (e.g., d13, u22)
 # =====================================================================
 # Set a baseline safe fallback if we aren't compiling on a standard Linux machine
-set(DEB_PKG_DISTRO "d13")
 
-if(EXISTS "/etc/os-release")
-    # 1. Load the raw system release definition content
-    file(READ "/etc/os-release" OS_RELEASE_CONTENT)
-    
-    # 2. Extract the lowercase ID field (e.g., ID=debian or ID=ubuntu)
-    if(OS_RELEASE_CONTENT MATCHES "ID=([a-zA-Z0-9_-]+)")
-        set(DISTRO_RAW_ID "${CMAKE_MATCH_1}")
-    endif()
-    
-    # 3. Extract the major version index number string (e.g., VERSION_ID="13" or VERSION_ID="22.04")
-    if(OS_RELEASE_CONTENT MATCHES "VERSION_ID=\"?([0-9]+)")
-        set(DISTRO_VERSION_NUM "${CMAKE_MATCH_1}")
-    endif()
+cmake_host_system_information(RESULT DISTRO_RAW_ID QUERY DISTRIB_ID)
+cmake_host_system_information(RESULT DISTRO_VERSION_NUM QUERY DISTRIB_VERSION_ID)
 
-    # 4. If both variables parsed successfully, build your token
-    if(DISTRO_RAW_ID AND DISTRO_VERSION_NUM)
-        # Extract the very first letter of the distribution name (Index 0, length 1)
-        string(SUBSTRING "${DISTRO_RAW_ID}" 0 1 DISTRO_FIRST_LETTER)
-        
-        # Merge them cleanly together
-        set(DEB_PKG_DISTRO "${DISTRO_FIRST_LETTER}${DISTRO_VERSION_NUM}")
-    endif()
-endif()
+string(SUBSTRING "${DISTRO_RAW_ID}" 0 1 DISTRO_FIRST_LETTER)
+set(DEB_PKG_DISTRO "${DISTRO_FIRST_LETTER}${DISTRO_VERSION_NUM}")
 
-message(STATUS "Automatically computed distribution token: ${DEB_PKG_DISTRO}")
+message(STATUS "Target OS distribution token: ${DEB_PKG_DISTRO}")
 
 set(CPACK_STRIP_FILES TRUE)
 
@@ -1305,14 +1298,16 @@ set(CPACK_COMPONENTS_ALL "Runtime" "Development")
 set(CPACK_DEB_COMPONENT_INSTALL ON)
 set(CPACK_COMPONENTS_GROUPING "ONE_PER_GROUP")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "RPC-Frmwrk System")
+set(CPACK_PACKAGE_HOMEPAGE    "https://github.com/zhiming99/rpc-frmwrk")
+set(CPACK_PACKAGE_VENDOR ${PACKAGE_BUGREPORT} )
 set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "RPC-Frmwrk runtime and servers.")
 set(CPACK_COMPONENT_DEVELOPMENT_DESCRIPTION "Development headers, tools, and test suites for RPC-Frmwrk.")
 
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${DEB_PKG_ARCH}")
-
 set(CPACK_DEBIAN_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER ${PACKAGE_BUGREPORT} )
 
+# DEB package configuration
 
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst.cmake.in"
@@ -1349,7 +1344,7 @@ set(CPACK_DEBIAN_RUNTIME_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME "${DEB_PKG_NAME}-dev")
 set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_DEPENDS
-    "${DEB_PKG_NAME} (= ${VERSION2}-${CPACK_DEBIAN_PACKAGE_RELEASE}), ${JS_DEBLIBS} libcppunit-dev, libdbus-1-dev, liblz4-dev, libjsoncpp-dev, ${KRB5_DEBLIBS} ${FUSE3_DEBLIBS} ${OPENSSL_DEBLIBS} ${JAVA_DEBLIBS} ${PYTHON_DEBLIBS} bash" 
+    "${DEB_PKG_NAME} (= ${VERSION2}-${CPACK_DEBIAN_PACKAGE_RELEASE}), libcppunit-dev, libdbus-1-dev, liblz4-dev, libjsoncpp-dev, ${JS_DEBLIBS} ${KRB5_DEBLIBS} ${FUSE3_DEBLIBS} ${OPENSSL_DEBLIBS} ${JAVA_DEBLIBS} ${PYTHON_DEBLIBS} bash" 
 )
 set(CPACK_DEBIAN_DEVELOPMENT_FILE_NAME "${CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}.deb")
 set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_CONTROL_EXTRA 
@@ -1362,6 +1357,10 @@ set(CPACK_DEBIAN_RUNTIME_PACKAGE_SHLIBDEPS_PRIVATE_DIRS
 	"${CPACK_TEMPORARY_DIRECTORY}/Runtime${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/rpcf"
 	)
 	
+set(CPACK_DEBIAN_RUNTIME_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_SHLIBDEPS OFF)
+
+# RPM package configuration
 # Feed to RPM engine (Note: postrm template maps to RPM's PRE_UNINSTALL hook) [1]
 set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst")
@@ -1369,14 +1368,28 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm")
 
-set(CPACK_DEBIAN_RUNTIME_PACKAGE_SHLIBDEPS ON)
-set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_SHLIBDEPS OFF)
-
 set(CPACK_RPM_PACKAGE_AUTOREQ ON)
 
 if(NOT CPACK_GENERATOR STREQUAL "RPM")
     set(CPACK_SET_DESTDIR ON)
 endif()
+
+set(CPACK_RPM_PACKAGE_ARCHITECTURE "${RPM_PKG_ARCH}")
+set(CPACK_RPM_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
+
+set(CPACK_RPM_RUNTIME_PACKAGE_NAME     "${DEB_PKG_NAME}")
+set(CPACK_RPM_RUNTIME_FILE_NAME        "${DEB_PKG_NAME}-${DEB_PKG_VER}-${DEB_PKG_REV}_${RPM_PKG_ARCH}.${DEB_PKG_DISTRO}")
+set(CPACK_RPM_RUNTIME_PACKAGE_REQUIRES "dbus,dbus-daemon,dbus-tools,dbus-libs,jsoncpp,lz4-libs,cppunit,${KRB5_RPMPKGS} ${OPENSSL_RPMPKGS} ${FUSE3_RPMPKGS} ${PYTHON_RPMPKGS} ${JAVA_RPMPKGS} bash,expect,attr,procps-ng,which,python3-urwid,locales") # RPM equivalent of DEPENDS
+
+set(CPACK_RPM_RUNTIME_POST_INSTALL_SCRIPT_FILE   "${CMAKE_CURRENT_SOURCE_DIR}/redhat/runtime/postinst.sh")
+set(CPACK_RPM_RUNTIME_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/redhat/runtime/postrm.sh")
+
+set(CPACK_RPM_DEVELOPMENT_PACKAGE_NAME "${DEB_PKG_NAME}-devel")
+set(CPACK_RPM_DEVELOPMENT_PACKAGE_REQUIRES "${DEB_PKG_NAME} = ${DEB_PKG_VER}-${DEB_PKG_REV},${JS_RPMLIBS} ${KRB5_RPMLIBS} ${FUSE3_RPMLIBS} ${OPENSSL_RPMLIBS} ${JAVA_RPMLIBS} ${PYTHON_RPMLIBS} bash")
+
+set(CPACK_RPM_DEVELOPMENT_FILE_NAME "${CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}")
+set(CPACK_RPM_RUNTIME_POST_INSTALL_SCRIPT_FILE  "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postinst" )
+set(CPACK_RPM_RUNTIME_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postrm" )
 
 set(CPACK_RPM_COMPONENT_INSTALL ON)
 
