@@ -24,15 +24,7 @@ endif()
 set(pipopt "")
 
 if(IS_VENV STREQUAL "false")
-    cmake_host_system_information(RESULT OS_NAME QUERY DISTRIB_ID)
-    cmake_host_system_information(RESULT OS_VERSION QUERY DISTRIB_VERSION_ID)
-    string(TOLOWER "${OS_NAME}" OS_NAME)
-
-    if((OS_NAME STREQUAL "debian" OR OS_NAME STREQUAL "raspbian") AND OS_VERSION VERSION_GREATER_EQUAL "12")
-        set(pipopt "--break-system-packages")
-    elseif(OS_NAME STREQUAL "ubuntu" AND OS_VERSION VERSION_GREATER_EQUAL "23")
-        set(pipopt "--break-system-packages")
-    endif()
+    get_safe_pip_options(pipopt)
 endif()
 
 if(pipopt)

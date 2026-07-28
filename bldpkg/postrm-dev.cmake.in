@@ -20,7 +20,7 @@ run_as_user() {
 }
 
 case "$1" in
-    remove|purge)
+    remove|purge|0)
         echo "Undoing post-installation tasks for ${PKG_NAME}..."
 
         # =====================================================================
@@ -38,8 +38,9 @@ case "$1" in
         fi
 
     ;;
-
-    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    upgrade|1)
+    ;;
+    failed-upgrade|abort-install|abort-upgrade|disappear)
     ;;
 
     *)

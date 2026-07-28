@@ -10,7 +10,10 @@ if [ ! -z "$2" ];then
 else
     prefix=
 fi
-if ! git archive --format=tar.gz --prefix=$prefix/ HEAD -o $destfile; then
-    exit $?
-fi
+
+git ls-files -z | tar -czf "$destfile" --transform "s;^;$prefix/;" --null -T -
+
+#if ! git archive --format=tar.gz --prefix=$prefix/ HEAD -o $destfile; then
+#    exit $?
+#fi
 

@@ -21,7 +21,7 @@ run_as_user() {
 }
 
 case "$1" in
-    configure)
+    configure|1|2)
         echo "Processing post-installation hooks for ${PKG_NAME}..."
 
         # =====================================================================

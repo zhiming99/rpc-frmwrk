@@ -45,6 +45,30 @@ find_package(BISON REQUIRED)
 include(FindPkgConfig)
 include(GNUInstallDirs)
 
+function(get_safe_pip_options RESULT_VAR)
+    # Check if we have already determined the options globally
+    if(NOT DEFINED CACHE{GLOBAL_SAFE_PIP_OPTIONS})
+        message(STATUS "Detecting pip capabilities...")
+
+        # Probe pip help output for the --break-system-packages flag
+        execute_process(
+            COMMAND pip3 install --help
+            OUTPUT_VARIABLE _pip_help_output
+            ERROR_QUIET
+        )
+
+        # Evaluate and set the persistent global cache variable
+        if(_pip_help_output MATCHES "--break-system-packages")
+            set(GLOBAL_SAFE_PIP_OPTIONS "--break-system-packages" CACHE INTERNAL "Safe pip options")
+        else()
+            set(GLOBAL_SAFE_PIP_OPTIONS "" CACHE INTERNAL "Safe pip options")
+        endif()
+    endif()
+
+    # Pass the globally stored result back up to the caller's local scope variable
+    set(${RESULT_VAR} "${GLOBAL_SAFE_PIP_OPTIONS}" PARENT_SCOPE)
+endfunction()
+
 # set RPATH for the binary executables and libraries.
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_INSTALL_RPATH
@@ -1381,15 +1405,39 @@ set(CPACK_RPM_RUNTIME_PACKAGE_NAME     "${DEB_PKG_NAME}")
 set(CPACK_RPM_RUNTIME_FILE_NAME        "${DEB_PKG_NAME}-${DEB_PKG_VER}-${DEB_PKG_REV}_${RPM_PKG_ARCH}.${DEB_PKG_DISTRO}")
 set(CPACK_RPM_RUNTIME_PACKAGE_REQUIRES "dbus,dbus-daemon,dbus-tools,dbus-libs,jsoncpp,lz4-libs,cppunit,${KRB5_RPMPKGS} ${OPENSSL_RPMPKGS} ${FUSE3_RPMPKGS} ${PYTHON_RPMPKGS} ${JAVA_RPMPKGS} bash,expect,attr,procps-ng,which,python3-urwid,locales") # RPM equivalent of DEPENDS
 
-set(CPACK_RPM_RUNTIME_POST_INSTALL_SCRIPT_FILE   "${CMAKE_CURRENT_SOURCE_DIR}/redhat/runtime/postinst.sh")
-set(CPACK_RPM_RUNTIME_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/redhat/runtime/postrm.sh")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/redhat/runtime/postinst"
+    @ONLY
+)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postrm.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/redhat/runtime/postrm"
+    @ONLY
+)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst-dev.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postinst"
+    @ONLY
+)
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postrm-dev.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postrm"
+    @ONLY
+)
+
+set(CPACK_RPM_RUNTIME_POST_INSTALL_SCRIPT_FILE   "${CMAKE_CURRENT_BINARY_DIR}/redhat/runtime/postinst")
+set(CPACK_RPM_RUNTIME_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/redhat/runtime/postrm")
 
 set(CPACK_RPM_DEVELOPMENT_PACKAGE_NAME "${DEB_PKG_NAME}-devel")
 set(CPACK_RPM_DEVELOPMENT_PACKAGE_REQUIRES "${DEB_PKG_NAME} = ${DEB_PKG_VER}-${DEB_PKG_REV},${JS_RPMLIBS} ${KRB5_RPMLIBS} ${FUSE3_RPMLIBS} ${OPENSSL_RPMLIBS} ${JAVA_RPMLIBS} ${PYTHON_RPMLIBS} bash")
 
 set(CPACK_RPM_DEVELOPMENT_FILE_NAME "${CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}")
-set(CPACK_RPM_RUNTIME_POST_INSTALL_SCRIPT_FILE  "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postinst" )
-set(CPACK_RPM_RUNTIME_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postrm" )
+set(CPACK_RPM_DEVELOPMENT_POST_INSTALL_SCRIPT_FILE  "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postinst" )
+set(CPACK_RPM_DEVELOPMENT_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postrm" )
 
 set(CPACK_RPM_COMPONENT_INSTALL ON)
 

@@ -6,7 +6,7 @@ ENABLE_JAVA="@ENABLE_JAVA@"
 PYTHON_MODULES="rpcf appmancli"
 
 case "$1" in
-    remove|purge)
+    remove|purge|0)
         echo "Undoing post-installation tasks for ${PKG_NAME}..."
 
         # =====================================================================
@@ -84,8 +84,9 @@ case "$1" in
         echo "-> Refreshing dynamic linker run-time bindings cache (ldconfig)..."
         ldconfig || true
     ;;
-
-    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    upgrade|1)
+    ;;
+    failed-upgrade|abort-install|abort-upgrade|disappear)
     ;;
 
     *)
