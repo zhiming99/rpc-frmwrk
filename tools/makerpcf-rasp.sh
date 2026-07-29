@@ -53,4 +53,5 @@ elif [ "$1" == "cmake" ];then
     popd
 fi
 echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
-echo Congratulations! build complete. Please remember to run rpcfg.py to config the system.
+echo Congratulations! build complete.
+echo Please make sure to run 'rpcfctl cfg' or 'rpcfctl tui' to config the system.
