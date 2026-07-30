@@ -42,7 +42,7 @@ case "$1" in
                     else
                         echo "Skipping nodejs package deployment: nodejs version (${NODEJS_MAJOR_VERSION}) is not higher than 18."
                     fi
-                else if command -v node >/dev/null 2>&1; then
+                elif command -v node >/dev/null 2>&1; then
                     # Extract the major version integer safely
                     NODE_VERSION_STR=$(run_as_user node -v)
                     NODEJS_MAJOR_VERSION=$(echo "$NODE_VERSION_STR" | tr -d 'v' | cut -d. -f1)
