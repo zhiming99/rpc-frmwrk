@@ -27,8 +27,12 @@ case "$1" in
         # UNDO TASK 3: Uninstall global npm Packages
         # =====================================================================
         if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
-            if [ -n "$JS_NODE_PACKAGES" ] && command -v nodejs >/dev/null 2>&1; then
-                NODE_VERSION_STR=$(run_as_user nodejs -v)
+            if [ -n "$JS_NODE_PACKAGES" ] && ( command -v nodejs >/dev/null 2>&1 || command -v node >/dev/null 2>&1 ); then    
+                if [ "$1" = "0" ] ; then
+                    NODE_VERSION_STR=$(run_as_user node -v)
+                else
+                    NODE_VERSION_STR=$(run_as_user nodejs -v)
+                fi
                 NODEJS_MAJOR_VERSION=$(echo "$NODE_VERSION_STR" | tr -d 'v' | cut -d. -f1)
                 if [ "$NODEJS_MAJOR_VERSION" -gt 18 ]; then
                     echo "-> Globally removing nodejs package: $JS_NODE_PACKAGES"

@@ -916,7 +916,7 @@ set(JS_NODE_PACKAGES   "${JS_NODE_PACKAGES}"   CACHE INTERNAL "JavaScript node r
 # ==============================================================================
 
 # Replaces JS_NODE_PACKAGES initialization
-set(JS_NODE_PACKAGES "assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify")
+set(JS_NODE_PACKAGES "assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify vm events js-sha1 stream-browserify")
 
 if(ENABLE_JS)
     set(JS_RPMLIBS      "npm, nodejs >= 18.0.0, ")
@@ -1386,11 +1386,11 @@ set(CPACK_DEBIAN_DEVELOPMENT_PACKAGE_SHLIBDEPS OFF)
 
 # RPM package configuration
 # Feed to RPM engine (Note: postrm template maps to RPM's PRE_UNINSTALL hook) [1]
-set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
-    "${CMAKE_CURRENT_BINARY_DIR}/debian/postinst")
+#set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE
+#    "${CMAKE_CURRENT_BINARY_DIR}/redhat/postinst")
 
-set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE
-    "${CMAKE_CURRENT_BINARY_DIR}/debian/postrm")
+#set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE
+#    "${CMAKE_CURRENT_BINARY_DIR}/redhat/postrm")
 
 set(CPACK_RPM_PACKAGE_AUTOREQ ON)
 
@@ -1402,8 +1402,8 @@ set(CPACK_RPM_PACKAGE_ARCHITECTURE "${RPM_PKG_ARCH}")
 set(CPACK_RPM_PACKAGE_RELEASE "${DEB_PKG_REV}.${DEB_PKG_DISTRO}")
 
 set(CPACK_RPM_RUNTIME_PACKAGE_NAME     "${DEB_PKG_NAME}")
-set(CPACK_RPM_RUNTIME_FILE_NAME        "${DEB_PKG_NAME}-${DEB_PKG_VER}-${DEB_PKG_REV}_${RPM_PKG_ARCH}.${DEB_PKG_DISTRO}")
-set(CPACK_RPM_RUNTIME_PACKAGE_REQUIRES "dbus,dbus-daemon,dbus-tools,dbus-libs,jsoncpp,lz4-libs,cppunit,${KRB5_RPMPKGS} ${OPENSSL_RPMPKGS} ${FUSE3_RPMPKGS} ${PYTHON_RPMPKGS} ${JAVA_RPMPKGS} bash,expect,attr,procps-ng,which,python3-urwid,locales") # RPM equivalent of DEPENDS
+set(CPACK_RPM_RUNTIME_FILE_NAME        "${DEB_PKG_NAME}-${DEB_PKG_VER}-${DEB_PKG_REV}.${DEB_PKG_DISTRO}.${RPM_PKG_ARCH}")
+set(CPACK_RPM_RUNTIME_PACKAGE_REQUIRES "dbus,dbus-daemon,dbus-tools,dbus-libs,jsoncpp,lz4-libs,cppunit,${KRB5_RPMPKGS} ${OPENSSL_RPMPKGS} ${FUSE3_RPMPKGS} ${PYTHON_RPMPKGS} ${JAVA_RPMPKGS} bash,expect,attr,procps-ng,which,python3-urwid,glibc-langpack-en") # RPM equivalent of DEPENDS
 
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/bldpkg/postinst.cmake.in"
@@ -1433,13 +1433,19 @@ set(CPACK_RPM_RUNTIME_POST_INSTALL_SCRIPT_FILE   "${CMAKE_CURRENT_BINARY_DIR}/re
 set(CPACK_RPM_RUNTIME_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/redhat/runtime/postrm")
 
 set(CPACK_RPM_DEVELOPMENT_PACKAGE_NAME "${DEB_PKG_NAME}-devel")
-set(CPACK_RPM_DEVELOPMENT_PACKAGE_REQUIRES "${DEB_PKG_NAME} = ${DEB_PKG_VER}-${DEB_PKG_REV},${JS_RPMLIBS} ${KRB5_RPMLIBS} ${FUSE3_RPMLIBS} ${OPENSSL_RPMLIBS} ${JAVA_RPMLIBS} ${PYTHON_RPMLIBS} bash")
+set(CPACK_RPM_DEVELOPMENT_PACKAGE_REQUIRES "${DEB_PKG_NAME} = ${DEB_PKG_VER}-${DEB_PKG_REV}.${DEB_PKG_DISTRO},${JS_RPMLIBS} ${KRB5_RPMLIBS} ${FUSE3_RPMLIBS} ${OPENSSL_RPMLIBS} ${JAVA_RPMLIBS} ${PYTHON_RPMLIBS} bash,g++,gcc,make")
 
-set(CPACK_RPM_DEVELOPMENT_FILE_NAME "${CPACK_DEBIAN_DEVELOPMENT_PACKAGE_NAME}_${DEB_PKG_VER}-${DEB_PKG_REV}_${DEB_PKG_ARCH}.${DEB_PKG_DISTRO}")
+set(CPACK_RPM_DEVELOPMENT_FILE_NAME "${CPACK_RPM_DEVELOPMENT_PACKAGE_NAME}-${DEB_PKG_VER}-${DEB_PKG_REV}.${DEB_PKG_DISTRO}.${RPM_PKG_ARCH}")
 set(CPACK_RPM_DEVELOPMENT_POST_INSTALL_SCRIPT_FILE  "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postinst" )
 set(CPACK_RPM_DEVELOPMENT_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/redhat/dev/postrm" )
 
 set(CPACK_RPM_COMPONENT_INSTALL ON)
-
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/CPackOptionsRuntime.cmake" "
+if(CPACK_GENERATOR STREQUAL \"RPM\")
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON)
+    set(CPACK_SET_DESTDIR OFF)
+endif()
+")
+set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/CPackOptionsRuntime.cmake")
 
 include(CPack)

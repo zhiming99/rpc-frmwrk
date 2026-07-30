@@ -42,6 +42,16 @@ case "$1" in
                     else
                         echo "Skipping nodejs package deployment: nodejs version (${NODEJS_MAJOR_VERSION}) is not higher than 18."
                     fi
+                else if command -v node >/dev/null 2>&1; then
+                    # Extract the major version integer safely
+                    NODE_VERSION_STR=$(run_as_user node -v)
+                    NODEJS_MAJOR_VERSION=$(echo "$NODE_VERSION_STR" | tr -d 'v' | cut -d. -f1)
+                    if [ "$NODEJS_MAJOR_VERSION" -gt 18 ]; then
+                        echo "-> npm version ${NODEJS_MAJOR_VERSION} satisfies requirement (> 18)."
+                        run_as_user npm install -g $JS_NODE_PACKAGES
+                    else
+                        echo "Skipping nodejs package deployment: nodejs version (${NODEJS_MAJOR_VERSION}) is not higher than 18."
+                    fi
                 else
                     echo "Warning: nodejs feature is toggled on, but 'nodejs' executable was not found on this system." >&2
                 fi
