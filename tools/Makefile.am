@@ -17,7 +17,7 @@ if ENABLE_GMSSL
 #gmssl files
 runtime_files += gmsslkey.sh
 gmssl_cmd=install gmsslkey.sh $${BinDir}/rpcf/;
-gmssl_prog="if [ -n \"$(DESTDIR)\" ]; then install /usr/local/bin/gmssl $${BinDir}/rpcf;fi;"
+gmssl_prog="if [ -n \"$(DESTDIR)\" ]; then install /usr/local/bin/gmssl $${BinDir};fi;"
 else
 gmssl_cmd=true;
 gmssl_prog=true;
