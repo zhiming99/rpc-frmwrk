@@ -79,11 +79,13 @@ endif()
 if(SIPBUILD OR SIPVER EQUAL 5)
     set(BUILD_COMMANDS
         COMMAND ${CMAKE_COMMAND} -E env FUSE3=${LINK_FUSE} bash gentoml.sh "${CMAKE_INSTALL_FULL_LIBDIR}" "${TARGET_CONF_FILE}.1" "${Debug}"
+        COMMAND sed -i "s@_VERSION_@${VERSION2}@" "${TARGET_CONF_FILE}"
         COMMAND bash -lc "CXXFLAGS= ${Python3_EXECUTABLE} -m sipbuild.tools.build --verbose --build-dir ./sipbuild"
         VERBATIM
         COMMAND bash -lc "sofile=`find ./sipbuild -name ${PYTHON_EXT1}`\;if [ ! -z \"\${sofile}\" ]\; then rm -f rpcf/rpcbase*.so*\;cp \${sofile} rpcf\;\
 cd rpcf\;ln -s ${PYTHON_EXT1} ${PYTHON_EXT}\;fi"
         VERBATIM
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 elseif(SIP4 OR SIPVER EQUAL 4)
     set(ARMBUILD "0")

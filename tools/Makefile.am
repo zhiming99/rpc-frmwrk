@@ -17,8 +17,10 @@ if ENABLE_GMSSL
 #gmssl files
 runtime_files += gmsslkey.sh
 gmssl_cmd=install gmsslkey.sh $${BinDir}/rpcf/;
+gmssl_prog="if [ -n \"$(DESTDIR)\" ]; then install /usr/local/bin/gmssl $${BinDir}/rpcf;fi;"
 else
 gmssl_cmd=true;
+gmssl_prog=true;
 endif
 
 if ENABLE_OPENSSL
@@ -54,7 +56,8 @@ install-exec-local:
 	if [ ! -e $${BinDir}/rpcf ]; then mkdir -p $${BinDir}/rpcf;fi; \
 	install rpcfg.py updcfg.py rpcfgnui.py rpcfgtui.py updinitcfg.py updwscfg.py krbparse.py updk5cfg.py disablessl.py geninitcfg.py buildinst.py unzipinst.sh $${BinDir}/rpcf/;\
     chmod +x $${BinDir}/rpcf/{rpcfg,updcfg,rpcfgnui}.py;\
-    eval ${gmssl_cmd}\
+    eval $(gmssl_cmd) \
+    eval $(gmssl_prog) \
     eval ${openssl_cmd}
     
 uninstall-hook:

@@ -65,3 +65,4 @@ etc/rpcf/*.py
 etc/rpcf/mktpl*
 etc/rpcf/pymktpl
 etc/rpcf/*ridl
+usr/bin/rpcf/gmssl

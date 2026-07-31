@@ -360,8 +360,10 @@ case "$cmd" in
         bash $cmddir/inituser.sh
         ;;
     initsvr)
-        if [[ ! -d $HOME/.rpcf ]]; then
+        if [[ ! -d $HOME/.rpcf/openssl ]]; then
             mkdir -p $HOME/.rpcf/openssl
+        fi
+        if [[ ! -d $HOME/.rpcf/gmssl ]]; then
             mkdir -p $HOME/.rpcf/gmssl
         fi
         rpcfctl clearmount
@@ -499,17 +501,17 @@ else
     echo Error generate OpenSSL key/cert;
 fi
 EOF
-                chmod u+x ~/.rpcf/gencmd.sh
+                chmod u+x $HOME/.rpcf/gencmd.sh
                 expect - << EOF 
 #!/usr/bin/expect -f
 set timeout -1
-spawn ~/.rpcf/gencmd.sh $cmddir $2 $3 $4
+spawn $HOME/.rpcf/gencmd.sh $cmddir $2 $3 $4
 expect {
     "Sign the certificate? " { send "y\r";exp_continue}
     "requests certified, commit? " { send "y\r";exp_continue} 
 }
 EOF
-                rm -f ~/.rpcf/gencmd.sh
+                rm -f $HOME/.rpcf/gencmd.sh
             elif bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
                 clidx=`cat $HOME/.rpcf/openssl/clidx`
                 svridx=`cat $HOME/.rpcf/openssl/svridx`
@@ -971,8 +973,8 @@ EOF
             echo $cmdline
             exit 1
         fi
-        if [[ ! -d ~/.rpcf ]]; then
-            echo Error cannot find ~/.rpcf
+        if [[ ! -d $HOME/.rpcf ]]; then
+            echo Error cannot find $HOME/.rpcf
             exit 1
         fi
         python3 $cmddir/buildinst.py $@

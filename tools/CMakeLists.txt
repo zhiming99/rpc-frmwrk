@@ -110,3 +110,15 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake" "
     endif()
 ")
 
+install(CODE " 
+message( STATUS, \"haha\" )
+if(DEFINED IS_CPACK_RUN)
+  file(INSTALL
+    TYPE PROGRAM
+    FILES \"/usr/local/bin/gmssl\"
+    DESTINATION \"${CMAKE_INSTALL_BINDIR}/rpcf\"
+  )
+endif()
+"
+)
+
