@@ -440,7 +440,7 @@ upstream {AppName} {{
     if len( strMonCliPkg ) > 0:
         strRpcfPath = strRootPath +"/rpcf"
         cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
-    cmdline += "{sudo} systemctl restart nginx > /dev/null 2&>1 || {sudo} nginx -s reload || pidof nginx || nginx"
+    cmdline += "( command -v systemctl && {sudo} systemctl restart nginx > /dev/null 2&>1 ) || {sudo} nginx -s reload || pidof nginx || nginx"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
     elif IsSuAvailable():
@@ -675,6 +675,9 @@ def ConfigWebServer2( initCfg : object )->int:
             ret = Config_Apache( initCfg )
             if ret == 0:
                 print( "Apache httpd is configured successfully" )
+        else:
+            raise Exception( "Error neither Nginx nor Apache is installed" )
+
     except Exception as err:
         print( err )
         if ret == 0:

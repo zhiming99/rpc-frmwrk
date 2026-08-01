@@ -699,7 +699,7 @@ EOF
         #updating webserver config, nginx or apache
         rpcfctl geninitcfg > /tmp/initcfg.json
         python3 $cmddir/updwscfg.py /tmp/initcfg.json
-        #rm /tmp/initcfg.json
+        rm /tmp/initcfg.json
         ;;
     login)
         mech_=`rpcfctl authmech | tr -d ' \t\n\r'`

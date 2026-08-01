@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import json
 import re
 
@@ -1517,12 +1518,54 @@ EOF
             oSecurity = self.initCfg.get('Security', [])
             sslFiles = oSecurity.get('SSLCred', {})
 
+            usingGmSSL = sslFiles.get('UsingGmSSL', "false")
+            homeDir = Path.home()
+            if usingGmSSL == 'true':
+                prefix = homeDir / ".rpcf" / "gmssl" 
+            else:
+                prefix = homeDir / ".rpcf" / "openssl" 
+
+            keyFile = sslFiles.get('KeyFile', "")
+            if len(keyFile) == 0 or not os.path.exists(keyFile):
+                try:
+                    if( prefix / "signkey.pem" ).exists():
+                        keyFile = str( prefix / "signkey.pem" )
+                    elif( prefix / "clientkey.pem").exists():
+                        keyFile = str( prefix / "clientkey.pem" )
+                    else:
+                        keyFile = ""
+                except Exception as err:
+                    print( err )
+                    keyFile = ""
+            certFile = sslFiles.get('CertFile', "")
+            if len(certFile) == 0 or not os.path.exists(certFile):
+                try:
+                    if( prefix / "signcert.pem" ).exists():
+                        certFile = str( prefix / "signcert.pem" )
+                    elif( prefix / "clientcert.pem" ).exists():
+                        certFile = str( prefix / "clientcert.pem" )
+                    else:
+                        certFile = ""
+                except Exception as err:
+                    print( err )
+                    certFile = ""
+            cacertFile = sslFiles.get('CACertFile', "")
+            if len(cacertFile) == 0 or not os.path.exists(cacertFile):
+                try:
+                    if( prefix / "certs.pem" ).exists():
+                        cacertFile = str( prefix / "certs.pem" )
+                    else:
+                        cacertFile = ""
+                except Exception as err:
+                    print( err )
+                    cacertFile = ""
+
             self.oSecWidgets = [
                 urwid.Text(_("SSL Settings"), align='center'),
                 urwid.Divider('-'),
-                urwid.Edit(_("    Key File : "), edit_text=sslFiles.get('KeyFile', '')),
-                urwid.Edit(_("   Cert File : "), edit_text=sslFiles.get('CertFile', '')),
-                urwid.Edit(_(" CACert File : "), edit_text=sslFiles.get('CACertFile', '')),
+                urwid.Edit(_("    Key File : "), edit_text=keyFile),
+                urwid.Edit(_("   Cert File : "), edit_text=certFile),
+                urwid.Edit(_(" CACert File : "), edit_text=cacertFile),
                 urwid.CheckBox(_("Using GmSSL"), state=(sslFiles.get('UsingGmSSL', False) == 'true')),
                 urwid.CheckBox(_("Verify Peer"), state=(sslFiles.get('VerifyPeer', False) == 'true')),
                 urwid.AttrWrap( urwid.Button(_("Generate Self-Signed Certificate"),
