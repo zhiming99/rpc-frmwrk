@@ -436,11 +436,11 @@ upstream {AppName} {{
     else:
         raise Exception( "Error the linux distribution is not supported by updwscfg.py yet" )
 
-    cmdline += "rm " + cfgFile + " && echo nginx setup complete ;"
+    cmdline += "rm " + cfgFile + ";"
     if len( strMonCliPkg ) > 0:
         strRpcfPath = strRootPath +"/rpcf"
         cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
-    cmdline += "( command -v systemctl && {sudo} systemctl restart nginx > /dev/null 2&>1 ) || {sudo} nginx -s reload || pidof nginx || nginx"
+    cmdline += "( ( ( command -v systemctl > /dev/null 2>&1 ) && {sudo} systemctl restart nginx > /dev/null 2>&1 ) || {sudo} nginx -s reload || pidof nginx || nginx ) && echo nginx setup complete;"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
     elif IsSuAvailable():

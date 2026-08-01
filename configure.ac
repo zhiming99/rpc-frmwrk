@@ -661,7 +661,7 @@ case $enable_testcases in
     ;;
 esac
 
-JS_NODE_PACKAGES="assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify"
+JS_NODE_PACKAGES="browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify"
 
 case $enable_js in
     yes)

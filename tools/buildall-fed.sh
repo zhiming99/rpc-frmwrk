@@ -18,6 +18,6 @@ ${SUDO} dnf -y install java-latest-openjdk-devel java-latest-openjdk-headless ja
 ${SUDO} dnf -y install sip5 || ${SUDO} dnf -y install sip6
 ${SUDO} dnf -y install python3-wheel python3-numpy rpmdevtools || pip3 install wheel numpy
 
-npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events js-sha1 stream-browserify
+npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify events js-sha1 stream-browserify
 
 bash ./makerpcf.sh $@

@@ -916,7 +916,7 @@ set(JS_NODE_PACKAGES   "${JS_NODE_PACKAGES}"   CACHE INTERNAL "JavaScript node r
 # ==============================================================================
 
 # Replaces JS_NODE_PACKAGES initialization
-set(JS_NODE_PACKAGES "assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify vm events js-sha1 stream-browserify")
+set(JS_NODE_PACKAGES "browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify")
 
 if(ENABLE_JS)
     set(JS_RPMLIBS      "npm, nodejs >= 18.0.0, ")
