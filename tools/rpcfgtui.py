@@ -1499,7 +1499,7 @@ EOF
         except Exception as err:
             self.show_message(_("Failed to update security configuration") + ": {}".format(str(err)))
             return
-        self.showOutputDlg( f"rpcfctl cfgweb {initFle}" )
+        self.showOutputDlg( f"rpcfctl cfgweb {initFile}" )
 
     def genInstaller( self, button ):
         try:
