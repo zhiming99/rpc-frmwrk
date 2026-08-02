@@ -1257,11 +1257,10 @@ endif()
 # =====================================================================
 if(AUTOTOOLS_DEB_AVAILABLE)
 
-# 3. Custom 'deb' Target
+# 3. autotools 'deb' Target
 # Replicates the original shell script behavior exactly using CMake-native commands
 add_custom_target(deb
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target dist
-    COMMAND echo "dist package is built"
     COMMAND ${CMAKE_COMMAND} -E rename "${PKGNAME}" "bldpkg/${DEBTAR}"
     COMMAND ${CMAKE_COMMAND} -E chdir bldpkg ${CMAKE_COMMAND} -E tar zxf "${DEBTAR}"
     COMMAND ${CMAKE_COMMAND} -E remove_directory "bldpkg/${DISTDIR}-${REV}"
@@ -1272,13 +1271,37 @@ add_custom_target(deb
     COMMENT "Building Debian package..."
 )
 elseif(AUTOTOOLS_RPM_AVAILABLE)
-# 4. Custom 'rpm' Target
+# 4. autotools 'rpm' Target
 add_custom_target(rpm
     COMMAND ${CMAKE_COMMAND} --build bldpkg --target rpm_rpcf
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building RPM package..."
 )
 endif()
+
+add_custom_target( DEB
+    COMMAND bash "bldpkg/cmakepak.sh" "DEB"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "CPack Debian package..."
+)
+
+add_custom_target( DEB-JAVA
+    COMMAND bash "bldpkg/cmakepak.sh" "DEB" "-DENABLE_JAVA=ON"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "CPack Debian package..."
+)
+
+add_custom_target( RPM
+    COMMAND bash "bldpkg/cmakepak.sh" "RPM"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "CPack RPM package..."
+)
+
+add_custom_target( RPM-JAVA
+    COMMAND bash "bldpkg/cmakepak.sh" "RPM" "-DENABLE_JAVA=ON"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "CPack RPM package..."
+)
 
 set(DEB_PKG_NAME     "${PROJECT_NAME}")
 set(DEB_PKG_VER      "${PROJECT_VERSION}")    # Automatically pulls 0.9.0

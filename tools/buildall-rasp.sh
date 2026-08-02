@@ -25,6 +25,6 @@ NODE_MAJOR=22
 curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
 apt-get install -y nodejs
 
-npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify events js-sha1 stream-browserify
+npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify
 
 bash ./makerpcf-rasp.sh $@

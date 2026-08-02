@@ -544,6 +544,8 @@ def UpdateApacheSSLConfigFedora(cfgFile: str,
                 elif line.strip().startswith("SSLCertificateKeyFile"):
                     key_file = line.split(None, 1)[1].strip()
 
+        if not os.path.exists( sslConfPath ):
+            raise Exception( f"Error invalid path {sslConfPath} . Please check if mod_ssl installed" )
         # Read and update ssl.conf
         updated_lines = []
         with open(sslConfPath, 'r') as ssl_conf:

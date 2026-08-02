@@ -1493,10 +1493,13 @@ EOF
     def configWebServer( self, button ):
         try:
             self.updateSecCfg()
+            initFile = "/tmp/initcfg.json"
+            with open(initFile, 'w') as f:
+                json.dump( self.initCfg, f, indent=4 )
         except Exception as err:
             self.show_message(_("Failed to update security configuration") + ": {}".format(str(err)))
             return
-        self.showOutputDlg( f"rpcfctl cfgweb" )
+        self.showOutputDlg( f"rpcfctl cfgweb {initFle}" )
 
     def genInstaller( self, button ):
         try:

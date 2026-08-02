@@ -697,8 +697,29 @@ EOF
         ;;
     cfgweb)
         #updating webserver config, nginx or apache
-        rpcfctl geninitcfg > /tmp/initcfg.json
-        python3 $cmddir/updwscfg.py /tmp/initcfg.json
+        initCfg="$1"
+        if [ -z "$1" ]; then 
+            initCfg="/tmp/initcfg.json"
+            rpcfctl geninitcfg > /tmp/initcfg.json
+        elif [[ "$(readlink -f $initCfg)" != "/tmp/initcfg.json" ]]; then
+            cat $initCfg > /tmp/initcfg.json 
+        fi
+        python3 -c '
+import json, sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    data = json.load(f)
+data["Security"]["misc"]["ConfigWebServer"] = "true"
+with open(p, "w") as f:
+    json.dump(data, f, indent=4)
+' /tmp/initcfg.json || {
+            echo "failed to patch initcfg.json" >&2;
+            exit 1;
+        }
+        if ! python3 "$cmddir/updwscfg.py" /tmp/initcfg.json; then
+            echo "Failed to update WebServer's settings" >&2
+            exit 1
+        fi
         rm /tmp/initcfg.json
         ;;
     login)
