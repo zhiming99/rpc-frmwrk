@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 #project(genrpcfs LANGUAGES C CXX)
 
+include(GNUInstallDirs)
 # ==============================================================================
 # 1. Define Static Library Target
 # ==============================================================================
@@ -32,6 +33,5 @@ set_target_properties(genrpcfs PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # 3. Installation Routines
 # ==============================================================================
 # Maps the static library layout tracking matching standard GNU installations
-include(GNUInstallDirs)
 install(TARGETS genrpcfs DESTINATION ${CMAKE_INSTALL_LIBDIR})
 

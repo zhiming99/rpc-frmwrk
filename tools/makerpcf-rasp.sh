@@ -43,8 +43,10 @@ if [ -z "$1" ]; then
     popd
 
 elif [ "$1" == "cmake" ];then
-    pushd ${BASE}/rpc-frmwrk
-    mkdir build
+    pushd ./rpc-frmwrk
+    if [ ! -d build ]; then
+        mkdir build || ( echo unable to create directory ./rpc-frmwrk/build && exit 1 )
+    fi
     pushd build
     cmake ..
     cmake --build .

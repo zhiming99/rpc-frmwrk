@@ -10,8 +10,8 @@
 * 在命令行下运行`bash buildall-deb.sh`, 用autotools构建`rpc-frmwrk`
 * 使用dnf/yum系统的用户下载[`tools/buildall-fed.sh`](../tools/buildall-fed.sh)和`tools/makerpcf.sh`。
 * 树莓派的用户下载[`tools/buildall-rasp.sh`](../tools/buildall-rasp.sh)和[`tools/makerpcf-rasp.sh`](../tools/makerpcf-rasp.sh)。
-* 由于`rpc-frmwrk`支持的语言较多，会下载各种语言的开发工具，因此下载时间较长。
 * 在安装好工具的前提下，也可以在vscode下打开目录`rpc-frmwrk`, 使用`ctrl-shift-B`编译。
+* 由于`rpc-frmwrk`支持的语言较多，会下载各种语言的开发工具，因此下载时间较长。
 
 ## 硬核编译`rpc-frmwrk`的方法
 ### 搭建编译环境
