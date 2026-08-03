@@ -22,5 +22,5 @@ make -j4
 cpack -G $pkgtype
 
 # restore the cache to /usr/local
-cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_SYSCONFDIR=/usr/local/etc ..
 popd

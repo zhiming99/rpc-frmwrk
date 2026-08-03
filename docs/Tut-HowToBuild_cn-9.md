@@ -4,6 +4,15 @@
 ## 第九节 如何编译rpc-frmwrk
 首先，熟悉docker的用户，或者急性子的用户可以参考[这篇文章](../tools/README_cn.md#Docker容器)用docker快速搭建一个`rpc-frmwrk`的运行环境。
 
+## 速通编译`rpc-frmwrk`
+* 下载文件[`tools/buildall-deb.sh`](../tools/buildall-deb.sh)和[`tools/makerpcf.sh`](../tools/makerpcf.sh). 
+* 在命令行下运行`bash buildall-deb.sh cmake`, 用cmake构建`rpc-frmwrk`
+* 在命令行下运行`bash buildall-deb.sh`, 用autotools构建`rpc-frmwrk`
+* 使用dnf/yum系统的用户下载[`tools/buildall-fed.sh`](../tools/buildall-fed.sh)和`tools/makerpcf.sh`。
+* 树莓派的用户下载[`tools/buildall-rasp.sh`](../tools/buildall-rasp.sh)和[`tools/makerpcf-rasp.sh`](../tools/makerpcf-rasp.sh)。
+* 由于`rpc-frmwrk`支持的语言较多，会下载各种语言的开发工具，因此下载时间较长。
+* 在安装好工具的前提下，也可以在vscode下打开目录`rpc-frmwrk`, 使用`ctrl-shift-B`编译。
+
 ## 硬核编译`rpc-frmwrk`的方法
 ### 搭建编译环境
 1. 安装`automake`工具。具体到ubuntu系统, 工具软件包有`autoconf, shtool, libtool, automake`等， fedora系统上，软件包的名字相同。
@@ -51,7 +60,7 @@
     * 然后在[`tools`](../tools)目录下运行`sudo docker buildx build --platform linux/armhf -t armhf/rpcf:latest -f Dockerfile.arm .`，建立docker镜像.
     * `Dokerfile.arm`会自动构建armhf的rpc-frmwrk镜像。这是一个32bit的代码，可以更改`armhf`为`aarch64`，以生成64bit的代码。
     * 运行这个Docker镜像的命令为`sudo docker run -it --rm --platform linux/armhf --device /dev/fuse --privileged armhf/rpcf:latest /bin/bash`。
-    * 这个方法可以在x86的机器上完美生成arm架构的代码。缺点是速度稍微慢一些。
+    * 这个方法不算传统的交叉编译，但是亦可以在x86的机器上完美生成arm架构的代码。缺点是速度稍微慢一些。
 
 ### 已知问题
 * 由于Linux发行版十分繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈，我们会尽快修复。

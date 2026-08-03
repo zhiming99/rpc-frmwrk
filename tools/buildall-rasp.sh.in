@@ -21,7 +21,7 @@ ${SUDO} apt-get -y install sip-tools || ${SUDO} apt-get -y install sip-dev pytho
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim
 ${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
 
-NODE_MAJOR=22
+NODE_MAJOR=18
 curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
 apt-get install -y nodejs
 

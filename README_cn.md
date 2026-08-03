@@ -8,9 +8,6 @@
 * `rpc-frmwrk`提供接口描述语言和框架代码的生成器，可以帮助用户快速搭建业务系统，平滑新系统的学习曲线。
 
 * `rpc-frmwrk`在架构上可以灵活定制，既可以生成分布式的微服务架构，也可以生成可热插拔的集中式服务进程。可分别应对强调业务隔离松耦合，或者强调性能吞吐量的不同应用场景。
-  * 当运行在微服务架构下，服务端和客户端各有一个桥接的守护进程。用户开发的各个业务进程位于这两个守护进程后面，通过`Unix Socket`或者`DBus`与守护进程通信。因而具有更大的灵活性和安全性，同时减少了系统框架的复杂度和代码的耦合性。
-  * 当运行在集中式服务架构下，服务端和客户端分别为两个独立的进程，此时`rpc-frmwrk`拥有更好的性能。服务端和客户端都可在`运行时`加载和启停用户开发的服务插件。
-  * 在任何一种架构下，`rpc-frmwrk`提供配置工具和`运行时接口`完成对传输功能的配置，包括加密，认证，WebSocket，Multihop，流控以及其他一些重要参数。
 * `rpc-frmwrk`在安全传输方面，支持国密(GmSSL)和OpenSSL两种安全传输协议. 在身份认证和访问控制方面，`rpc-frmwrk`支持简单的`SimpAuth`密码认证，亦可通过`Kerberos`或者`OAuth2`提供单点登陆(SSO)服务。
 * 更详细的概念和名词解释请参考[rpc-frmwrk的概念和技术介绍](./Concept_cn.md)。
 
@@ -33,14 +30,14 @@
 17. [`rpc-frwmrk监控器`](./monitor/client/js/appmoncli/README_cn.md)
 
 ## 开发RPC应用程序
-通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, Python, Java, JavaScript)的两种模式的`RPC`应用程序的开发.关于`ridl`详细信息请参考这篇[文章](./ridl/README_cn.md)
+通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, Python, Java, JavaScript)的两种模式的`RPC`应用程序的开发.
 1. `微服务模式`： `rpc-frmwrk`最早支持的的架构，用户通过运用`rpc-frmwrk`运行库提供的接口，和各种内建的工具类，执行同步，异步，超时，取消，以及`流`传输等功能，从而实现高性能的业务逻辑。`微服务模式`的可以动态的启停各个微服务，不需要中断其他的线上服务。
 2. `紧凑模式`：如果对性能要求较高，你也可以使用`ridlc`生成传统的C/S架构，服务器和客户端，是两个单独的程序，特点是延迟小，吞吐量大，扩展性灵活性稍弱。
 3. 对`rpc-frmwrk`的开发和技术细节感兴趣的读者，可以更进一步阅读[rpc-frmwrk的开发教程](./docs/Tut-Index.md)。
+4. 关于`ridl`详细信息请参考这篇[文章](./ridl/README_cn.md)
 
 ## 编译, 配置和运行`rpc-frmwrk`   
-1. 编译`rpc-frmwrk`请参考[如何编译rpc-frmwrk](./docs/Tut-HowToBuild_cn-9.md).
-1. 当你已经编译成功`rpc-frmwrk`，在源码的根目录下运行 `sudo make install`进行安装.
+1. 编译`rpc-frmwrk`请参考[如何编译rpc-frmwrk](./docs/Tut-HowToBuild_cn-9.md#速通编译rpc-frmwrk).
 2. 在用户服务器运行之前，你需要配置`rpc-frwmrk`一些关键信息。`rpcfg.py`是`rpc-frmwrk`的图形界面配置工具。`rpcfg.py`功能强大，大部分`rpc-frmwrk`的运行参数，均可通过`rpcfg.py`进行设置。有关`rpcfg.py`的详细说明，可以参考其[使用说明](./tools/README_cn.md).
 3. 配置完成后, 启动服务器端的守护进程，如`rpcrouter -dr 2`和客户端的守护进程，如`rpcrouter -dr 1`.  有关守护进程的详细信息请参考这篇[文章](./rpc/router/README_cn.md).
 5. 连通性测试。可运行系统自带的测试程序来验证当前设置是否正确. 先在服务器端启动服务器程序`/usr/local/bin/rpcf/hwsvrsmk`, 然后在客户端启动`/usr/local/bin/rpcf/hwclismk`.根据`hwclismk`的输出进行验证。这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run)有更详细的介绍.
