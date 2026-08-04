@@ -399,7 +399,7 @@ class CAutoPtr : public IAutoPtr
         if( SUCCEEDED( ret ) )
         {
             m_pObj = dynamic_cast< T* >( pObj );
-            if( m_pObj == nullptr )
+            if( !m_pObj && pObj )
             {
                 pObj->Release();
                 ret = -EFAULT;
@@ -412,7 +412,7 @@ class CAutoPtr : public IAutoPtr
         if( SUCCEEDED( ret ) )
         {
             m_pObj = dynamic_cast< T* >( pObj );
-            if( m_pObj == nullptr )
+            if( !m_pObj && pObj )
             {
                 pObj->Release();
                 std::string strMsg =

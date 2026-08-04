@@ -10,14 +10,12 @@ if [ ! -d ./GmSSL -o ! -f ./GmSSL/CMakeLists.txt ]; then
         echo Error failed to pull GmSSL
         exit 1
     fi
-	popd
 fi
 pushd ./GmSSL
-if [ ! -d build ]; then mkdir ./build; fi
-	cd build
-	cmake ..
-	make;make test
-	${SUDO} make install
+if [ ! -d build ]; then mkdir ./build || ( echo unable to create directory ./GmSSL/build && exit ); fi
+cd build
+cmake ..;make;make test
+${SUDO} make install
 popd
 
 echo downloading rpc-frmwrk...
@@ -29,7 +27,6 @@ if [ ! -d rpc-frmwrk -o ! -f ./rpc-frmwrk/ipc/rpcif.cpp ]; then
         echo Error failed to pull rpc-frmwrk
         exit 1
     fi
-	popd
 fi
 
 if [ -z "$1" ]; then
@@ -49,8 +46,9 @@ elif [ "$1" == "cmake" ];then
     fi
     pushd build
     cmake ..
-    cmake --build .
-    ${SUDO} cmake --install .
+    if cmake --build . ; then
+        ${SUDO} cmake --install .
+    fi
     popd
     popd
 fi

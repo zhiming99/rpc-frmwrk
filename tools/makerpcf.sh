@@ -42,8 +42,9 @@ elif [ "$1" == "cmake" ];then
     mkdir build
     pushd build
     cmake ..
-    cmake --build .
-    ${SUDO} cmake --install .
+    if cmake --build . ; then
+        ${SUDO} cmake --install .
+    fi
     popd
     popd
 fi

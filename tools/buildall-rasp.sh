@@ -14,7 +14,7 @@ libtool shtool automake autoconf autotools-dev make dbus dbus-bin \
 libdbus-1-dev libjsoncpp-dev libkrb5-dev python3-build \
 liblz4-dev openssl libssl-dev libcppunit-dev \
 libfuse3-dev bash net-tools procps swig default-jdk-headless cmake \
-libcommons-cli-java ccache curl fuse3 python3-urwid gettext
+libcommons-cli-java ccache curl fuse3 python3-urwid gettext attr
 
 ${SUDO} apt-get -y install sip-tools || ${SUDO} apt-get -y install sip-dev python3-sip python3-sip-dev || true
 
@@ -25,6 +25,6 @@ NODE_MAJOR=18
 curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
 apt-get install -y nodejs
 
-npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify
+for ((i=0;i<100;i++));do if npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify ; then break; fi;done
 
 bash ./makerpcf-rasp.sh $@

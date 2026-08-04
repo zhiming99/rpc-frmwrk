@@ -257,7 +257,7 @@
                     "PortNumber": "4132",
                     "Compression": "true",
                     "EnableSSL": "true",
-                    "HasAuth": "true",
+                    "HasAuth": "false",
                     "AuthMech": "SimpAuth",
                     "EnableWS": "false",
                     "RouterPath": "/",
