@@ -39,6 +39,19 @@ fi
 cmd="$1"
 shift
 
+run_as_root()
+{
+    if [ "$(id -u)" -eq 0 ]; then
+        $@
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        # su -c requires a single string, so we safely quote the arguments
+        printf -v cmd_str '%q ' "$@"
+        su -s /bin/sh -c "$cmd_str"
+    fi
+}
+
 function is_app_online()
 {
     if check_appreg_mount; then
@@ -392,6 +405,11 @@ EOF
         fi
         bash $cmddir/initappreg.sh -s
         rpcfctl clearmount;
+        if [ "$(id -u)" -ne 0 ]; then
+            echo Update the ssl keys with root privilege...
+        fi
+        source_dir=$HOME/.rpcf/openssl
+        run_as_root python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
         ;;
     initcli)
         if [[ ! -d $HOME/.rpcf ]]; then
@@ -407,6 +425,11 @@ EOF
             rpcfctl genkeys gmssl 1 1
         fi
         rpcfctl clearmount
+        source_dir=$HOME/.rpcf/openssl
+        if [ "$(id -u)" -ne 0 ]; then
+            echo Update the ssl keys with root privilege...
+        fi
+        run_as_root python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/clientkey.pem $source_dir/clientcert.pem $source_dir/certs.pem
         ;;
     importkey | import)
         cmdline="rpcfctl importkey <openssl|gmssl> <private key file> <public cert file> [<cacert file>]"
@@ -460,7 +483,7 @@ EOF
         if [[ "$bRoot" == "false" ]]; then
             SUDOCMD=
         else
-            if which sudo; then
+            if command -v sudo; then
                 SUDOCMD=sudo
             fi
         fi

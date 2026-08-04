@@ -840,7 +840,7 @@ set(FEATURES        "${FEATURES}"        CACHE INTERNAL "" FORCE)
 
 if(ENABLE_PYTHON)
     set(PYTHON_RPMLIBS   "python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 ),")
-    set(PYTHON_RPMPKGS   "python3-installer,python3-numpy,")
+    set(PYTHON_RPMPKGS   "python3-pip,python3-numpy,")
     set(PYTHON_RPMFILES  "%{_libdir}/rpcf/*.whl")
     
     # Note the escaped '\$i' to pass the literal variable out to the RPM runtime shell script
