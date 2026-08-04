@@ -14,12 +14,13 @@ libtool shtool automake autoconf autotools-dev make dbus dbus-bin \
 libdbus-1-dev libjsoncpp-dev libkrb5-dev python3-build \
 liblz4-dev openssl libssl-dev libcppunit-dev \
 libfuse3-dev bash net-tools procps swig default-jdk-headless cmake \
-libcommons-cli-java ccache curl fuse3 python3-urwid gettext attr
+libcommons-cli-java ccache curl fuse3 gettext attr
 
 ${SUDO} apt-get -y install sip-tools || ${SUDO} apt-get -y install sip-dev python3-sip python3-sip-dev || true
 
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim
 ${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
+pip3 install --break-system-packages urwid
 
 NODE_MAJOR=18
 curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
