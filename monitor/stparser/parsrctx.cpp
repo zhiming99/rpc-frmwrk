@@ -22,6 +22,7 @@
  * =====================================================================================
  */
 #include <rpc.h>
+#include "stlexer.h"
 #include "parsrctx.h"
 #include <iostream>
 #include <sstream>

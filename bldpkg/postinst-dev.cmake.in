@@ -1,0 +1,72 @@
+#!/bin/sh
+set -e
+
+# Automatically injected by CMake at build time
+PKG_NAME="@PACKAGE_NAME@-dev"
+ENABLE_JS="@ENABLE_JS@"
+JS_NODE_PACKAGES="@JS_NODE_PACKAGES@"
+
+run_as_user() {
+    if [ -n "${SUDO_USER}" ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            sudo -u "${SUDO_USER}" "$@"
+        else
+            # su -c requires a single string, so we safely quote the arguments
+            printf -v cmd_str '%q ' "$@"
+            su -s /bin/sh -c "$cmd_str" -- "${SUDO_USER}"
+        fi
+    else
+        "$@"
+    fi
+}
+
+case "$1" in
+    configure|1|2)
+        echo "Processing post-installation hooks for ${PKG_NAME}..."
+
+        # =====================================================================
+        # TASK 3: Global npm Package Installation (Node.js version > 18)
+        # =====================================================================
+        # Check if the feature toggle was enabled during compilation
+        if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
+            if [ -n "$JS_NODE_PACKAGES" ]; then
+                echo "Checking nodejs environment for global packages..."
+                
+                if command -v nodejs >/dev/null 2>&1; then
+                    # Extract the major version integer safely
+                    NODE_VERSION_STR=$(run_as_user nodejs -v)
+                    NODEJS_MAJOR_VERSION=$(echo "$NODE_VERSION_STR" | tr -d 'v' | cut -d. -f1)
+                    if [ "$NODEJS_MAJOR_VERSION" -ge 18 ]; then
+                        echo "-> npm version ${NODEJS_MAJOR_VERSION} satisfies requirement (>= 18)."
+                        run_as_user npm install -g $JS_NODE_PACKAGES
+                    else
+                        echo "Skipping nodejs package deployment: nodejs version (${NODEJS_MAJOR_VERSION}) is less than 18."
+                    fi
+                elif command -v node >/dev/null 2>&1; then
+                    # Extract the major version integer safely
+                    NODE_VERSION_STR=$(run_as_user node -v)
+                    NODEJS_MAJOR_VERSION=$(echo "$NODE_VERSION_STR" | tr -d 'v' | cut -d. -f1)
+                    if [ "$NODEJS_MAJOR_VERSION" -ge 18 ]; then
+                        echo "-> npm version ${NODEJS_MAJOR_VERSION} satisfies requirement (>= 18)."
+                        run_as_user npm install -g $JS_NODE_PACKAGES
+                    else
+                        echo "Skipping nodejs package deployment: nodejs version (${NODEJS_MAJOR_VERSION}) is less than 18."
+                    fi
+                else
+                    echo "Warning: nodejs feature is toggled on, but 'nodejs' executable was not found on this system." >&2
+                fi
+            fi
+        fi
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
+

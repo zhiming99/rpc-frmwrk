@@ -20,7 +20,7 @@ libtool shtool automake autoconf autotools-dev make dbus dbus-bin python3-venv \
 libdbus-1-dev libjsoncpp-dev libkrb5-dev \
 liblz4-dev lz4 openssl libssl-dev libcppunit-dev \
 libfuse3-dev fuse3 bash net-tools procps swig cmake attr \
-libcommons-cli-java curl figlet python3-urwid gettext \
+libcommons-cli-java curl figlet gettext \
 git devscripts debhelper expect vim screen tmux iputils-ping
 
 RUN apt-get install -y default-jdk-headless || apt-get install -y openjdk-8-jdk-headless
@@ -32,7 +32,7 @@ RUN python3 -m venv /opt/venv
 # Inject the environment paths globally for all future layers and execution tasks
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN pip install --upgrade pip && pip install sip wheel numpy
+RUN pip install --upgrade pip && pip install sip wheel numpy urwid
 
 # ubuntu 22.04's official version of nodejs is outdated, lets install node 20 from nodejs'
 # site instead.
@@ -46,7 +46,7 @@ RUN apt-get install -y nodejs || touch ${HOME}/nojs
 
 RUN cd ${HOME};for i in $(seq 1 100);do if git clone 'https://github.com/zhiming99/GmSSL.git'; then break; fi;done
 RUN cd ${HOME};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
-RUN npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify
+RUN npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify
 RUN cd ${HOME};for i in $(seq 1 100); do if git clone 'https://github.com/zhiming99/rpc-frmwrk.git';then break;fi;done
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`

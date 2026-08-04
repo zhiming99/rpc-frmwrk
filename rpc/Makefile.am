@@ -46,3 +46,4 @@ endif
 SUBDIRS += security
 #endif
 
+EXTRA_DIST=CMakeLists.txt

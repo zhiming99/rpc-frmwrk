@@ -1,4 +1,7 @@
-EXTRA_DIST=control.in blddpkg.sh.in rules bldrpm.sh rpcf.spec.in rpcf.install.in rpcf-dev.install.in rpcf-static.install.in README.md
+EXTRA_DIST=control.in blddpkg.sh.in rules bldrpm.sh rpcf.spec.in rpcf.install.in \
+rpcf-dev.install.in rpcf-static.install.in README.md CMakeLists.txt \
+collect_files.sh postinst.cmake.in postrm.cmake.in \
+postinst-dev.cmake.in postrm-dev.cmake.in cmakepak.sh
 
 rev=0
 DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)-$(rev)

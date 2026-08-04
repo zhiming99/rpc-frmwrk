@@ -24,3 +24,4 @@ hwsvrsmk_LDADD=$(iftest_LDFLAGS) libhellowrd.la
 hwsvrsmk_CPPFLAGS=$(iftest_CPPFLAGS) -DSERVER
 
 link_dir=./
+EXTRA_DIST=CMakeLists.txt

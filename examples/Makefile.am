@@ -173,3 +173,5 @@ EXTRA_DIST += $(jstest)/iftest/iftest.html \
  $(jstest)/player/sftest.html \
  $(jstest)/player/FileTransfercli.js \
  $(jstest)/player/maincli.js
+
+EXTRA_DIST += CMakeLists.txt

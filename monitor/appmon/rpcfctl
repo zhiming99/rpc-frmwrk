@@ -39,6 +39,19 @@ fi
 cmd="$1"
 shift
 
+run_as_root()
+{
+    if [ "$(id -u)" -eq 0 ]; then
+        $@
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        # su -c requires a single string, so we safely quote the arguments
+        printf -v cmd_str '%q ' "$@"
+        su -s /bin/sh -c "$cmd_str"
+    fi
+}
+
 function is_app_online()
 {
     if check_appreg_mount; then
@@ -360,8 +373,10 @@ case "$cmd" in
         bash $cmddir/inituser.sh
         ;;
     initsvr)
-        if [[ ! -d $HOME/.rpcf ]]; then
+        if [[ ! -d $HOME/.rpcf/openssl ]]; then
             mkdir -p $HOME/.rpcf/openssl
+        fi
+        if [[ ! -d $HOME/.rpcf/gmssl ]]; then
             mkdir -p $HOME/.rpcf/gmssl
         fi
         rpcfctl clearmount
@@ -390,6 +405,11 @@ EOF
         fi
         bash $cmddir/initappreg.sh -s
         rpcfctl clearmount;
+        if [ "$(id -u)" -ne 0 ]; then
+            echo Update the ssl keys with root privilege...
+        fi
+        source_dir=$HOME/.rpcf/openssl
+        run_as_root python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
         ;;
     initcli)
         if [[ ! -d $HOME/.rpcf ]]; then
@@ -397,17 +417,19 @@ EOF
             mkdir -p $HOME/.rpcf/gmssl
         fi
         rpcfctl clearmount
-        authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
-        if [[ "x$authmech" == "xSimpAuth" ]] ||
-            [[ "x$authmech" == "xOAuth2" ]]; then
-            regfsmnt -i $HOME/.rpcf/clientreg.dat
-            if [[ ! -f $HOME/.rpcf/openssl/clientkey.pem ]]; then
-                rpcfctl genkeys openssl 1 1
-            fi
-            if [[ ! -f $HOME/.rpcf/gmssl/clientkey.pem ]]; then
-                rpcfctl genkeys gmssl 1 1
-            fi
+        regfsmnt -i $HOME/.rpcf/clientreg.dat
+        if [[ ! -f $HOME/.rpcf/openssl/clientkey.pem ]]; then
+            rpcfctl genkeys openssl 1 1
         fi
+        if [[ ! -f $HOME/.rpcf/gmssl/clientkey.pem ]]; then
+            rpcfctl genkeys gmssl 1 1
+        fi
+        rpcfctl clearmount
+        source_dir=$HOME/.rpcf/openssl
+        if [ "$(id -u)" -ne 0 ]; then
+            echo Update the ssl keys with root privilege...
+        fi
+        run_as_root python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/clientkey.pem $source_dir/clientcert.pem $source_dir/certs.pem
         ;;
     importkey | import)
         cmdline="rpcfctl importkey <openssl|gmssl> <private key file> <public cert file> [<cacert file>]"
@@ -451,7 +473,7 @@ EOF
             caroot="$targetdir/$(basename $4)"
         fi
         bRoot="false"
-        drvpath=$cfgPath/drver.json
+        drvpath=$cfgPath/driver.json
         if [[ "$script_dir" == "/usr/bin" ]] || [[ "$script_dir" == "/usr/local/bin" ]]; then
             bRoot="true"
         else
@@ -461,7 +483,7 @@ EOF
         if [[ "$bRoot" == "false" ]]; then
             SUDOCMD=
         else
-            if which sudo; then
+            if command -v sudo; then
                 SUDOCMD=sudo
             fi
         fi
@@ -499,17 +521,17 @@ else
     echo Error generate OpenSSL key/cert;
 fi
 EOF
-                chmod u+x ~/.rpcf/gencmd.sh
+                chmod u+x $HOME/.rpcf/gencmd.sh
                 expect - << EOF 
 #!/usr/bin/expect -f
 set timeout -1
-spawn ~/.rpcf/gencmd.sh $cmddir $2 $3 $4
+spawn $HOME/.rpcf/gencmd.sh $cmddir $2 $3 $4
 expect {
     "Sign the certificate? " { send "y\r";exp_continue}
     "requests certified, commit? " { send "y\r";exp_continue} 
 }
 EOF
-                rm -f ~/.rpcf/gencmd.sh
+                rm -f $HOME/.rpcf/gencmd.sh
             elif bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
                 clidx=`cat $HOME/.rpcf/openssl/clidx`
                 svridx=`cat $HOME/.rpcf/openssl/svridx`
@@ -664,7 +686,7 @@ EOF
             echo $_mech
         fi
         ;;
-    geninitcfg)
+    geninitcfg|sc)
         cmdline="rpcfctl geninitcfg [-c] [<output file>]"
         drvpath=$cfgPath/driver.json
         python3 $cmddir/geninitcfg.py $drvpath $@
@@ -695,9 +717,30 @@ EOF
         ;;
     cfgweb)
         #updating webserver config, nginx or apache
-        rpcfctl geninitcfg > /tmp/initcfg.json
-        python3 $cmddir/updwscfg.py /tmp/initcfg.json
-        #rm /tmp/initcfg.json
+        initCfg="$1"
+        if [ -z "$1" ]; then 
+            initCfg="/tmp/initcfg.json"
+            rpcfctl geninitcfg > /tmp/initcfg.json
+        elif [[ "$(readlink -f $initCfg)" != "/tmp/initcfg.json" ]]; then
+            cat $initCfg > /tmp/initcfg.json 
+        fi
+        python3 -c '
+import json, sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    data = json.load(f)
+data["Security"]["misc"]["ConfigWebServer"] = "true"
+with open(p, "w") as f:
+    json.dump(data, f, indent=4)
+' /tmp/initcfg.json || {
+            echo "failed to patch initcfg.json" >&2;
+            exit 1;
+        }
+        if ! python3 "$cmddir/updwscfg.py" /tmp/initcfg.json; then
+            echo "Failed to update WebServer's settings" >&2
+            exit 1
+        fi
+        rm /tmp/initcfg.json
         ;;
     login)
         mech_=`rpcfctl authmech | tr -d ' \t\n\r'`
@@ -725,6 +768,8 @@ EOF
                 exit 1
             fi
             kinit -kt $HOME/.rpcf/krb5cli.keytab $1
+        else
+            echo Error authentication is not enabled.
         fi
         ;;
     backup)
@@ -971,8 +1016,8 @@ EOF
             echo $cmdline
             exit 1
         fi
-        if [[ ! -d ~/.rpcf ]]; then
-            echo Error cannot find ~/.rpcf
+        if [[ ! -d $HOME/.rpcf ]]; then
+            echo Error cannot find $HOME/.rpcf
             exit 1
         fi
         python3 $cmddir/buildinst.py $@

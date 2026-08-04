@@ -1,6 +1,9 @@
 pysources = README.md gentoml.sh rpcf/proxy.py rpcf/__init__.py proxy.sip pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh stripsym.sh rpcf/iolib.py rpcf/serijson.py fastrpc.sip fuseif.sip
 
-EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py tests/iftest/*.py  tests/katest/*.py  tests/prtest/*.py  tests/sftest/*.py  tests/sftest/README.md tests/sftest/sfdesc.json tests/stmtest/*.py tests/stmtest/README.md
+EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py \
+tests/iftest/*.py  tests/katest/*.py  tests/prtest/*.py  tests/sftest/*.py \
+tests/sftest/README.md tests/sftest/sfdesc.json tests/stmtest/*.py \
+tests/stmtest/README.md CMakeLists.txt
 
 if SIP4
 SIPVER=4
@@ -23,6 +26,7 @@ all:
 	@if echo "$(COMMON_LINK)" | grep "latomic"; then export ARMBUILD="1"; else export ARMBUILD="0";fi;\
 	if [ "x$(SIPVER)" == "x5" ]; then \
         FUSE3="$(LINK_FUSE)" bash gentoml.sh $(libdir);\
+        sed -i 's;_VERSION_;$(VERSION);;' ./pyproject.toml;\
 		CXXFLAGS= python3 -m sipbuild.tools.build --verbose --build-dir ./sipbuild; \
         rm -f rpcf/rpcbase*.so*;\
 		sofile=$$(find ./sipbuild -name $(PYTHON_EXT1));\
@@ -59,6 +63,7 @@ genpipopt:
 # check if venv is enabled, and supress --user option if venv is active.
 IS_VENV := $(shell python3 -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')")
 useropt := $(if $(filter false,$(IS_VENV)),--user,)
+command := $(if $(filter false,$(IS_VENV)),python3 -m build --wheel --no-isolation --outdir dist/ .,pip wheel . --no-deps --no-build-isolation -w dist/ )
 
 install: genpipopt
 	@if [ "x$(DESTDIR)" != "x" ];then \

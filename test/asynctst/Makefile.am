@@ -26,3 +26,4 @@ asyncsvrtst_CPPFLAGS=$(async_CPPFLAGS) -DSERVER
 link_dir=./
 
 
+EXTRA_DIST=CMakeLists.txt

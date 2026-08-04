@@ -11,3 +11,4 @@ smoketest_CPPFLAGS=$(smktest_CPPFLAGS)
 
 link_dir=./
 
+EXTRA_DIST=CMakeLists.txt

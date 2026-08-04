@@ -31,7 +31,7 @@ libauth_ladir=$(libdir)
 dist_libauth_conf_DATA=blist.json
 libauth_confdir=$(sysconfdir)/rpcf
 
-EXTRA_DIST=README.md README_cn.md
+EXTRA_DIST=README.md README_cn.md CMakeLists.txt
 
 libauth_la_LDFLAGS = -version-info @VERSION2@
 libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc \

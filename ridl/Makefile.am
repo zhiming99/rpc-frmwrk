@@ -12,7 +12,9 @@ EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py \
 pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py \
 pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java \
 JavaSerialImpl.java JVariant.java $(javatest)/SimpFileSvccli.java \
- $(javatest)/SimpFileSvcsvr.java $(javatest)/StreamSvccli.java $(javatest)/StreamSvcsvr.java $(javatest)/maincli.java $(javatest)/mainsvr.java
+ $(javatest)/SimpFileSvcsvr.java $(javatest)/StreamSvccli.java \
+$(javatest)/StreamSvcsvr.java $(javatest)/maincli.java $(javatest)/mainsvr.java \
+ CMakeLists.txt
 
 nodist_ridlc_SOURCES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl synccfg.py mktplsvr mktplsvr
 

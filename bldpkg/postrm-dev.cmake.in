@@ -1,0 +1,57 @@
+#!/bin/sh
+set -e
+
+PKG_NAME="@PACKAGE_NAME@"
+ENABLE_JS="@ENABLE_JS@"
+JS_NODE_PACKAGES="@JS_NODE_PACKAGES@"
+
+run_as_user() {
+    if [ -n "${SUDO_USER}" ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            sudo -u "${SUDO_USER}" "$@"
+        else
+            # su -c requires a single string, so we safely quote the arguments
+            printf -v cmd_str '%q ' "$@"
+            su -s /bin/sh -c "$cmd_str" -- "${SUDO_USER}"
+        fi
+    else
+        "$@"
+    fi
+}
+
+case "$1" in
+    remove|purge|0)
+        echo "Undoing post-installation tasks for ${PKG_NAME}..."
+
+        # =====================================================================
+        # UNDO TASK 3: Uninstall global npm Packages
+        # =====================================================================
+        if [ "$ENABLE_JS" = "ON" ] || [ "$ENABLE_JS" = "TRUE" ] || [ "$ENABLE_JS" = "1" ]; then
+            if [ -n "$JS_NODE_PACKAGES" ] && ( command -v nodejs >/dev/null 2>&1 || command -v node >/dev/null 2>&1 ); then    
+                if [ "$1" = "0" ] ; then
+                    NODE_VERSION_STR=$(run_as_user node -v)
+                else
+                    NODE_VERSION_STR=$(run_as_user nodejs -v)
+                fi
+                NODEJS_MAJOR_VERSION=$(echo "$NODE_VERSION_STR" | tr -d 'v' | cut -d. -f1)
+                if [ "$NODEJS_MAJOR_VERSION" -ge 18 ]; then
+                    echo "-> Globally removing nodejs package: $JS_NODE_PACKAGES"
+                    run_as_user npm uninstall -g $JS_NODE_PACKAGES || true
+                fi
+            fi
+        fi
+
+    ;;
+    upgrade|1)
+    ;;
+    failed-upgrade|abort-install|abort-upgrade|disappear)
+    ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
+

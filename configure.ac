@@ -418,6 +418,7 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rpcf.spec
                  bldpkg/rpcf.install
                  bldpkg/rpcf-dev.install
+                 bldpkg/rpcf-static.install
                  bldpkg/blddpkg.sh
                  examples/Makefile
                  test/Makefile
@@ -660,17 +661,17 @@ case $enable_testcases in
     ;;
 esac
 
-JS_NODE_PACKAGES="assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
+JS_NODE_PACKAGES="browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify"
 
 case $enable_js in
     yes)
-        JS_RPMLIBS="npm," 
+        JS_RPMLIBS="npm, nodejs >= 18.0.0, " 
         JS_RPMFILES="%{_libdir}/rpcf/jslib/*ZZZZZ%{_sysconfdir}/rpcf/oa2checkdesc.jsonZZZZZ%{_mandir}/man1/oinit.1.gzZZZZZ%{_sysconfdir}/rpcf/appmonui.tar.gz"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
         JS_RPMPOST="echo npm -g install ${JS_NODE_PACKAGES}"
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
         JS_RPMPOSTUN="echo npm -g remove ${JS_NODE_PACKAGES}"
-        JS_DEBLIBS="npm,"
+        JS_DEBLIBS="npm, nodejs (>= 18.0.0), "
         JS_DEBDEVFILES="usr/lib/@DEB_HOST_MULTIARCH@/rpcf/jslib/*"
         JS_DEBFILES="etc/rpcf/oa2checkdesc.jsonZZZZZusr/share/man/man1/oinit.1ZZZZZetc/rpcf/appmonui.tar.gz"
         JS_CFGOPT=

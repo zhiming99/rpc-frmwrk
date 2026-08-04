@@ -10,14 +10,12 @@ if [ ! -d ./GmSSL -o ! -f ./GmSSL/CMakeLists.txt ]; then
         echo Error failed to pull GmSSL
         exit 1
     fi
-	popd
 fi
 pushd ./GmSSL
-if [ ! -d build ]; then mkdir ./build; fi
-	cd build
-	cmake ..
-	make;make test
-	${SUDO} make install
+if [ ! -d build ]; then mkdir ./build || ( echo unable to create directory ./GmSSL/build && exit ); fi
+cd build
+cmake ..;make;make test
+${SUDO} make install
 popd
 
 echo downloading rpc-frmwrk...
@@ -29,16 +27,31 @@ if [ ! -d rpc-frmwrk -o ! -f ./rpc-frmwrk/ipc/rpcif.cpp ]; then
         echo Error failed to pull rpc-frmwrk
         exit 1
     fi
-	popd
 fi
 
-pushd ./rpc-frmwrk; autoreconf -vfi &&
-automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`;
+if [ -z "$1" ]; then
+    pushd ./rpc-frmwrk; autoreconf -vfi &&
+    automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`;
 
-bash ./cfgsel -r
-make
+    bash ./cfgsel -r
+    make
 
-${SUDO} make install;
-popd
+    ${SUDO} make install;
+    popd
+
+elif [ "$1" == "cmake" ];then
+    pushd ./rpc-frmwrk
+    if [ ! -d build ]; then
+        mkdir build || ( echo unable to create directory ./rpc-frmwrk/build && exit 1 )
+    fi
+    pushd build
+    cmake ..
+    if cmake --build . ; then
+        ${SUDO} cmake --install .
+    fi
+    popd
+    popd
+fi
 echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
-echo Congratulations! build complete. Please remember to run rpcfg.py to config the system.
+echo Congratulations! build complete.
+echo Please make sure to run 'rpcfctl cfg' or 'rpcfctl tui' to config the system.

@@ -1,0 +1,149 @@
+#!/bin/sh
+set -e
+
+# Automatically injected by CMake at build time
+PKG_NAME="@PACKAGE_NAME@"
+ENABLE_JAVA="@ENABLE_JAVA@"
+
+case "$1" in
+    configure|1|2)
+        echo "Processing post-installation hooks for ${PKG_NAME}..."
+
+        # =====================================================================
+        # TASK 1: Dynamic Python Wheel Installation
+        # =====================================================================
+        using_installer=false
+        if [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/pip3" ]; then
+            PIP_CMD="$VIRTUAL_ENV/bin/pip3"
+            PIP_OPTS=""
+            echo "-> Detected Active Virtual Environment: $VIRTUAL_ENV"
+        elif [ -x "/opt/venv/bin/pip3" ]; then
+            PIP_CMD="/opt/venv/bin/pip3"
+            PIP_OPTS=""
+            echo "-> Detected Default System Venv: /opt/venv"
+        elif command -v pip3; then
+            PIP_CMD="pip3"
+            PIP_OPTS=""
+            echo "-> Operating on Global System Python"
+
+            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3")
+            if [ -f "/usr/lib/python${PYTHON_VERSION}/EXTERNALLY-MANAGED" ] || [ -f "/usr/lib32/python${PYTHON_VERSION}/EXTERNALLY-MANAGED" ]; then
+                echo "--> Modern OS safeguard detected. Appending --break-system-packages."
+                PIP_OPTS="--break-system-packages"
+            fi
+        else
+            using_installer=true
+        fi
+
+        # Detect if we are on DEB or RPM to look up files correctly
+        if command -v dpkg >/dev/null 2>&1; then
+            # Debian approach
+            WHL_FILES=$(dpkg -L "$PKG_NAME" | grep '\.whl$' || true)
+            JAR_FILES=$(dpkg -L "$PKG_NAME" | grep '\.jar$' || true)
+        elif command -v rpm >/dev/null 2>&1; then
+            # RPM approach [1]
+            WHL_FILES=$(rpm -ql "$PKG_NAME" | grep '\.whl$' || true)
+            JAR_FILES=$(rpm -ql "$PKG_NAME" | grep '\.jar$' || true)
+        else
+            # Fallback fallback if package manager query fails
+            WHL_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.whl" 2>/dev/null || true)
+            JAR_FILES=$(find @CMAKE_INSTALL_FULL_LIBDIR@/rpcf -maxdepth 2 -name "*.jar" 2>/dev/null || true)
+        fi
+
+        if [ "$using_installer" = "true" ]; then
+            echo "$WHL_FILES" | while read -r whl_file; do
+                [ -f "$whl_file" ] || continue
+                case "$whl_file" in
+                    *oinit*whl)
+                    ;;
+                    *)
+                        echo "->Installing the wheel files: $whl_file with python3-installer"
+                        python3 -m installer "$whl_file"
+                    ;;
+                esac
+            done
+        elif command -v "$PIP_CMD" >/dev/null 2>&1; then
+            echo "$WHL_FILES" | while read -r whl_file; do
+                [ -f "$whl_file" ] || continue
+                case "$whl_file" in
+                    *oinit*whl)
+                    ;;
+                    *)
+                    echo "-> Installing wheel: $whl_file"
+                    "$PIP_CMD" install --force-reinstall --no-deps $PIP_OPTS "$whl_file"
+                    ;;
+                esac
+            done
+        else
+            echo "Warning: pip3 command not found. Skipping wheel installation phase." >&2
+        fi
+
+
+        # =====================================================================
+        # TASK 2: Dynamic JAR Versionless Symbolic Linking
+        # =====================================================================
+        if [ "$ENABLE_JAVA" = "ON" ] || [ "$ENABLE_JAVA" = "TRUE" ] || [ "$ENABLE_JAVA" = "1" ]; then
+            echo "Processing JAR file adjustments..."
+            echo "$JAR_FILES" | while read -r jar_path; do
+                if [ -f "$jar_path" ]; then
+                    jar_dir=$(dirname "$jar_path")
+                    jar_file=$(basename "$jar_path")
+                    base_name=$(echo "$jar_file" | sed -E 's/-[0-9].*\.jar$/\.jar/')
+
+                    if [ "$jar_file" != "$base_name" ]; then
+                        symlink_target="${jar_dir}/${base_name}"
+                        echo "-> Creating versionless symlink: $symlink_target -> $jar_file"
+                        ln -sf "$jar_file" "$symlink_target"
+                    fi
+                fi
+            done
+        fi
+
+
+        # =====================================================================
+        # TASK 4: System-wide PATH and LD_LIBRARY_PATH configurations
+        # =====================================================================
+        echo "Configuring system-wide environment pathways..."
+
+        # 1. Update PATH via a custom profile.d shell script fragment
+        # This executes automatically whenever any user opens a login shell
+        PROFILE_SCRIPT="/etc/profile.d/rpcf.sh"
+        echo "-> Generating ${PROFILE_SCRIPT}"
+        cat << 'EOF' > "$PROFILE_SCRIPT"
+# Append custom bin paths to system PATH if they are not already present
+if [ -d "/usr/bin" ] && ! echo "$PATH" | grep -q "/usr/bin:"; then
+    PATH="$PATH:/usr/bin"
+fi
+if [ -d "/usr/bin/rpcf" ] && ! echo "$PATH" | grep -q "/usr/bin/rpcf"; then
+    PATH="$PATH:/usr/bin/rpcf"
+fi
+export PATH
+EOF
+        chmod 644 "$PROFILE_SCRIPT"
+
+        # 2. Update LD_LIBRARY_PATH alternative via ld.so.conf.d
+        # On Linux, appending paths to ld.so.conf is the standard, secure way
+        # to add persistent shared library lookup layers instead of using raw LD_LIBRARY_PATH
+        LD_CONF_FILE="/etc/ld.so.conf.d/rpcf.conf"
+        echo "-> Generating ${LD_CONF_FILE}"
+        cat << 'EOF' > "$LD_CONF_FILE"
+@CMAKE_INSTALL_FULL_LIBDIR@/rpcf
+EOF
+        chmod 644 "$LD_CONF_FILE"
+
+        # 3. Reload the dynamic linker cache to activate the new library paths immediately
+        echo "-> Refreshing dynamic linker run-time bindings cache (ldconfig)..."
+        ldconfig
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
+

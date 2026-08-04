@@ -111,14 +111,17 @@ class CTasklet : public ICancellableTask
     virtual bool IsAsync() const
     { return true; }
 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wstringop-overflow"
     inline gint32 GetError() const
-    { return m_iRet; }
+    { return m_iRet.load(std::memory_order_acquire); }
 
     inline gint32 SetError( gint32 err )
     {
-        m_iRet = err;
+        m_iRet.store(err, std::memory_order_release);
         return err;
     }
+    #pragma GCC diagnostic pop
 
     LwVecPtr GetParamList(
         EnumPropId iProp = propParamList );

@@ -7,7 +7,7 @@ else
 fi
 ${SUDO} dnf -y install which gcc g++ python3 flex bison libtool automake autoconf \
 make dbus-devel jsoncpp-devel lz4-devel cmake ccache lz4-libs cppunit \
-cppunit-devel dbus dbus-tools dbus-libs dbus-daemon jsoncpp bash krb5-devel krb5-libs \
+cppunit-devel dbus dbus-tools dbus-libs dbus-daemon jsoncpp bash krb5-devel \
 python3-devel python3-pip python3-setuptools python3-build \
 openssl-devel openssl openssl-libs expect \
 fuse3-devel fuse3 fuse3-libs npm vim screen git attr \
@@ -18,6 +18,6 @@ ${SUDO} dnf -y install java-latest-openjdk-devel java-latest-openjdk-headless ja
 ${SUDO} dnf -y install sip5 || ${SUDO} dnf -y install sip6
 ${SUDO} dnf -y install python3-wheel python3-numpy rpmdevtools || pip3 install wheel numpy
 
-npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify
+npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify
 
-bash ./makerpcf.sh
+bash ./makerpcf.sh $@

@@ -1,11 +1,20 @@
 # Specify sip v5 as the build system for the package.
 [build-system]
-requires = ["sip >=5, <6"]
+requires = ["sip >=5"]
 build-backend = "sipbuild.api"
 
 # Specify the PEP 566 metadata for the project.
 [tool.sip.metadata]
 name = "rpcbase"
+
+[project]
+name = "rpcbase"
+version = "0.9.0"
+description = "The python support library for RPC-Frmwrk ."
+authors = [
+    { name = "zhiming", email = "woodhead99@gmail.com" }
+]
+keywords = ["rpc", "python"]
 
 [tool.sip.bindings.rpcf]
 headers = ["rpc.h"]

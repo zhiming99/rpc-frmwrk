@@ -1,18 +1,17 @@
 [English](./README.md)
-- [rpc-frmwrk配置工具](#rpc-frmwrk配置工具)
+- [rpc-frmwrk图形界面配置工具](#rpc-frmwrk图形界面配置工具)
   - [连接页(Connection)](#连接页connection)
   - [安全页(Security)](#安全页security)
   - [级联页(Multihop)](#级联页multihop)
-- [命令行工具rpcfctl](#命令行工具rpcfctl)
+- [rpc-frmwrk命令行配置工具](#rpc-frmwrk命令行配置工具)
 - [快速构建rpc-frmwrk的方法](#快速构建rpc-frmwrk的方法)
   - [Docker容器](#docker容器)
   - [使用shell脚本](#使用shell脚本)
   - [注意事项](#注意事项)
 
 
-# rpc-frmwrk配置工具
-[`rpcfg.py`](./rpcfg.py)是一个配置和部署`rpc-frmwrk`的图形化工具。它能够生成`rpc-frmwrk`系统级的配置文件，如`driver.json, router.json, rtauth.json和authprxy.json`。这些文件对于`rpcrouter`或者`紧凑模式`的用户应用程序很重要。同时它也具备简单的密钥管理，Kerberos服务器的自动配置，以及nginx或者httpd的自动配置能力。并且能够生成安装rpc-frmwrk，部署密钥，配置web服务器和KDC主机的安装包，方便部署和维护。
-
+# rpc-frmwrk图形界面配置工具
+* [`rpcfg.py`](./rpcfg.py)是一个配置和部署`rpc-frmwrk`的图形化工具。它能够生成`rpc-frmwrk`系统级的配置文件，如`driver.json, router.json, rtauth.json和authprxy.json`。这些文件对于`rpcrouter`或者`紧凑模式`的用户应用程序很重要。同时它也具备简单的密钥管理，Kerberos服务器的自动配置，以及nginx或者httpd的自动配置能力。并且能够生成安装rpc-frmwrk，部署密钥，配置web服务器和KDC主机的安装包，方便部署和维护。
 `rpcfg.py`的UI界面是一组在对话框下的标签页，我们将分别介绍`连接页`，`安全页`，`级联页`和`负载均衡页`。
 ## 连接页(Connection)
   连接页主要用于设置`rpc-frmwrk`服务器的ip地址，端口号，以及传输协议或者选项等。
@@ -90,7 +89,7 @@
    * 启用安全连接(SSL)。
    * 删除本节点(Remove Node X)。
 
-# 命令行工具`rpcfctl`
+# rpc-frmwrk命令行配置工具
 * `rpcfctl`是rpc-frmwrk的命令行工具集，通过`rpcfctl`可以调用rpc-frmwrk的各种配置，管理和监控功能。其中`rpcfctl cfg`即是打开`rpcfg.py`。
 * 对于没有图形界面的控制台用户，`rpcfctl tui`提供`rpcfg.py`的字符界面版本，其功能和`rpcfg.py`一一对应。因此`rpcfctl`是`rpcfg.py`的超集工具集。有关`rpcfctl`的详细信息可以参看[`rpc-frmwrk应用控制工具`](../monitor/appmon/rpcfctl_cn.md)。运行命令`LANG=zh_CN.UTF-8 rpcfctl tui -b`可以展现下面的中文界面。
     * 下图是主菜单   

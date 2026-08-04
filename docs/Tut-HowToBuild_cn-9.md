@@ -2,10 +2,18 @@
 
 # rpc-frmwrk开发教程
 ## 第九节 如何编译rpc-frmwrk
-首先，熟悉docker的用户，或者急性子的用户可以参考[这篇文章](../tools/README_cn.md#Docker容器)用docker快速搭建一个`rpc-frmwrk`的运行环境。
 
-## 硬核编译`rpc-frmwrk`的方法
-### 搭建编译环境
+### 速通编译`rpc-frmwrk`
+* 下载文件[`tools/buildall-deb.sh`](../tools/buildall-deb.sh)和[`tools/makerpcf.sh`](../tools/makerpcf.sh). 
+* 在命令行下运行`bash buildall-deb.sh cmake`, 用cmake构建`rpc-frmwrk`
+* 在命令行下运行`bash buildall-deb.sh`, 用autotools构建`rpc-frmwrk`
+* 使用dnf/yum系统的用户下载[`tools/buildall-fed.sh`](../tools/buildall-fed.sh)和`tools/makerpcf.sh`。
+* 树莓派的用户下载[`tools/buildall-rasp.sh`](../tools/buildall-rasp.sh)和[`tools/makerpcf-rasp.sh`](../tools/makerpcf-rasp.sh)。
+* 在安装好工具的前提下，也可以在vscode下打开目录`rpc-frmwrk`, 使用`ctrl-shift-B`编译。
+* 由于`rpc-frmwrk`支持的语言较多，会下载各种语言的开发工具，因此下载时间较长。
+
+### 用autotools硬核编译`rpc-frmwrk`的方法
+#### 搭建编译环境
 1. 安装`automake`工具。具体到ubuntu系统, 工具软件包有`autoconf, shtool, libtool, automake`等， fedora系统上，软件包的名字相同。
 2. 安装所需的编译器，如`gcc, g++, bison, flex`
 3. 生成Python框架用到的软件包, ubuntu上是`python3-dev`和`sip-dev`，fedora上，名字略有不同，`python3-devel`和`sip`。还包括`pip`, `numpy` `wheel`这几个重要的python包.
@@ -17,7 +25,7 @@
 9. 在代码的根目录下，运行如下命令初始化编译环境。
     * `libtoolize` 
     * 运行`autoreconf -vfi`.
-### 根据需求裁剪功能模块
+#### 根据需求裁剪功能模块
 `rpc-frmwrk`目前支持四种语言，三种安全认证方式，两种SSL连接。所以对于不在需求范围的语言和功能，可以进行一些裁减。可裁减的模块有一定的依赖关系，因此在裁减时需要注意。  
 | 序号 | 功能模块 | 描述 | 示例|依赖关系|能否禁用|
 | -------- | --------- | --------- |------------------|---|---|
@@ -28,7 +36,7 @@
 |5|fuse3|fuse3是用来安装`rpcfs`提供系统状态的模块，该功能主要用于服务器端。|`bash cfgsel -r --disable-fuse3`将关闭此功能||**不能**禁用|
 |6|krb5|安全认证模块|krb5是用来支持Kerberos认证的框架，因此关闭此模块，所有的认证功能都被关闭.`bash cfgsel -r --disable-krb5`将关闭此功能.|依赖于openssl或gmssl|可以禁用|
 |7|openssl和gmssl|安全连接模块|这两个模块都是提供安全连接的功能，根据需要，关闭其中的一个，不影响另一个的工作, GmSSL是国产的安全连接软件，使用SM2+SM4的安全连接。如`bash cfgsel -r disable-openssl`将关闭openssl的支持|可以禁用其中一个|
-### 在X86平台上编译`rpc-frmwrk`:
+#### 在X86平台上编译`rpc-frmwrk`:
 1. 运行`bash cfgsel -r`或者`bash cfgsel -d`生成release版或debug版的Makefile树. release版是编译器优化过的版本，而debug版是没有优化并带有debug symbol的代码，适合调试用。这里[`cfgsel`](https://github.com/zhiming99/rpc-frmwrk/blob/master/cfgsel)是脚本`configure`的wrapper, 并增加了debug/release的命令选项，同时它会转发其他命令选项给`configure`. 比如`rpc-frmwrk`有许多可配置特性, 包括 `gmssl`, `openssl`, `fuse3`, `auth`, `python`, `java`, `js` `testcases`等. 缺省时, 这些特性将全部编译. 但是如果目标系统有资源限制或者额外考虑，可以用`bash cfgsel -[rd] --disable-xxx`关闭一些特性. 下面是一些配置的例子 
     * `bash cfgsel -r`
     * `bash cfgsel -r --disable-java --disable-krb5 --disable-js --disable-testcases`.    
@@ -41,17 +49,20 @@
 5. 运行 `make rpm` 可以生成一个rpm包.
  
 
-### 在树梅派上编译`rpc-frmwrk`:
+#### 在树梅派上编译`rpc-frmwrk`:
 * 过程同X86上的编译。树莓派上，编译时使用`make`即可，使用`make -j4`，有时会死机。
 
-### 交叉编译
+#### 交叉编译
 * 建议使用docker，方法如下
     * 国内的用户需要先配置docker使用国内的docker加速镜像，如腾讯云。
     * 先拉取QEMU虚拟机`sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes`
     * 然后在[`tools`](../tools)目录下运行`sudo docker buildx build --platform linux/armhf -t armhf/rpcf:latest -f Dockerfile.arm .`，建立docker镜像.
     * `Dokerfile.arm`会自动构建armhf的rpc-frmwrk镜像。这是一个32bit的代码，可以更改`armhf`为`aarch64`，以生成64bit的代码。
     * 运行这个Docker镜像的命令为`sudo docker run -it --rm --platform linux/armhf --device /dev/fuse --privileged armhf/rpcf:latest /bin/bash`。
-    * 这个方法可以在x86的机器上完美生成arm架构的代码。缺点是速度稍微慢一些。
+    * 这个方法不算传统的交叉编译，但是亦可以在x86的机器上完美生成arm架构的代码。缺点是速度稍微慢一些。
+
+### 使用Docker容器
+熟悉docker的用户，或者急性子的用户可以参考[这篇文章](../tools/README_cn.md#快速构建rpc-frmwrk的方法)用docker快速搭建一个`rpc-frmwrk`的运行环境。
 
 ### 已知问题
 * 由于Linux发行版十分繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈，我们会尽快修复。

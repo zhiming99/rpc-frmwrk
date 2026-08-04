@@ -76,6 +76,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcfctl
 %{_bindir}/rpcf/apptimer
 %{_bindir}/rpcf/sinit
+%{_bindir}/gmssl
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json

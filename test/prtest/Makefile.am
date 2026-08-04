@@ -24,3 +24,4 @@ prsvrtst_LDADD=$(prtest_LDFLAGS) libprsvr.la
 prsvrtst_CPPFLAGS=$(prtest_CPPFLAGS) -DSERVER
 
 link_dir=./
+EXTRA_DIST=CMakeLists.txt

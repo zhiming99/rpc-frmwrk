@@ -17,8 +17,10 @@ if ENABLE_GMSSL
 #gmssl files
 runtime_files += gmsslkey.sh
 gmssl_cmd=install gmsslkey.sh $${BinDir}/rpcf/;
+gmssl_prog="if [ -n \"$(DESTDIR)\" ]; then install /usr/local/bin/gmssl $${BinDir};fi;"
 else
 gmssl_cmd=true;
+gmssl_prog=true;
 endif
 
 if ENABLE_OPENSSL
@@ -37,7 +39,7 @@ EXTRA_DIST= $(pysources) README.md README_cn.md runtest.sh.in regtest.sh \
 ridlctst.sh updcfg.py.in Dockerfile.in Dockerfile.arm.in Dockerfile \
 Dockerfile.arm buildall-deb.sh.in buildall-fed.sh.in makerpcf.sh \
 buildall-rasp.sh.in makerpcf-rasp.sh btinrtst.sh $(testcfgfiles) \
-$(runtime_files) rpcfgtui-zh_CN.po 
+$(runtime_files) rpcfgtui-zh_CN.po CMakeLists.txt
 
 locale_rpcfgtui_DATA=rpcfgtui.mo
 locale_rpcfgtuidir=$(localedir)/zh_CN/LC_MESSAGES
@@ -54,7 +56,8 @@ install-exec-local:
 	if [ ! -e $${BinDir}/rpcf ]; then mkdir -p $${BinDir}/rpcf;fi; \
 	install rpcfg.py updcfg.py rpcfgnui.py rpcfgtui.py updinitcfg.py updwscfg.py krbparse.py updk5cfg.py disablessl.py geninitcfg.py buildinst.py unzipinst.sh $${BinDir}/rpcf/;\
     chmod +x $${BinDir}/rpcf/{rpcfg,updcfg,rpcfgnui}.py;\
-    eval ${gmssl_cmd}\
+    eval $(gmssl_cmd) \
+    eval $(gmssl_prog) \
     eval ${openssl_cmd}
     
 uninstall-hook:

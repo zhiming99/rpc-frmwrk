@@ -25,4 +25,4 @@ actcsvrtst_CPPFLAGS=$(actc_CPPFLAGS) -DSERVER -fPIC
 
 link_dir=./
 
-
+EXTRA_DIST=CMakeLists.txt

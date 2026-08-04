@@ -6,4 +6,4 @@ libgmsslpt_ladir=$(libdir)
 libgmsslpt_la_LDFLAGS = -version-info @VERSION2@
 libgmsslpt_la_LIBADD = -L../../combase -L.. -L../../ipc -L$(top_srcdir)/3rd_party -L/usr/local/lib ../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lgmssl -lpthread -ldl
 
-
+EXTRA_DIST=CMakeLists.txt

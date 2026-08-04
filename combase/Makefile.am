@@ -39,3 +39,4 @@ libcombase_ladir=$(libdir)
 
 libcombase_la_LDFLAGS=-version-info @VERSION2@
 libcombase_la_LIBADD= -L../3rd_party -lutils -lpthread -ldl -llz4 $(COMMON_LINK)
+EXTRA_DIST=CMakeLists.txt

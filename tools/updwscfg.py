@@ -436,11 +436,11 @@ upstream {AppName} {{
     else:
         raise Exception( "Error the linux distribution is not supported by updwscfg.py yet" )
 
-    cmdline += "rm " + cfgFile + " && echo nginx setup complete ;"
+    cmdline += "rm " + cfgFile + ";"
     if len( strMonCliPkg ) > 0:
         strRpcfPath = strRootPath +"/rpcf"
         cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
-    cmdline += "{sudo} systemctl restart nginx > /dev/null 2&>1 || {sudo} nginx -s reload || pidof nginx || nginx"
+    cmdline += "( ( ( command -v systemctl > /dev/null 2>&1 ) && {sudo} systemctl restart nginx > /dev/null 2>&1 ) || {sudo} nginx -s reload || pidof nginx || nginx ) && echo nginx setup complete;"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
     elif IsSuAvailable():
@@ -544,6 +544,8 @@ def UpdateApacheSSLConfigFedora(cfgFile: str,
                 elif line.strip().startswith("SSLCertificateKeyFile"):
                     key_file = line.split(None, 1)[1].strip()
 
+        if not os.path.exists( sslConfPath ):
+            raise Exception( f"Error invalid path {sslConfPath} . Please check if mod_ssl installed" )
         # Read and update ssl.conf
         updated_lines = []
         with open(sslConfPath, 'r') as ssl_conf:
@@ -675,6 +677,9 @@ def ConfigWebServer2( initCfg : object )->int:
             ret = Config_Apache( initCfg )
             if ret == 0:
                 print( "Apache httpd is configured successfully" )
+        else:
+            raise Exception( "Error neither Nginx nor Apache is installed" )
+
     except Exception as err:
         print( err )
         if ret == 0:

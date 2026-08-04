@@ -51,46 +51,6 @@ for( int i = 0; i < ( yylen ); i++ ) \
 #define USING_SEP_STATE     87
 #define CASESEL_CHECK_STATES     std::vector<int>({ 71, 72 })
 
-#define YYSTYPE std::shared_ptr< YYSPAIR >
-
-struct YYLTYPE1
-{
-  int first_line;
-  int first_column;
-  int last_line;
-  int last_column;
-};
-
-#define YYLTYPE YYLTYPE1
-
-struct YYLTYPE2 :
-    public YYLTYPE
-{
-    stdstr text;
-    gint32 fidx = -1; // file name index into the m_vecFiles.
-    void initialize()
-    {
-        first_line = 1;
-        first_column = 1;
-        last_line = 1;
-        last_column = 1;
-    }
-
-    YYLTYPE2( const YYLTYPE2& rhs )
-    {
-        first_line = rhs.first_line;
-        first_column = rhs.first_column;
-        last_line = rhs.last_line;
-        last_column = rhs.last_column;
-        text = rhs.text;
-    }
-    YYLTYPE2()
-    {
-        initialize();
-        fidx = -1;
-    }
-};
-
 namespace rpcf
 {
 typedef enum
@@ -109,7 +69,6 @@ typedef enum
     endifBlock,
 } enumBlkType;
 
-typedef std::pair< Variant, YYLTYPE2 > YYSPAIR;
 
 struct FILECTX2
 {

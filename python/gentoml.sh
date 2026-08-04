@@ -5,17 +5,35 @@ else
     DBUS_INC=$(echo $(pkg-config --cflags dbus-1 jsoncpp ) | sed 's/^-I/, "/g;s/ -I/", "/g;s/\(.*\)$/\1"/' | sed 's:/:\\/:g')
 fi
 
-sed "s:XXXXXXXX:$DBUS_INC:g" pyproject.toml.tmpl > pyproject.toml
+template_path=./pyproject.toml.tmpl
+if [[ ! -z "$2" ]]; then
+    template_path="$2"
+fi
+
+debugbuild="false"
+if [[ ! -z "$3" ]] && [[ "$3" == "true" ]]; then
+    debugbuild="true"
+fi
+
+sed "s:XXXXXXXX:$DBUS_INC:g" $template_path > pyproject.toml
 scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 sed -i "s:YYY:$scriptDir/..:g" pyproject.toml
-if [ "x$1" \> "x" ]; then
+if [ ! -z "$1" ]; then
     sed -i "s:XXXWLRPATH:-Wl,-rpath=$1,-rpath=$1/rpcf:" pyproject.toml
 fi
 if [ "x${ARMBUILD}" == "x1" ]; then
     sed -i "s:\(\"combase\):\"atomic\", \1:" pyproject.toml
 fi
-if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then
-    echo generate python extention package with debug infomation
+if [[ -z "$2" ]]; then
+    if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then
+        echo generate python extention package with debug infomation
+        sed -i "s:ZZZZZ:,\"-O0\", \"-ggdb\", \"-DDEBUG\", \"-UNDEBUG\":" pyproject.toml
+    else
+        echo generate release version of python extention package 
+        sed -i "s:ZZZZZ::" pyproject.toml
+    fi
+elif [[ "$debugbuild" == "true" ]]; then
+    echo generate python extention package with debug infomation2
     sed -i "s:ZZZZZ:,\"-O0\", \"-ggdb\", \"-DDEBUG\", \"-UNDEBUG\":" pyproject.toml
 else
     echo generate release version of python extention package 
