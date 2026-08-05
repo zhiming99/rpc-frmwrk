@@ -1357,8 +1357,29 @@ gint32 CSharedLock::TryLockWrite()
 #include <pwd.h>
 stdstr GetHomeDir()
 {
-    struct passwd* pwd = getpwuid( getuid() );
-    return stdstr( pwd->pw_dir );
+    const char* szHome = std::getenv("HOME");
+    if( szHome && szHome[ 0 ] != '\0' )
+        return stdstr( szHome );
+
+    // Allocate a buffer for getpwuid_r
+    long lSize  = sysconf( _SC_GETPW_R_SIZE_MAX );
+    if (lSize == -1)
+        lSize = 4096;
+
+    std::vector<char> buffer( lSize );
+
+    uid_t uid = getuid();
+    struct passwd pwd;
+    struct passwd* result = nullptr;
+    
+    if( getpwuid_r(uid, &pwd, buffer.data(),
+        buffer.size(), &result ) == 0 &&
+        result != nullptr)
+    {
+        if( result->pw_dir && result->pw_dir[0] != '\0' )
+            return stdstr( result->pw_dir );
+    }
+    return "/tmp"; 
 }
 
 

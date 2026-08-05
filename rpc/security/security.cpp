@@ -1493,6 +1493,20 @@ gint32 CRpcReqForwarderAuth::GetLatestHash(
     return ret;
 }
 
+const stdstr& GetHomeDirCached()
+{
+    static stdstr strHome;
+    static bool bInitialized = false;
+
+    // Guaranteed thread-safe, fast execution path after the first call
+    if( !bInitialized )
+    {
+        strHome = GetHomeDir();
+        bInitialized = true;
+    }
+    return strHome;
+}
+
 gint32 CRpcReqForwarderAuth::GetCookieByHash(
     IConfigDb* pConnParams,
     const stdstr& strHashOrigin )
@@ -1502,8 +1516,8 @@ gint32 CRpcReqForwarderAuth::GetCookieByHash(
     bool bStop = false;
     do{
         CParamList oParams;
-        stdstr strHome = GetHomeDir();
-        strHome += "/.rpcf/";
+        stdstr strHome =
+            GetHomeDirCached() + "/.rpcf/";
         oParams.SetStrProp(
             propConfigPath, strHome + CLI_REG );
         ret = pRegfs.NewObj(
