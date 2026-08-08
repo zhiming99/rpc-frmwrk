@@ -181,9 +181,9 @@
             "PortDriver": "RpcOpenSSLFidoDrv",
             "Parameters": {
                 "comments": "Certificate and private key file paths",
-                "CertFile": "/home/zhiming/.rpcf/openssl/signcert.pem",
-                "KeyFile": "/home/zhiming/.rpcf/openssl/signkey.pem",
-                "CACertFile": "/home/zhiming/.rpcf/openssl/certs.pem",
+                "CertFile": "/home/user/.rpcf/openssl/signcert.pem",
+                "KeyFile": "/home/user/.rpcf/openssl/signkey.pem",
+                "CACertFile": "/home/user/.rpcf/openssl/certs.pem",
                 "SecretFile": "",
                 "VerifyPeer": "false"
             },
@@ -196,9 +196,9 @@
             "PortDriver": "RpcGmSSLFidoDrv",
             "Parameters": {
                 "comments": "Certificate and private key file paths",
-                "CertFile": "./server.pem",
-                "KeyFile": "./server.pem",
-                "CACertFile": "",
+                "CertFile": "/home/user/.rpcf/gmssl/signcert.pem",
+                "KeyFile": "/home/user/.rpcf/gmssl/signkey.pem",
+                "CACertFile": "/home/user/.rpcf/gmssl/certs.pem",
                 "SecretFile": ""
             },
             "VerifyPeer": "false"
@@ -256,7 +256,7 @@
                     "BindTo": "false",
                     "PortNumber": "4132",
                     "Compression": "true",
-                    "EnableSSL": "true",
+                    "EnableSSL": "false",
                     "HasAuth": "false",
                     "AuthMech": "SimpAuth",
                     "EnableWS": "false",

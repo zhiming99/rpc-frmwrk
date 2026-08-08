@@ -24,6 +24,11 @@
  *
  * =====================================================================================
  */
+
+#if BUILD_64 == 0
+#define _FILE_OFFSET_BITS 64
+#endif
+
 #include <iostream>
 #include <vector>
 #include <string>

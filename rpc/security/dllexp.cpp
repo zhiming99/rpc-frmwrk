@@ -69,7 +69,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CKdcRelayFdo );
     INIT_MAP_ENTRYCFG( CKdcRelayPdo );
     INIT_MAP_ENTRYCFG( CKrb5InitHook );
-    INIT_MAP_ENTRYCFG( CRemoteProxyStateAuth );
     INIT_MAP_ENTRYCFG( CKdcRelayProxyStat );
 #endif
 
@@ -77,6 +76,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( COAuth2LoginProxyImpl );
 #endif
 
+    INIT_MAP_ENTRYCFG( CRemoteProxyStateAuth );
     INIT_MAP_ENTRYCFG( CSimpleAuthCliWrapper );
     INIT_MAP_ENTRYCFG( CSimpAuthLoginProxyImpl );
 
