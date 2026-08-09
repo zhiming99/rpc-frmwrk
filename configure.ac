@@ -374,11 +374,11 @@ case $host in
     ;;
     arm*)
         BITWIDTH=32
-        CXXFLAGS+=' -DBUILD_64=0'
+        CXXFLAGS+=' -DBUILD_64=0 -D_FILE_OFFSET_BITS=64'
     ;;
     i?86*)
         BITWIDTH=32
-        CXXFLAGS+=' -DBUILD_64=0 -m32'
+        CXXFLAGS+=' -DBUILD_64=0 -m32 -D_FILE_OFFSET_BITS=64'
     ;;
 esac
 

@@ -1439,7 +1439,8 @@ gint32 CIoManager::Start()
             break;
         }
 
-        OutputMsg( 0, "IoMgr is starting..." );
+        DebugPrintEx( logInfo,
+            0, "IoMgr is starting..." );
 
         m_bInit = true;
         m_bStop = false;
@@ -1746,7 +1747,10 @@ gint32 CIoManager::RescheduleTaskByTid(
 gint32 CIoManager::Stop()
 {
     gint32 ret = 0;
-    DebugPrint( 0, "IoMgr is stopping..." );
+
+    DebugPrintEx( logInfo,
+        0, "IoMgr is stopping..." );
+
     LOGINFO( this, 0, "IoMgr is shuting down..." );
     m_oLogger.Stop();
 

@@ -539,12 +539,12 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)")
 
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
     set(BITWIDTH 32)
-    add_compile_definitions(BUILD_64=0)
+    add_compile_definitions(BUILD_64=0 _FILE_OFFSET_BITS=64 )
     set(CXXFLAGS "${CXXFLAGS} -DBUILD_64=0")
 
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^i.86")
     set(BITWIDTH 32)
-    add_compile_definitions(BUILD_64=0)
+    add_compile_definitions(BUILD_64=0 _FILE_OFFSET_BITS=64)
 
     # Replaces CXXFLAGS+=' -m32'
     add_compile_options(-m32)

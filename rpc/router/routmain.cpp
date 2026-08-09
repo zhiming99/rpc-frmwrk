@@ -63,6 +63,7 @@ static std::string g_strCmdLine;
 std::atomic< bool > g_bExit={false};
 std::atomic< bool > g_bMonOff ={false};
 extern stdstr g_strMonName;
+extern EnumLogLvl rpcf::g_dwLogLevel;
 
 // the following two globals must be present for
 // libfuseif.so
@@ -416,6 +417,7 @@ void Usage( char* szName )
         "\t [ -o Enable monitoring when the rpcrouter run as a bridge, that is '-r 2' ]\n"
         "\t [ --monitor=<app instname> similiar to '-o' option but specifying an app instance name, as different from the default 'rpcrouter1' ]\n"
         "\t [ -l Use the driver.json in current directory instead of the default one ]\n"
+        "\t [ -L <log level>  Set the vobose degree, 0-6, 6 to be the most vbose.\n"
         "\t [ -v Version information ]\n"
         "\t [ -h This help ]\n",
         szName );
@@ -439,7 +441,7 @@ int main( int argc, char** argv )
     g_strCmdLine =
         SimpleCmdLine( argc, argv );
     while( ( opt = getopt_long(
-        argc, argv, "hr:adcfs:m:vglo",
+        argc, argv, "hr:adcfs:m:vgloL:",
         long_options, &option_index ) ) != -1 )
     {
         switch (opt)
@@ -547,6 +549,14 @@ int main( int argc, char** argv )
         case 'l':
             {
                 g_bLocal = true;
+                break;
+            }
+        case 'L':
+            {
+                EnumLogLvl dwLevel =
+                    ( EnumLogLvl )atoi( optarg );
+                if( dwLevel <= logInfo || dwLevel >= logEmerg )
+                    g_dwLogLevel = dwLevel;
                 break;
             }
         default: /*  '?' */

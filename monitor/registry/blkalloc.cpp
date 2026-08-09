@@ -728,7 +728,7 @@ CBlockAllocator::CBlockAllocator(
             ret = -errno;
             break;
         }
-        DebugPrint( ret,
+        DebugPrintEx( logInfo, ret,
             "Info: registry path %s",
             strPath.c_str() );
         m_iFd = ret;
