@@ -555,7 +555,7 @@ int main( int argc, char** argv )
             {
                 EnumLogLvl dwLevel =
                     ( EnumLogLvl )atoi( optarg );
-                if( dwLevel <= logInfo || dwLevel >= logEmerg )
+                if( dwLevel <= logInfo && dwLevel >= logEmerg )
                     g_dwLogLevel = dwLevel;
                 break;
             }

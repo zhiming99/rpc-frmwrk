@@ -625,11 +625,13 @@ int main( int nArgc, char* pszArgv[] )
                 g_bGmSSL = true;
                 break;
             case 'L':
-                EnumLogLvl dwLevel =
-                    ( EnumLogLvl )atoi( optarg );
-                if( dwLevel <= logInfo || dwLevel >= logEmerg )
-                    g_dwLogLevel = dwLevel;
-                break;
+                {
+                    EnumLogLvl dwLevel =
+                        ( EnumLogLvl )atoi( optarg );
+                    if( dwLevel <= logInfo && dwLevel >= logEmerg )
+                        g_dwLogLevel = dwLevel;
+                    break;
+                }
             case 'h':
             default:
                 Usage(pszArgv[0]);
