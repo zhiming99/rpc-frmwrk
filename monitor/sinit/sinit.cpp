@@ -145,7 +145,7 @@ gint32 DestroyContext()
     }
 
     CoUninitialize();
-    DebugPrintEx( logErr, 0,
+    DebugPrintEx( logInfo, 0,
         "#Leaked objects is %d",
         CObjBase::GetActCount() );
     return STATUS_SUCCESS;
