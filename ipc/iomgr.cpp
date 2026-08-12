@@ -1788,6 +1788,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
     SetLogModName( strModName );
 
     do{
+        GetHomeDirCached();
         CParamList a;
         a.SetPointer( propIoMgr, this );
         a.SetStrProp( propConfigPath,
@@ -2188,52 +2189,7 @@ gint32 CIoManager::TryFindDescFile(
                 break;
             }
         }
-
-        ret = GetCmdLineOpt(
-            propSearchPaths, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        StrVecPtr pvecPaths( pObj );
-        if( pvecPaths.IsEmpty() )
-        {
-            ret = -ENOENT;
-            break;
-        }
-        bool bFound = false;
-        std::string strFullPath;
-        for( auto& elem : ( *pvecPaths )() )
-        {
-            strFullPath = elem + "/" +  strFile;
-            ret = access(
-                strFullPath.c_str(), R_OK );
-
-            if( ret == 0 )
-            {
-                bFound = true;
-                break;
-            }
-
-            strFullPath = elem + "/../etc/rpcf/" + strFile;
-            ret = access(
-                strFullPath.c_str(), R_OK );
-            if( ret == 0 )
-            {
-                bFound = true;
-                break;
-            }
-            ret = -errno;
-        }
-
-        if( bFound )
-        {
-            strPath = strFullPath;
-            ret = 0;
-            break;
-        }
-
-        ret = FindInstCfg(
-            strFile, strPath );
+        ret = FindInstCfg( strFile, strPath );
 
     }while( 0 );
 

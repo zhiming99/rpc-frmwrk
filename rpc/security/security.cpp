@@ -1493,20 +1493,6 @@ gint32 CRpcReqForwarderAuth::GetLatestHash(
     return ret;
 }
 
-const stdstr& GetHomeDirCached()
-{
-    static stdstr strHome;
-    static bool bInitialized = false;
-
-    // Guaranteed thread-safe, fast execution path after the first call
-    if( !bInitialized )
-    {
-        strHome = GetHomeDir();
-        bInitialized = true;
-    }
-    return strHome;
-}
-
 gint32 CRpcReqForwarderAuth::GetCookieByHash(
     IConfigDb* pConnParams,
     const stdstr& strHashOrigin )

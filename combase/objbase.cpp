@@ -370,17 +370,26 @@ gint32 FindInstCfg(
         return -EINVAL;
 
     // relative path
-    std::string strFile = "./";
     char buf[ 1024 ];
     buf[ sizeof( buf ) - 1 ] = 0;
     size_t iSize = std::min(
         strFileName.size() + 1, sizeof( buf ) - 1 );
     strncpy( buf,
         strFileName.c_str(), iSize );
-    strFile += basename( buf );
 
+    stdstr strFile = basename( buf );
     do{
-        std::string strFullPath = "/etc/rpcf/";
+        auto& strHome = GetHomeDirCached();
+        stdstr strFullPath = strHome +
+            "/.rpcf/etc/rpcf/" + strFile;
+        ret = access( strFullPath.c_str(), R_OK );
+        if( ret == 0 )
+        {
+            strPath = strFullPath;
+            break;
+        }
+
+        strFullPath = "/etc/rpcf/";
         strFullPath += strFile;
         ret = access( strFullPath.c_str(), R_OK );
         if( ret == 0 )
@@ -397,16 +406,6 @@ gint32 FindInstCfg(
             strPath = strFullPath;
             break;
         }
-
-        strFullPath.clear();
-        ret = GetLibPath( strFullPath );
-        if( ERROR( ret ) )
-            break;
-
-        strFullPath += "/../etc/rpcf/" + strFile;
-        ret = access( strFullPath.c_str(), R_OK );
-        if( ret == 0 )
-            strPath = strFullPath;
 
     }while( 0 );
 
@@ -1380,6 +1379,20 @@ stdstr GetHomeDir()
             return stdstr( result->pw_dir );
     }
     return "/tmp"; 
+}
+
+const stdstr& GetHomeDirCached()
+{
+    static stdstr strHome;
+    static bool bInitialized = false;
+
+    // Guaranteed thread-safe, fast execution path after the first call
+    if( !bInitialized )
+    {
+        strHome = GetHomeDir();
+        bInitialized = true;
+    }
+    return strHome;
 }
 
 

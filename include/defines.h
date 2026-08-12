@@ -352,6 +352,7 @@ gint32 GenStrHash( const stdstr& strMsg,
     guint32& dwHash );
 
 stdstr GetHomeDir();
+const stdstr& GetHomeDirCached();
 
 const char* Version();
 
