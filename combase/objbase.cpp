@@ -406,6 +406,18 @@ gint32 FindInstCfg(
             strPath = strFullPath;
             break;
         }
+        strFullPath.clear();
+        ret = GetLibPath( strFullPath );
+        if( ERROR( ret ) )
+            break;
+        strFullPath +=
+            "/../etc/rpcf/" + strFile;
+        ret = access( strFullPath.c_str(), R_OK );
+        if( ret == 0 )
+        {
+            strPath = strFullPath;
+            break;
+        }
 
     }while( 0 );
 
