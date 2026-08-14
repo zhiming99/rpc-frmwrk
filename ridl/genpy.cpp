@@ -1146,7 +1146,12 @@ static gint32 GenStructsFilePy(
             ret = FindInstCfg(
                 "./seribase.py", strPath );
             if( ERROR( ret ) )
-                break;
+            {
+                ret = access( "./seribase.py", R_OK );
+                if( ERROR( ret ) )
+                    break;
+                strPath = "./seribase.py";
+            }
             strCmd +=
                 strPath + " " + strSeribase;
             system( strCmd.c_str() );

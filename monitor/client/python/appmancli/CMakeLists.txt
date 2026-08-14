@@ -53,17 +53,13 @@ file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/appmancli")
 add_custom_command(
     OUTPUT ${GENERATED_PY_FILES}
     
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/etc/rpcf"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${top_dir}/ridl/seribase.py"
-        "${CMAKE_BINARY_DIR}/etc/rpcf/"
-
     # Stage boilerplate code-generation tracking tools securely
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${top_dir}/ridl/mktpl" "${top_dir}/ridl/mktplsvr" 
         "${top_dir}/ridl/pymktpl" "${top_dir}/ridl/mktplcli" 
         "${top_dir}/ridl/drvtpl.json" "${top_dir}/ridl/odesctpl2.json" 
         "${top_dir}/ridl/synccfg.py"
+        "${top_dir}/ridl/seribase.py"
         "${CMAKE_CURRENT_BINARY_DIR}/appmancli/"
         
     # Execute internal IDL tool compiler mapping environments

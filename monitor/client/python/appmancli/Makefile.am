@@ -32,7 +32,7 @@ appmancli/__init__.py:
     if(($$bexit==0));then echo all files are ready;exit 0;fi; \
     if true; then \
         if [ ! -f ./mktpl ];then \
-            cp $(top_dir)/ridl/{mktpl,mktplsvr,pymktpl,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
+            cp $(top_dir)/ridl/{mktpl,mktplsvr,pymktpl,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py,seribase.py} . ;\
         fi;\
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
