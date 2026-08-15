@@ -71,7 +71,7 @@ add_custom_command(
         "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/AppManagercli.py"
         "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/maincli.py"
         "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/apptimer.py"
-        "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/"
+        "${CMAKE_CURRENT_BINARY_DIR}/appmancli/"
 
     # Cleanup trailing tracking files
     COMMAND ${CMAKE_COMMAND} -E rm -f 
