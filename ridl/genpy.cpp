@@ -1121,6 +1121,22 @@ gint32 CDeclarePyStruct::Output()
     return ret;
 }
 
+bool IsSameFile(const stdstr& p1, const stdstr& p2)
+{
+    struct stat stat1, stat2;
+
+    // stat automatically resolves symbolic links and relative paths
+    if (stat(p1.c_str(), &stat1) != 0)
+        return false; 
+    if (stat(p2.c_str(), &stat2) != 0)
+        return false; 
+
+    // Compare device ID and Inode ID
+    return (stat1.st_dev == stat2.st_dev) &&
+        (stat1.st_ino == stat2.st_ino);
+}
+
+
 static gint32 GenStructsFilePy(
     CPyWriter* m_pWriter, ObjPtr& pRoot )
 {
@@ -1137,10 +1153,9 @@ static gint32 GenStructsFilePy(
             break;
         }
 
-        stdstr strCmd = "rm ";
+        stdstr strCmd = "cp ";
         stdstr strSeribase =
         m_pWriter->GetOutPath() +  "/seribase.py";
-        strCmd += strSeribase + ";cp ";
         {
             stdstr strPath;
             ret = FindInstCfg(
@@ -1152,9 +1167,12 @@ static gint32 GenStructsFilePy(
                     break;
                 strPath = "./seribase.py";
             }
-            strCmd +=
-                strPath + " " + strSeribase;
-            system( strCmd.c_str() );
+            if( !IsSameFile( strPath, strSeribase ) )
+            {
+                strCmd +=
+                    strPath + " " + strSeribase;
+                system( strCmd.c_str() );
+            }
         }
 
         m_pWriter->SelectStructsFile();

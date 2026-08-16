@@ -53,7 +53,6 @@ file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/appmancli")
 add_custom_command(
     OUTPUT ${GENERATED_PY_FILES}
     
-    # Stage boilerplate code-generation tracking tools securely
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${top_dir}/ridl/mktpl" "${top_dir}/ridl/mktplsvr" 
         "${top_dir}/ridl/pymktpl" "${top_dir}/ridl/mktplcli" 
