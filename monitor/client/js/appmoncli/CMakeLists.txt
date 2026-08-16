@@ -45,7 +45,8 @@ add_custom_command(
         "${CMAKE_CURRENT_BINARY_DIR}/"
         
     # Execute internal IDL tool compiler mapping environments
-    COMMAND $<TARGET_FILE:ridlc> --noreadme --services=AppMonitor -sJO . "${ridl_file}"
+    COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_BINARY_DIR}/tools:${CMAKE_SOURCE_DIR}/tools"
+        $<TARGET_FILE:ridlc> --noreadme --services=AppMonitor -sJO . "${ridl_file}"
     DEPENDS "${ridl_file}" ridlc
 
     # Clean up intermediate configuration logs

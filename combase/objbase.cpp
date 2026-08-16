@@ -1757,5 +1757,34 @@ stdstr GetThreadName()
     return stdstr( szBuf );
 }
 
+bool CopyFile(
+    const stdstr& src, const stdstr& dst )
+{
+    std::ifstream srcFile(src, std::ios::binary);
+    std::ofstream dstFile(dst, std::ios::binary);
+
+    if( !srcFile || !dstFile )
+        return false;
+
+    dstFile << srcFile.rdbuf();
+    return srcFile.good() && dstFile.good();
+}
+
+bool IsSameFile(
+    const stdstr& p1, const stdstr& p2 )
+{
+    struct stat stat1, stat2;
+
+    // stat automatically resolves symbolic links and relative paths
+    if (stat(p1.c_str(), &stat1) != 0)
+        return false; 
+    if (stat(p2.c_str(), &stat2) != 0)
+        return false; 
+
+    // Compare device ID and Inode ID
+    return (stat1.st_dev == stat2.st_dev) &&
+        (stat1.st_ino == stat2.st_ino);
+}
+
 }
 

@@ -919,4 +919,10 @@ gint32 GetHostAndPortFromUrl(
 
 gint32 StartDBus();
 
+bool CopyFile(
+    const stdstr& src, const stdstr& dst );
+
+bool IsSameFile(
+    const stdstr& p1, const stdstr& p2 );
+
 }

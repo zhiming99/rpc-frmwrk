@@ -17,6 +17,7 @@ appmonuidir=$(sysconfdir)/rpcf
 auto_files=appmonstructs.js AppMonitorclibase.js driver.json appmondesc.json
 
 
+top_dir=$(abs_top_srcdir)
 $(ridl_file):
 	@bexit=0;for i in $(auto_files);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
     if((bexit==0));then exit 0;fi; \
@@ -27,6 +28,7 @@ $(ridl_file):
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
     if [ -f ../../../../ridl/.libs/ridlc ]; then \
+        PYTHONPATH=$(top_dir)/tools \
         LD_LIBRARY_PATH=../../../../combase/.libs:$${LD_LIBRARY_PATH} $(ridlc_path) --noreadme --services=AppMonitor -sJO . $(ridl_file); \
     else \
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
