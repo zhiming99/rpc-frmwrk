@@ -22,10 +22,6 @@ if [ ! -f $logger ]; then
     touch $logger
 fi
 
-if [ ! -d "$HOME/.rpcf/openssl" ]; then
-    rpcfctl initsvr
-fi
-
 # overwrite the etc_dir
 if [ -f "$HOME/.rpcf/etc/rpcf/driver.json" ]; then
     etc_dir="$HOME/.rpcf/etc/rpcf"

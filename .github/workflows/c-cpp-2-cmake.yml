@@ -51,6 +51,9 @@ jobs:
     - name: install
       run: cd build && sudo cmake --install .
 
+    - name: initsvr
+      run: /usr/local/bin/rpcfctl initsvr
+
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
     - name: cleanup for kerberos test
