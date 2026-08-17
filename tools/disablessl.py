@@ -6,11 +6,15 @@ import sys
 from urllib.parse import urlsplit
 import errno
 from updcfg import *
+from pathlib import Path
 
 bDisable = True
 def GetTestPaths2( path : str= None ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     paths = []
+
+    paths.append( 
+        str( Path.home() / ".rpcf/etc/rpcf" ) )
 
     curDir = dir_path
     paths.append( curDir + "/../../etc/rpcf" )

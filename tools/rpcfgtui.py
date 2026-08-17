@@ -560,7 +560,7 @@ class MenuDialog:
                 for widget in self.oSecWidgets:
                     if not isinstance( widget, urwid.Edit ):
                         continue
-                    homeDir = os.path.expanduser("~") + "/.rpcf"
+                    homeDir = str( Path.home() / ".rpcf" )
                     if bGmSSL:
                         homeDir += "/gmssl/"
                     else:

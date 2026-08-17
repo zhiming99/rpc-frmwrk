@@ -16,19 +16,27 @@ fi
 
 updattr=${cmddir}/updattr.py
 
-if [[ "$script_dir" == "/usr/bin" ]]; then
+if [[ -f "$HOME/.rpcf/etc/rpcf/driver.json" ]];then
+    cfgPath="$HOME/.rpcf/etc/rpcf"
+elif [[ "$script_dir" == "/usr/bin" ]]; then
     cfgPath="/etc/rpcf"
 elif [[ "$script_dir" == "/usr/local/bin" ]]; then
     cfgPath="/usr/local/etc/rpcf"
 fi
+
 #echo cmddir=$cmddir
 source ${cmddir}/appfuncs.sh
 
 # rpcfctl - rpc-frmwrk Control Utility
-# Usage: rpcfctl <start|stop|status|list> [appname]
 
 function usage() {
-    echo you can 'man rpcfctl' for detailed introduction.
+    echo "Usage: $0 <command> [<options>]"
+    echo "rpcfctl <initsvr|initcli>"
+    echo "  Initialize the server/client runtime environment"
+    echo "rpcfctl <start|stop|status> [appname]"
+    echo "  Start/Stop/Show status of registered application 'appname'"
+    echo "rpcfctl list"
+    echo "  List registered applications"
 }
 
 if [[ $# -lt 1 ]]; then
@@ -212,9 +220,8 @@ case "$cmd" in
             usage
             exit 1
         fi
-        appname="$1"
-        echo "Status of application: $appname"
-        bash $cmddir/showapp.sh $appname
+        echo "Status of applications:"
+        bash $cmddir/showapp.sh $@
         ;;
     list)
         echo "Listing all managed applications"
@@ -379,6 +386,9 @@ case "$cmd" in
         if [[ ! -d $HOME/.rpcf/gmssl ]]; then
             mkdir -p $HOME/.rpcf/gmssl
         fi
+        if [[ ! -d $HOME/.rpcf/etc/rpcf ]]; then
+            mkdir -p $HOME/.rpcf/etc/rpcf
+        fi
         rpcfctl clearmount
         if [[ ! -f $HOME/.rpcf/openssl/signkey.pem ]]; then
             echo "generate openssl keys"
@@ -410,13 +420,20 @@ EOF
         fi
         source_dir=$HOME/.rpcf/openssl
         run_as_root python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
+        cp $cfgPath/*.json $HOME/.rpcf/etc/rpcf/
+        cp $cfgPath/appmonui.tar.gz $HOME/.rpcf/etc/rpcf/
+        echo initsvr completed
         ;;
     initcli)
-        if [[ ! -d $HOME/.rpcf ]]; then
+        if [[ ! -d $HOME/.rpcf/openssl ]]; then
             mkdir -p $HOME/.rpcf/openssl
+        fi
+        if [[ ! -d $HOME/.rpcf/gmssl ]]; then
             mkdir -p $HOME/.rpcf/gmssl
         fi
-        rpcfctl clearmount
+        if [[ ! -d $HOME/.rpcf/etc/rpcf ]]; then
+            mkdir -p $HOME/.rpcf/etc/rpcf
+        fi
         regfsmnt -i $HOME/.rpcf/clientreg.dat
         if [[ ! -f $HOME/.rpcf/openssl/clientkey.pem ]]; then
             rpcfctl genkeys openssl 1 1
@@ -424,12 +441,14 @@ EOF
         if [[ ! -f $HOME/.rpcf/gmssl/clientkey.pem ]]; then
             rpcfctl genkeys gmssl 1 1
         fi
-        rpcfctl clearmount
         source_dir=$HOME/.rpcf/openssl
         if [ "$(id -u)" -ne 0 ]; then
             echo Update the ssl keys with root privilege...
         fi
         run_as_root python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/clientkey.pem $source_dir/clientcert.pem $source_dir/certs.pem
+        cp $cfgPath/*.json $HOME/.rpcf/etc/rpcf/
+        cp $cfgPath/appmonui.tar.gz $HOME/.rpcf/etc/rpcf/
+        echo initcli completed
         ;;
     importkey | import)
         cmdline="rpcfctl importkey <openssl|gmssl> <private key file> <public cert file> [<cacert file>]"

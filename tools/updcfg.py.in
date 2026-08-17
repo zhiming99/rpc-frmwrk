@@ -12,21 +12,26 @@ from tempfile import mkstemp
 from updwscfg import IsSudoAvailable, rpcf_system
 import errno
 import socket
+from pathlib import Path
 
 g_passDlg = None
 def GetTestPaths( path : str= None ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
+    parent_dir = os.path.basename( dir_path )
     paths = []
     if path is None:
-        curDir = dir_path
-        paths.append( curDir + "/../../etc/rpcf" )
-        paths.append( "/etc/rpcf")
+        if parent_dir == "rpcf" :
+            etcDir = Path.home() / ".rpcf/etc/rpcf"
+            paths.append( str( etcDir ) )
 
-        curDir += "/../test/"
-        paths.append( curDir + "iftest" )
-        paths.append( curDir + "btinrt" )
-        paths.append( '../monitor/appmon' )
-        if IsFeatureEnabled( 'testcases' ):
+            curDir = dir_path
+            paths.append( curDir + "/../../etc/rpcf" )
+            paths.append( "/etc/rpcf")
+            paths.append( dir_path + '../monitor/appmon' )
+        else:
+            curDir = dir_path + "/../test/"
+            paths.append( curDir + "iftest" )
+            paths.append( curDir + "btinrt" )
             paths.append( curDir + "actcancel" )
             paths.append( curDir + "asynctst" )
             paths.append( curDir + "evtest" )
@@ -36,6 +41,7 @@ def GetTestPaths( path : str= None ) :
             paths.append( curDir + "prtest" )
             paths.append( curDir + "sftest" )
             paths.append( curDir + "stmtest" )
+            paths.append( dir_path + '../monitor/appmon' )
     else:
         paths.append( path )
 
@@ -324,11 +330,16 @@ def ExportTestCfgs( cfgList:list ):
         if testDesc == 'appmondesc.json':
             cmdLine = f"path=$(dirname {pathVal[0]});"
             cmdLine += "cd $path; if [ ! -f appmonui.tar.gz ]; then exit 1; fi;"
+            cmdLine += "if touch testfile;then rm -f testfile;nosudo='true';else nosudo='false';fi;"
             cmdLine += "tempdir=`mktemp -d`;curdir=$(pwd);cd $tempdir;tar -zxf $curdir/appmonui.tar.gz;"
+            cmdLine += "if [ \"$nosudo\" = \"true\" ];then "
+            cmdLine += "cp $curdir/appmondesc.json ./;tar -zcf $curdir/appmonui.tar.gz *; cd $curdir; rm -rf $tempdir;"
+            cmdLine += "else "
             if IsSudoAvailable():
                 cmdLine += "cp $curdir/appmondesc.json ./;sudo tar -zcf $curdir/appmonui.tar.gz *; cd $curdir; rm -rf $tempdir;"
             else:
                 cmdLine += "cp $curdir/appmondesc.json ./;su -c \"tar -zcf $curdir/appmonui.tar.gz *\"; cd $curdir; rm -rf $tempdir;"
+            cmdLine += "fi;"
             rpcf_system( cmdLine )
 
 
@@ -443,7 +454,8 @@ def LoadConfigFiles( path : str) :
     curDir = dir_path
     if path is None:
         if parent_dir == "rpcf" :
-            #paths.append( "." )
+            etcDir = Path.home() / ".rpcf/etc/rpcf"
+            paths.append( str( etcDir ) )
             paths.append( curDir + "/../../etc/rpcf" )
             paths.append( "/etc/rpcf")
         else:
