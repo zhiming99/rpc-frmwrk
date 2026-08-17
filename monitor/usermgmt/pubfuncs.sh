@@ -98,6 +98,7 @@ function check_user_mount()
         echo "you may want to use 'inituser.sh' to initialize one first"
         return 1
     fi
+    export rootdir=
     if (( $mt == 1 ));then
         rootdir=`echo $appmp | awk '{print $3}'`
         if [ -d "$rootdir/usereg/users" ]; then
