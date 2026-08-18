@@ -478,6 +478,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( drvfile, "r" )
                 jsonvals[ 0 ] = [drvfile, json.load(fp) ]
                 fp.close()
+                print( f"haha {drvfile}" )
                 count-=1
         except Exception as err :
             pass
@@ -487,6 +488,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( rtfile, "r" )
                 jsonvals[ 1 ] = [rtfile, json.load(fp)]
                 fp.close()
+                print( f"haha {rtfile}" )
                 count-=1
         except Exception as err :
             pass
