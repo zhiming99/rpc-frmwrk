@@ -171,6 +171,7 @@ echo stressTest normal passed!
 echo testing RPC-over-stream
 echo $bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
+cat testdir/driver.json
 echo start stressTest ROS...
 stressTest
 
