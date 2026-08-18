@@ -50,7 +50,7 @@ jobs:
       run: /usr/local/bin/rpcfctl initsvr
 
     - name: cleanup for test
-      run: sudo python3 /usr/local/bin/rpcf/rpcfgnui.py tools/testcfgs/mincfg.json
+      run: python3 /usr/local/bin/rpcf/rpcfgnui.py tools/testcfgs/mincfg.json
 
     - name: registry test
       run:  bash tools/regtest.sh

@@ -14,5 +14,5 @@ fi
 $SUDO pkill rpcrouter || true
 $SUDO pkill python3 || true
 cat $output
-$SUDO python3 /usr/local/bin/rpcf/rpcfgnui.py $output
+python3 /usr/local/bin/rpcf/rpcfgnui.py $output
 popd

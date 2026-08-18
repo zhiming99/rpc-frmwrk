@@ -25,7 +25,7 @@ else
     SUDO=
 fi
 
-$SUDO python3 /usr/local/bin/rpcf/rpcfgnui.py $output
+python3 /usr/local/bin/rpcf/rpcfgnui.py $output
 
 popd
 
