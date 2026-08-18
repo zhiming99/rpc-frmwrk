@@ -422,12 +422,14 @@ EOF
         p1=`readlink -f $cfgPath`
         p2=`readlink -f $HOME/.rpcf/etc/rpcf`
         if [ -n "$p1" ] && [ "$p1" = "$p2" ]; then
+            echo $HOME/.rpcf/etc/rpcf already initialized
             true
         else
             cp $cfgPath/*.json $HOME/.rpcf/etc/rpcf/
             cp $cfgPath/appmonui.tar.gz $HOME/.rpcf/etc/rpcf/
             echo updating keys in driver.json
             python3 $cmddir/updatekeys.py $HOME/.rpcf/etc/rpcf/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
+            cat $HOME/.rpcf/etc/rpcf/driver.json 
         fi
         echo initsvr completed
         ;;
@@ -456,6 +458,7 @@ EOF
             p1=`readlink -f $cfgPath`
             p2=`readlink -f $HOME/.rpcf/etc/rpcf`
             if [ -n "$p1" ] && [ "$p1" = "$p2" ]; then
+                echo $HOME/.rpcf/etc/rpcf already initialized
                 true
             else
                 cp $cfgPath/*.json $HOME/.rpcf/etc/rpcf/

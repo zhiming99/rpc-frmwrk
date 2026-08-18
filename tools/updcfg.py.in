@@ -886,6 +886,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
     bServer : bool, destDir : str ) -> int :
 
     drvVal = drvFile[ 1 ]
+    print( drvFile[0] )
 
     if 'Ports' in drvVal :
         ports = drvVal['Ports']
