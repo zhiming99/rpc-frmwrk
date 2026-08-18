@@ -419,12 +419,6 @@ EOF
             echo Update the ssl keys with root privilege...
         fi
         source_dir=$HOME/.rpcf/openssl
-        if [ "$cfgPath" = "$HOME/.rpcf/etc/rpcf" ]; then
-            runasroot=""
-        else
-            runasroot="run_as_root"
-        fi
-        $runasroot python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
         p1=`readlink -f $cfgPath`
         p2=`readlink -f $HOME/.rpcf/etc/rpcf`
         if [ -n "$p1" ] && [ "$p1" = "$p2" ]; then
@@ -432,6 +426,8 @@ EOF
         else
             cp $cfgPath/*.json $HOME/.rpcf/etc/rpcf/
             cp $cfgPath/appmonui.tar.gz $HOME/.rpcf/etc/rpcf/
+            echo updating keys in driver.json
+            python3 $cmddir/updatekeys.py $HOME/.rpcf/etc/rpcf/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
         fi
         echo initsvr completed
         ;;
@@ -456,19 +452,14 @@ EOF
         if [ "$(id -u)" -ne 0 ]; then
             echo Update the ssl keys with root privilege...
         fi
-        if [ "$cfgPath" = "$HOME/.rpcf/etc/rpcf" ]; then
-            runasroot=""
-        else
-            runasroot="run_as_root"
-        fi
         if [ ! -f "$HOME/.rpcf/appreg.dat" ]; then
-            $runasroot python3 $cmddir/updatekeys.py $cfgPath/driver.json openssl $source_dir/clientkey.pem $source_dir/clientcert.pem $source_dir/certs.pem
             p1=`readlink -f $cfgPath`
             p2=`readlink -f $HOME/.rpcf/etc/rpcf`
             if [ -n "$p1" ] && [ "$p1" = "$p2" ]; then
                 true
             else
                 cp $cfgPath/*.json $HOME/.rpcf/etc/rpcf/
+                python3 $cmddir/updatekeys.py $HOME/.rpcf/etc/rpcf/driver.json openssl $source_dir/clientkey.pem $source_dir/clientcert.pem $source_dir/certs.pem
             fi
         fi
         echo initcli completed
