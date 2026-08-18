@@ -29,6 +29,8 @@ fi
 
 if [ "$1" == "2" ]; then
     ulimit -c unlimited
+    echo cat ${etc_dir}/driver.json
+    cat ${etc_dir}/driver.json
     echo logger...
     ${bin_dir}/rpcf_logger -dO $logger;
     echo starting the app server...
@@ -88,7 +90,6 @@ elif [ "$1" == "1" ]; then
     echo restart logger...
     ${bin_dir}/rpcf_logger -dO $logger;
     echo restart rpcrouters...
-    cat ${etc_dir}/driver.json
     ${bin_dir}/rpcrouter -gr 2 $auth -L6 >> $logfile &
     if [ -d ./reqfwdr ]; then
         pushd ./reqfwdr;
