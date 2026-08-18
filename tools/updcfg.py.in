@@ -482,7 +482,7 @@ def LoadConfigFiles( path : str) :
                 print( f"haha {drvfile}" )
                 count-=1
         except Exception as err :
-            pass
+            print(err)
         try:
             if jsonvals[ 1 ] is None :
                 rtfile = strPath + "/router.json"
@@ -492,7 +492,7 @@ def LoadConfigFiles( path : str) :
                 print( f"haha {rtfile}" )
                 count-=1
         except Exception as err :
-            pass
+            print(err)
 
         try:
             if jsonvals[ 2 ] is None :
@@ -502,7 +502,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            pass
+            print(err)
         
         try:
             if jsonvals[ 3 ] is None :
@@ -512,7 +512,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            pass            
+            print(err)
 
         try:
             if jsonvals[ 4 ] is None and IsFeatureEnabled( 'js' ) :
@@ -522,7 +522,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            pass            
+            print(err)
 
         try:
             if jsonvals[ 5 ] is None :
@@ -532,7 +532,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            pass            
+            print(err)
 
         try:
             if jsonvals[ 6 ] is None :
@@ -542,7 +542,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            pass            
+            print(err)
 
         try:
             if jsonvals[ 7 ] is None :
@@ -552,7 +552,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            pass            
+            print(err)
 
         if count == 0:
             break
