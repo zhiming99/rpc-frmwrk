@@ -427,7 +427,8 @@ EOF
         else
             cp $cfgPath/*.json $HOME/.rpcf/etc/rpcf/
             cp $cfgPath/appmonui.tar.gz $HOME/.rpcf/etc/rpcf/
-            echo updating keys in driver.json
+            echo updating keys in driver.json...
+            echo python3 $cmddir/updatekeys.py $HOME/.rpcf/etc/rpcf/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
             python3 $cmddir/updatekeys.py $HOME/.rpcf/etc/rpcf/driver.json openssl $source_dir/signkey.pem $source_dir/signcert.pem $source_dir/certs.pem
             cat $HOME/.rpcf/etc/rpcf/driver.json 
         fi
