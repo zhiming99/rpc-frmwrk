@@ -471,6 +471,7 @@ def LoadConfigFiles( path : str) :
     
     count = 8
     jsonvals = [ None ] * 8
+    print( f"{paths}" )
     for strPath in paths :
         try:
             if jsonvals[ 0 ] is None :
