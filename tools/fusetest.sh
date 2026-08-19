@@ -14,6 +14,11 @@ dumpfile=$basedir/logdump.txt
 function stressTest()
 {
     pushd testdir
+    grep -n srcPath ./synccfg.py
+    python3 synccfg.py
+    cat ./TestTypesdesc.json
+    cat $HOME/.rpcf/etc/rpcf/driver.json
+
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
 
@@ -157,10 +162,6 @@ RUNCLIENT
 echo testing normal RPC
 echo $bin_dir/ridlc -f -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -f -O ./testdir ../testypes.ridl
-cat testdir/TestTypesdesc.json
-pushd ./testdir
-python3 ./synccfg.py
-popd
 echo start stressTest normal...
 stressTest
 
@@ -175,10 +176,6 @@ echo stressTest normal passed!
 echo testing RPC-over-stream
 echo $bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
-cat testdir/TestTypesdesc.json
-pushd ./testdir
-python3 ./synccfg.py
-popd
 echo start stressTest ROS...
 stressTest
 
@@ -193,9 +190,6 @@ echo stressTest ROS passed!
 echo testing normal RPC via shared library
 echo $bin_dir/ridlc -lf -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -lf -O ./testdir ../testypes.ridl
-pushd ./testdir
-python3 ./synccfg.py
-popd
 echo start mkDirTest normal
 mkDirTest
 
@@ -210,9 +204,6 @@ echo mkDirTest normal passed!
 echo testing RPC-over-stream via shared library
 echo $bin_dir/ridlc -lsf -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -lsf -O ./testdir ../testypes.ridl
-pushd ./testdir
-python3 ./synccfg.py
-popd
 echo mkDirTest ROS
 mkDirTest
 
