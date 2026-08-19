@@ -14,13 +14,10 @@ dumpfile=$basedir/logdump.txt
 function stressTest()
 {
     pushd testdir
-    grep -n srcPath ./synccfg.py
-    python3 synccfg.py
-    cat ./TestTypesdesc.json
-    cat $HOME/.rpcf/etc/rpcf/driver.json
 
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
+    make sync
 
     >$dumpfile
 

@@ -3930,6 +3930,10 @@ gint32 CExportObjDesc2::OutputROS()
                 ";s:srcPath = .*$:srcPath = \"";
             strCmdLine += strDrv + "\":";
         }
+        else
+        {
+            ret = 0;
+        }
         const char* args[5];
 
         args[ 0 ] = "/bin/sed";

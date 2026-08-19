@@ -471,7 +471,6 @@ def LoadConfigFiles( path : str) :
     
     count = 8
     jsonvals = [ None ] * 8
-    print( f"{paths}" )
     for strPath in paths :
         try:
             if jsonvals[ 0 ] is None :
@@ -479,7 +478,6 @@ def LoadConfigFiles( path : str) :
                 fp = open( drvfile, "r" )
                 jsonvals[ 0 ] = [drvfile, json.load(fp) ]
                 fp.close()
-                print( f"haha {drvfile}" )
                 count-=1
         except Exception as err :
             print(err)
@@ -489,7 +487,6 @@ def LoadConfigFiles( path : str) :
                 fp = open( rtfile, "r" )
                 jsonvals[ 1 ] = [rtfile, json.load(fp)]
                 fp.close()
-                print( f"haha {rtfile}" )
                 count-=1
         except Exception as err :
             print(err)
@@ -889,7 +886,6 @@ def Update_Drv( initCfg: dict, drvFile : list,
     bServer : bool, destDir : str ) -> int :
 
     drvVal = drvFile[ 1 ]
-    print( drvFile[0] )
 
     if 'Ports' in drvVal :
         ports = drvVal['Ports']
