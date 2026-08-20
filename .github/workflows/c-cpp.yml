@@ -46,9 +46,6 @@ jobs:
     - name: install
       run: sudo make install
 
-    - name: initsvr
-      run: /usr/local/bin/rpcfctl initsvr
-
     - name: cleanup for test
       run: python3 /usr/local/bin/rpcf/rpcfgnui.py tools/testcfgs/mincfg.json
 

@@ -47,9 +47,6 @@ jobs:
     - name: install
       run: sudo make install
 
-    - name: initsvr
-      run: /usr/local/bin/rpcfctl initsvr
-
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
     - name: cleanup for kerberos test
