@@ -9,7 +9,7 @@ import errno
 import getopt
 import sys
 from urwid.widget.constants import BOX_SYMBOLS
-from updcfg import CheckIpAddr, IsFeatureEnabled, tempname
+from updcfg import CheckIpAddr, IsFeatureEnabled, tempname, GetTestPaths, Update_InitCfg
 from updwscfg import rpcf_system, GetDistName
 from updk5cfg import *
 from functools import partial
@@ -883,7 +883,6 @@ class MenuDialog:
                     if label == _("Enable Authentication") and widget.get_state():
                         return True
         return False
-        return False
 
     def HasSSL( self ):
         if not ( IsFeatureEnabled('openssl') or IsFeatureEnabled('gmssl') ):
@@ -1685,7 +1684,13 @@ EOF
         def updateRpcfCfg():
             self.showOutputDlg(f"rpcfctl updcfg {tempInit};rm -f {tempInit}>/dev/null",
                 callback = lambda button : self.exit_program(button) )
-        self.ElevatePrivilege2( updateRpcfCfg )
+        paths = GetTestPaths()
+        if paths[ 0 ] == str( Path.home() / ".rpcf/etc/rpcf" ):
+            drvPath = paths[ 0 ] + "/driver.json"
+            if not os.access( drvPath, os.W_OK ):
+                self.ElevatePrivilege2( updateRpcfCfg )
+                return
+        Update_InitCfg( tempInit, None )
 
     def confirm_discard_and_exit(self, button):
         raise urwid.ExitMainLoop()

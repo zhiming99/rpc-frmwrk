@@ -47,19 +47,6 @@ fi
 cmd="$1"
 shift
 
-run_as_root()
-{
-    if [ "$(id -u)" -eq 0 ]; then
-        $@
-    elif command -v sudo >/dev/null 2>&1; then
-        sudo "$@"
-    else
-        # su -c requires a single string, so we safely quote the arguments
-        printf -v cmd_str '%q ' "$@"
-        su -s /bin/sh -c "$cmd_str"
-    fi
-}
-
 function is_app_online()
 {
     if check_appreg_mount; then
@@ -473,6 +460,11 @@ EOF
             echo $cmdline
             exit 1
         fi
+        if [[ ! -d "$HOME/.rpcf" ]]; then
+            echo The rpc-frwmrk runtime environment is not initialized yet.
+            echo please run 'rpcfctl initsvr' or 'rpcfctl initcli' first
+            exit 1
+        fi
         if [[ "x$1" == "xopenssl" ]]; then
             targetdir=$HOME/.rpcf/openssl
         elif [[ "x$1" == "xgmssl" ]]; then
@@ -515,15 +507,8 @@ EOF
             echo Error: unable to find driver.json to update
             exit 1
         fi
-        if [[ "$bRoot" == "false" ]]; then
-            SUDOCMD=
-        else
-            if command -v sudo; then
-                SUDOCMD=sudo
-            fi
-        fi
         echo Updating key setting requires root privilige.
-        if $SUDOCMD python3 $cmddir/updatekeys.py $drvpath $1 $targetdir/$(basename $2) $targetdir/$(basename $3) $caroot; then
+        if python3 $cmddir/updatekeys.py $drvpath $1 $targetdir/$(basename $2) $targetdir/$(basename $3) $caroot; then
             echo "Imported keys to $targetdir successfully."
             echo "rpc-frmwrk will use the newly imported key for SSL connection"
             echo "And don't forget to update your web server configuration if WebSocket is enabled "
@@ -843,10 +828,17 @@ with open(p, "w") as f:
             exit 1
         fi
         pushd $HOME > /dev/null
+        if [[ ! -d "$HOME/.rpcf" ]]; then
+            echo The rpc-frwmrk runtime environment is not initialized yet.
+            echo please run 'rpcfctl initsvr' or 'rpcfctl initcli' first
+            exit 1
+        fi
         if [[ -d .rpcf ]]; then
-            echo "Warning: directory .rpcf will be overritten, continue(y/N)?"
+            echo "Warning: directory .rpcf will be overritten, continue(yes/No)?"
             read answer
-            if [ "x$answer" == "x" ] || [ "x$answer" == "xno" ] || [[ "x$answer" == "xNo" ]]; then
+            if [ "x$answer" == "xy" ] || [ "x$answer" == "xyes" ]; then
+                true;
+            else
                 popd > /dev/null
                 exit 0
             fi
@@ -866,12 +858,7 @@ with open(p, "w") as f:
             popd > /dev/null
             exit 1
         fi
-        if [[ "x$(whoami)" == "xroot" ]];then
-            SUDOCMD=
-        elif which sudo > /dev/null; then
-            SUDOCMD=sudo
-        fi
-        $SUDOCMD python3 $cmddir/rpcfgnui.py ./cfgbk.json
+        python3 $cmddir/rpcfgnui.py ./cfgbk.json
         echo Restore completed successfully
         popd > /dev/null
         ;;

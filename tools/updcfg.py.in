@@ -330,7 +330,7 @@ def ExportTestCfgs( cfgList:list ):
         if testDesc == 'appmondesc.json':
             cmdLine = f"path=$(dirname {pathVal[0]});"
             cmdLine += "cd $path; if [ ! -f appmonui.tar.gz ]; then exit 1; fi;"
-            cmdLine += "if touch testfile;then rm -f testfile;nosudo='true';else nosudo='false';fi;"
+            cmdLine += "if touch testfile > /dev/null 2>&1;then rm -f testfile;nosudo='true';else nosudo='false';fi;"
             cmdLine += "tempdir=`mktemp -d`;curdir=$(pwd);cd $tempdir;tar -zxf $curdir/appmonui.tar.gz;"
             cmdLine += "if [ \"$nosudo\" = \"true\" ];then "
             cmdLine += "cp $curdir/appmondesc.json ./;tar -zcf $curdir/appmonui.tar.gz *; cd $curdir; rm -rf $tempdir;"
@@ -480,7 +480,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
         try:
             if jsonvals[ 1 ] is None :
                 rtfile = strPath + "/router.json"
@@ -489,7 +489,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
 
         try:
             if jsonvals[ 2 ] is None :
@@ -499,7 +499,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
         
         try:
             if jsonvals[ 3 ] is None :
@@ -509,7 +509,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
 
         try:
             if jsonvals[ 4 ] is None and IsFeatureEnabled( 'js' ) :
@@ -519,7 +519,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
 
         try:
             if jsonvals[ 5 ] is None :
@@ -529,7 +529,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
 
         try:
             if jsonvals[ 6 ] is None :
@@ -539,7 +539,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
 
         try:
             if jsonvals[ 7 ] is None :
@@ -549,7 +549,7 @@ def LoadConfigFiles( path : str) :
                 fp.close()
                 count-=1
         except Exception as err :
-            print(err)
+            pass
 
         if count == 0:
             break
