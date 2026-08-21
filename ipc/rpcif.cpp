@@ -4511,6 +4511,7 @@ gint32 CRpcServices::LoadObjDesc(
                 break;
             }
 
+            bool bHasAuth = false;
             // set the default parameters
             if( bProxyPdo )
             {
@@ -4596,7 +4597,10 @@ gint32 CRpcServices::LoadObjDesc(
                     string strVal =
                         oObjElem[ JSON_ATTR_HASAUTH ].asString();
                     if( strVal == "true" )
+                    {
                         oConnParams.SetBoolProp( propHasAuth, true );
+                        bHasAuth = true;
+                    }
                     else
                         oConnParams.SetBoolProp( propHasAuth, false );
                 }
@@ -4623,7 +4627,15 @@ gint32 CRpcServices::LoadObjDesc(
             }
             else
             {
-                if( oAuth.GetCfg()->size() > 0 )
+                if( oObjElem.isMember( JSON_ATTR_HASAUTH ) &&
+                    oObjElem[ JSON_ATTR_HASAUTH ].isString() )
+                {
+                    string strVal =
+                        oObjElem[ JSON_ATTR_HASAUTH ].asString();
+                    if( strVal == "true" )
+                        bHasAuth = true;
+                }
+                if( bHasAuth && oAuth.GetCfg()->size() > 0 )
                     oCfg.SetObjPtr( propAuthInfo, oAuth.GetCfg() );
             }
 
