@@ -389,6 +389,7 @@ case "$cmd" in
             expect - << EOF > /dev/null
 #!/usr/bin/expect -f
 set timeout -1
+echo initializing user registry...
 spawn $cmddir/inituser.sh -s 
 expect {
     "Password:" { send "123\n";exp_continue}
@@ -400,6 +401,7 @@ EOF
         else
             bash $cmddir/inituser.sh -s
         fi
+        echo initializing application registry...
         bash $cmddir/initappreg.sh -s
         rpcfctl clearmount;
         if [ "$(id -u)" -ne 0 ]; then

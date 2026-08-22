@@ -4,7 +4,6 @@ from rpcf.rpcbase import *
 from rpcf.proxy import *
 from seribase import CSerialBase
 from actcancelstructs import *
-import numpy
 import errno
 
 from ActiveCancelsvrbase import *
