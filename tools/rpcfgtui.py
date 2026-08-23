@@ -1691,6 +1691,7 @@ EOF
                 self.ElevatePrivilege2( updateRpcfCfg )
                 return
         Update_InitCfg( tempInit, None )
+        raise urwid.ExitMainLoop()
 
     def confirm_discard_and_exit(self, button):
         raise urwid.ExitMainLoop()
