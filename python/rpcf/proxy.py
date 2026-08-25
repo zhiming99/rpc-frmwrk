@@ -45,27 +45,27 @@ class LogLevel :
     logInfo = 6
 
 class ErrorCode( IntEnum ) :
-    INVALID_HANDLE = ctypes.c_int32( 0 )
-    STATUS_SUCCESS = ctypes.c_int32( 0 )
-    STATUS_PENDING = ctypes.c_int32( 0x10001 )
-    STATUS_MORE_PROCESS_NEEDED = ctypes.c_int32( 0x10002 )
-    STATUS_CHECK_RESP = ctypes.c_int32( 0x10003 )
-    ERROR_FAIL = ctypes.c_int32( 0x80000001 )
-    ERROR_ADDRESS = ctypes.c_int32( 0x80010002 )
-    ERROR_STATE = ctypes.c_int32( 0x80010003 )
-    ERROR_WRONG_THREAD = ctypes.c_int32( 0x80010004 )
-    ERROR_CANNOT_CANCEL = ctypes.c_int32( 0x80010005 )
-    ERROR_PORT_STOPPED = ctypes.c_int32( 0x80010006 )
-    ERROR_FALSE = ctypes.c_int32( 0x80010007 )
-    ERROR_REPEAT = ctypes.c_int32( 0x80010008 )
-    ERROR_PREMATURE = ctypes.c_int32( 0x80010009 )
-    ERROR_NOT_HANDLED = ctypes.c_int32( 0x8001000a )
-    ERROR_CANNOT_COMP = ctypes.c_int32( 0x8001000b )
-    ERROR_USER_CANCEL = ctypes.c_int32( 0x8001000c )
-    ERROR_PAUSED = ctypes.c_int32( 0x8001000d )
-    ERROR_NOT_IMPL = ctypes.c_int32( 0x80010010 )
-    ERROR_CANCEL_INSTEAD = ctypes.c_int32( 0x8001000f )
-    ERROR_QUEUE_FULL = ctypes.c_int32( 0x8001000e )
+    INVALID_HANDLE = ctypes.c_int32( 0 ).value
+    STATUS_SUCCESS = ctypes.c_int32( 0 ).value
+    STATUS_PENDING = ctypes.c_int32( 0x10001 ).value
+    STATUS_MORE_PROCESS_NEEDED = ctypes.c_int32( 0x10002 ).value
+    STATUS_CHECK_RESP = ctypes.c_int32( 0x10003 ).value
+    ERROR_FAIL = ctypes.c_int32( 0x80000001 ).value
+    ERROR_ADDRESS = ctypes.c_int32( 0x80010002 ).value
+    ERROR_STATE = ctypes.c_int32( 0x80010003 ).value
+    ERROR_WRONG_THREAD = ctypes.c_int32( 0x80010004 ).value
+    ERROR_CANNOT_CANCEL = ctypes.c_int32( 0x80010005 ).value
+    ERROR_PORT_STOPPED = ctypes.c_int32( 0x80010006 ).value
+    ERROR_FALSE = ctypes.c_int32( 0x80010007 ).value
+    ERROR_REPEAT = ctypes.c_int32( 0x80010008 ).value
+    ERROR_PREMATURE = ctypes.c_int32( 0x80010009 ).value
+    ERROR_NOT_HANDLED = ctypes.c_int32( 0x8001000a ).value
+    ERROR_CANNOT_COMP = ctypes.c_int32( 0x8001000b ).value
+    ERROR_USER_CANCEL = ctypes.c_int32( 0x8001000c ).value
+    ERROR_PAUSED = ctypes.c_int32( 0x8001000d ).value
+    ERROR_NOT_IMPL = ctypes.c_int32( 0x80010010 ).value
+    ERROR_CANCEL_INSTEAD = ctypes.c_int32( 0x8001000f ).value
+    ERROR_QUEUE_FULL = ctypes.c_int32( 0x8001000e ).value
 
 def DebugPrint( strMsg : str, logLevel = 3 ) :
     PyDbgPrint( strMsg.encode(), logLevel )
