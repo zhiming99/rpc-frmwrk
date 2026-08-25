@@ -14,7 +14,6 @@
 '''
 import sys
 import time
-import numpy as np
 import threading as tr
 import getpass
 import errno
@@ -66,9 +65,9 @@ class PyFileTransClient( PyFileTransferBase ):
     '''
     def UploadFile( self,
         fileName:   str,
-        chanHash:   np.uint64, 
-        offset:     np.uint64,
-        size:       np.uint64 )->[ int, list ]:
+        chanHash:   int, 
+        offset:     int,
+        size:       int )->[ int, list ]:
 
         resp = self.PySendRequest(
             PyFileTransClient._ifName_, "UploadFile",
@@ -90,9 +89,9 @@ class PyFileTransClient( PyFileTransferBase ):
     '''
     def DownloadFile( self,
         fileName:   str,
-        chanHash:   np.uint64,
-        offset:     np.uint64,
-        size:       np.uint64 )->[ int, list ]:
+        chanHash:   int,
+        offset:     int,
+        size:       int )->[ int, list ]:
 
         resp = self.PySendRequest(
            PyFileTransClient._ifName_, "DownloadFile", 
@@ -122,9 +121,9 @@ class PyFileTransClient( PyFileTransferBase ):
 
     def DoUploadFile( self,
         fileName:   str,
-        hChannel:   np.uint64, 
-        offset: np.uint64=0,
-        size :  np.uint64=0 )->[ int, list ]:
+        hChannel:   int, 
+        offset: int=0,
+        size :  int=0 )->[ int, list ]:
         resp = [ EC.STATUS_SUCCESS, list() ]
         while True :
             if not os.access( fileName, os.R_OK ) :
@@ -211,7 +210,7 @@ class PyFileTransClient( PyFileTransferBase ):
 
     def DoDownloadFile( self,
         fileName:   str,
-        hChannel:   np.uint64 )->[ int, list ]:
+        hChannel:   int )->[ int, list ]:
 
         while True :
             '''Before downloading, fetch the
@@ -241,7 +240,7 @@ class PyFileTransClient( PyFileTransferBase ):
                 break;
 
             if oCtx.fp is not None:
-                resp[ 0 ] = -error.EBUSY
+                resp[ 0 ] = -errno.EBUSY
                 break
             
             try:

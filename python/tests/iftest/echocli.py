@@ -1,6 +1,6 @@
 import sys
 import errno
-import numpy as np
+import ctypes
 from rpcf.rpcbase import *
 
 from rpcf.proxy import PyRpcContext, PyRpcProxy
@@ -37,13 +37,13 @@ class CEchoClient:
     def Echo2( self, i1, i2 ):
         return self.sendRequest(
             self._ifName_, "Echo2",
-            np.int32( i1 ),
-            np.float64( i2 ) )
+            ctypes.c_int32( i1 ),
+            ctypes.c_float( i2 ) )
 
     def EchoCfg( self, iCount, pObj ):
         return self.sendRequest(
             self._ifName_, "EchoCfg",
-            np.int32( iCount ), pObj )
+            ctypes.c_int32( iCount ), pObj )
 
 #2. aggregrate the interface class and the PyRpcProxy
 # class by CEchoProxy to pickup the python-cpp

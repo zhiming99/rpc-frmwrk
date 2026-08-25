@@ -12,7 +12,6 @@
 '''
 import sys
 import time
-import numpy as np
 import threading as tr
 import getpass
 import errno
@@ -59,9 +58,9 @@ class PyFileTransSvr( PyFileTransferBase ):
     def UploadFile( self,
         callback,
         fileName:   str,
-        chanHash:   np.uint64, 
-        offset:     np.uint64,
-        size:       np.uint64 )->[ int, list ]:
+        chanHash:   int, 
+        offset:     int,
+        size:       int )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
             fileName = self.strRootDir + "/" + fileName
@@ -70,7 +69,7 @@ class PyFileTransSvr( PyFileTransferBase ):
             by the idhash.
             '''
             hChannel = self.oInst.GetChanByIdHash(
-                np.uint64( chanHash ) )
+                chanHash )
             if hChannel == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break
@@ -85,7 +84,7 @@ class PyFileTransSvr( PyFileTransferBase ):
                 break;
 
             if oCtx.fp is not None:
-                resp[ 0 ] = -error.EBUSY
+                resp[ 0 ] = -errno.EBUSY
                 break
 
             try:
@@ -166,9 +165,9 @@ class PyFileTransSvr( PyFileTransferBase ):
     def DownloadFile( self,
         callback,
         fileName:   str,
-        chanHash:   np.uint64,
-        offset:     np.uint64,
-        size:       np.uint64 )->[ int, list ]:
+        chanHash:   int,
+        offset:     int,
+        size:       int )->[ int, list ]:
         resp = [ 0, list() ]
         while True :
             fileName = self.strRootDir + "/" + fileName
@@ -180,7 +179,7 @@ class PyFileTransSvr( PyFileTransferBase ):
             for file transfer by the idhash.
             '''
             hChannel = self.oInst.GetChanByIdHash(
-                np.uint64( chanHash ) )
+                chanHash )
             if hChannel == 0 :
                 resp[ 0 ] = -errno.EINVAL
                 break
@@ -195,7 +194,7 @@ class PyFileTransSvr( PyFileTransferBase ):
                 break;
 
             if oCtx.fp is not None:
-                resp[ 0 ] = -error.EBUSY
+                resp[ 0 ] = -errno.EBUSY
                 break
             
             try:

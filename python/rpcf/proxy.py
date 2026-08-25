@@ -24,7 +24,6 @@
 ''' 
 from rpcf.rpcbase import *
 from inspect import signature
-import numpy as np
 
 import errno
 import inspect
@@ -34,6 +33,7 @@ import pickle
 import os
 from enum import IntEnum
 from typing import Union, Tuple, Optional
+import ctypes
 
 class LogLevel :
     logEmerg = 0
@@ -45,27 +45,27 @@ class LogLevel :
     logInfo = 6
 
 class ErrorCode( IntEnum ) :
-    INVALID_HANDLE = np.int32( 0 )
-    STATUS_SUCCESS = np.int32( 0 )
-    STATUS_PENDING = np.int32( 0x10001 )
-    STATUS_MORE_PROCESS_NEEDED = np.int32( 0x10002 )
-    STATUS_CHECK_RESP = np.int32( 0x10003 )
-    ERROR_FAIL = np.int32( np.uint32( 0x80000001 ) )
-    ERROR_ADDRESS = np.int32( np.uint32( 0x80010002 ) )
-    ERROR_STATE = np.int32( np.uint32( 0x80010003 ) )
-    ERROR_WRONG_THREAD = np.int32( np.uint32( 0x80010004 ) )
-    ERROR_CANNOT_CANCEL = np.int32( np.uint32( 0x80010005 ) )
-    ERROR_PORT_STOPPED = np.int32( np.uint32( 0x80010006 ) )
-    ERROR_FALSE = np.int32( np.uint32( 0x80010007 ) )
-    ERROR_REPEAT = np.int32( np.uint32( 0x80010008 ) )
-    ERROR_PREMATURE = np.int32( np.uint32( 0x80010009 ) )
-    ERROR_NOT_HANDLED = np.int32( np.uint32( 0x8001000a ) )
-    ERROR_CANNOT_COMP = np.int32( np.uint32( 0x8001000b ) )
-    ERROR_USER_CANCEL = np.int32( np.uint32( 0x8001000c ) )
-    ERROR_PAUSED = np.int32( np.uint32( 0x8001000d ) )
-    ERROR_NOT_IMPL = np.int32( np.uint32( 0x80010010 ) )
-    ERROR_CANCEL_INSTEAD = np.int32( np.uint32( 0x8001000f ) )
-    ERROR_QUEUE_FULL = np.int32( np.uint32( 0x8001000e ) )
+    INVALID_HANDLE = ctypes.c_int32( 0 )
+    STATUS_SUCCESS = ctypes.c_int32( 0 )
+    STATUS_PENDING = ctypes.c_int32( 0x10001 )
+    STATUS_MORE_PROCESS_NEEDED = ctypes.c_int32( 0x10002 )
+    STATUS_CHECK_RESP = ctypes.c_int32( 0x10003 )
+    ERROR_FAIL = ctypes.c_int32( 0x80000001 )
+    ERROR_ADDRESS = ctypes.c_int32( 0x80010002 )
+    ERROR_STATE = ctypes.c_int32( 0x80010003 )
+    ERROR_WRONG_THREAD = ctypes.c_int32( 0x80010004 )
+    ERROR_CANNOT_CANCEL = ctypes.c_int32( 0x80010005 )
+    ERROR_PORT_STOPPED = ctypes.c_int32( 0x80010006 )
+    ERROR_FALSE = ctypes.c_int32( 0x80010007 )
+    ERROR_REPEAT = ctypes.c_int32( 0x80010008 )
+    ERROR_PREMATURE = ctypes.c_int32( 0x80010009 )
+    ERROR_NOT_HANDLED = ctypes.c_int32( 0x8001000a )
+    ERROR_CANNOT_COMP = ctypes.c_int32( 0x8001000b )
+    ERROR_USER_CANCEL = ctypes.c_int32( 0x8001000c )
+    ERROR_PAUSED = ctypes.c_int32( 0x8001000d )
+    ERROR_NOT_IMPL = ctypes.c_int32( 0x80010010 )
+    ERROR_CANCEL_INSTEAD = ctypes.c_int32( 0x8001000f )
+    ERROR_QUEUE_FULL = ctypes.c_int32( 0x8001000e )
 
 def DebugPrint( strMsg : str, logLevel = 3 ) :
     PyDbgPrint( strMsg.encode(), logLevel )
@@ -75,42 +75,42 @@ def OutputMsg( strMsg : str ) :
 
 def GetNpValue( typeid, val ) :
     if typeid == cpp.typeUInt32 :
-        return np.uint32( val )
+        return ctypes.c_uint32( val )
 
     elif typeid == cpp.typeUInt64 :
-        return np.uint64( val )
+        return ctypes.c_uint64( val )
 
     elif typeid == cpp.typeFloat :
-        return np.float32( val )
+        return ctypes.c_float( val )
 
     elif typeid == cpp.typeDouble :
-        return np.float64( val )
+        return ctypes.c_double( val )
 
     elif typeid == cpp.typeUInt16 :
-        return np.uint16( val )
+        return ctypes.c_uint16( val )
 
     elif typeid ==  cpp.typeUInt8 :
-        return np.uint8( val )
+        return ctypes.c_uint8( val )
 
     return None
 
 def GetObjType( var ) :
-    if ( isinstance( var, np.int32 ) or
-        isinstance( var, np.uint32 ) ) :
+    if ( isinstance( var, ctypes.c_int32 ) or
+        isinstance( var, ctypes.c_uint32 ) ) :
         return cpp.typeUInt32
-    elif ( isinstance( var, np.int64 ) or
-        isinstance( var, np.uint64 ) ) :
+    elif ( isinstance( var, ctypes.c_int64 ) or
+        isinstance( var, ctypes.c_uint64 ) ) :
         return cpp.typeUInt64
-    elif isinstance( var, np.float32 ) :
+    elif isinstance( var, ctypes.c_float ) :
         return cpp.typeFloat
-    elif isinstance( var, np.float64 ) or \
+    elif isinstance( var, ctypes.c_double ) or \
         isinstance( var, float ) :
         return cpp.typeDouble
-    elif ( isinstance( var, np.int16 ) or
-        isinstance( var, np.uint16 ) ) :
+    elif ( isinstance( var, ctypes.c_int16 ) or
+        isinstance( var, ctypes.c_uint16 ) ) :
         return cpp.typeUInt16
-    elif ( isinstance( var, np.int8 ) or
-        isinstance( var, np.uint8 ) ) :
+    elif ( isinstance( var, ctypes.c_int8 ) or
+        isinstance( var, ctypes.c_uint8 ) ) :
         return cpp.typeUInt8
     elif isinstance( var, str ) :
         return cpp.typeString
@@ -119,7 +119,7 @@ def GetObjType( var ) :
     elif isinstance( var, bytearray ) or \
         isinstance( var, bytes ) :
         return cpp.typeByteArr
-    elif isinstance( var, np.bool ) :
+    elif isinstance( var, ctypes.c_bool ) :
         return cpp.typeByte
     elif isinstance( var, cpp.BufPtr ) :
         return var.GetExDataType()
@@ -133,22 +133,22 @@ def GetObjType( var ) :
 
 def GetTypeObj( typeid ) :
     if typeid == cpp.typeUInt32 :
-        return np.uint32
+        return ctypes.c_uint32
 
     elif typeid == cpp.typeUInt64 :
-        return np.uint64
+        return ctypes.c_uint64
 
     elif typeid == cpp.typeFloat :
-        return np.float32
+        return ctypes.c_float
 
     elif typeid == cpp.typeDouble :
-        return np.float64
+        return ctypes.c_double
 
     elif typeid == cpp.typeUInt16 :
-        return np.uint16
+        return ctypes.c_uint16
 
     elif typeid ==  cpp.typeUInt8 :
-        return np.uint8
+        return ctypes.c_uint8
 
     elif typeid == cpp.typeString :
         return str
@@ -495,7 +495,7 @@ class PyRpcServices :
                     if isinstance( trueResp, list ) :
                         trueResp.insert( 0, ret )
                         self.InvokeCallback( callback, trueResp )
-                except PickleError:
+                except pickle.PickleError:
                     listArgs.insert( 0, -cpp.EBADMSG )
                     self.InvokeCallback( callback, listArgs )
             else :
@@ -995,11 +995,11 @@ class PyRpcProxy( PyRpcServices ) :
 
     ''' sendRequestAsync returns a tuple with two
     elements, 0 is the return code, and 1 is a
-    np.int64 as a taskid, which can be used to
+    64bit integer as a taskid, which can be used to
     cancel the request sent'''
     def sendRequestAsync( self,
         callback, strIfName,
-        strMethod, *args )->Tuple[int, np.uint64]:
+        strMethod, *args )->Tuple[int, int]:
 
         resp = [ 0, None ]
         listArgs = list( args )

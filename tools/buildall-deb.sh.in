@@ -18,7 +18,7 @@ bash net-tools procps swig default-jdk-headless cmake libcommons-cli-java ccache
 
 ${SUDO} apt-get -y install sip-tools python3-sipbuild || ${SUDO} apt-get -y install sip-dev python3-sip python3-sip-dev || true
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim
-${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
+${SUDO} apt-get -y install python3-wheel || pip3 install wheel
 
 NODE_MAJOR=24
 curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - || exit 3
