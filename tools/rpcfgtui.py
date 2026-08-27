@@ -1690,6 +1690,10 @@ EOF
             if not os.access( drvPath, os.W_OK ):
                 self.ElevatePrivilege2( updateRpcfCfg )
                 return
+        elif not os.access( drvPath, os.W_OK ):
+            self.ElevatePrivilege2( updateRpcfCfg )
+            return
+
         Update_InitCfg( tempInit, None )
         raise urwid.ExitMainLoop()
 
