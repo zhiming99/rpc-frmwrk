@@ -539,12 +539,12 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)")
 
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
     set(BITWIDTH 32)
-    add_compile_definitions(BUILD_64=0)
+    add_compile_definitions(BUILD_64=0 _FILE_OFFSET_BITS=64 )
     set(CXXFLAGS "${CXXFLAGS} -DBUILD_64=0")
 
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^i.86")
     set(BITWIDTH 32)
-    add_compile_definitions(BUILD_64=0)
+    add_compile_definitions(BUILD_64=0 _FILE_OFFSET_BITS=64)
 
     # Replaces CXXFLAGS+=' -m32'
     add_compile_options(-m32)
@@ -839,8 +839,8 @@ set(FEATURES        "${FEATURES}"        CACHE INTERNAL "" FORCE)
 # ==============================================================================
 
 if(ENABLE_PYTHON)
-    set(PYTHON_RPMLIBS   "python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 ),")
-    set(PYTHON_RPMPKGS   "python3-pip,python3-numpy,")
+    set(PYTHON_RPMLIBS   "python3-devel, python3-pip, python3-build, ( sip5 or sip6 ),")
+    set(PYTHON_RPMPKGS   "python3-pip,")
     set(PYTHON_RPMFILES  "%{_libdir}/rpcf/*.whl")
     
     # Note the escaped '\$i' to pass the literal variable out to the RPM runtime shell script
@@ -848,7 +848,7 @@ if(ENABLE_PYTHON)
     set(PYTHON_RPMPOSTUN "pip3 uninstall -y")
     
     set(PYTHON_DEBLIBS   "python3-setuptools, python3-dev, python3-build, python3-pip, sip5-tools | sip-tools | sip-dev,")
-    set(PYTHON_DEBPKGS   "python3-numpy, python3-installer, ")
+    set(PYTHON_DEBPKGS   "python3-installer, ")
     set(PYTHON_DEBFILES  "usr/lib/*/rpcf/*.whl")
     set(PYTHON_CFGOPT    "")
     string(APPEND FEATURES "+python ")

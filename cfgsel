@@ -2,9 +2,9 @@
 bld=$1
 shift
 if [ "x$bld" == "x-d" ]; then
-    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1 -fno-strict-aliasing" $@
+    CONFIG_SHELL=/bin/bash ./configure --disable-static "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1 -fno-strict-aliasing" $@
 elif [ "x$bld" == "x-r" ]; then
-    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" $@
+    CONFIG_SHELL=/bin/bash ./configure --disable-static "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" $@
 else
     echo "Usage: cfgsel <-d/-r> [options]"
     echo "  -d: debug build"

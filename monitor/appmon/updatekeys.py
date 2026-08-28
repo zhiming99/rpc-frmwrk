@@ -47,6 +47,7 @@ def update_keys(json_path, ssl_type, priv_key, pub_cert, cacert):
                     params["CACertFile"] = ""
                 port["Parameters"] = params
                 found = True
+                break
 
         if not found:
             print(f"PortClass {port_class} not found in Ports.")

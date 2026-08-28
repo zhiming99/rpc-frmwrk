@@ -1,6 +1,6 @@
 #asynchronous version of echocli
 import sys
-import numpy as np
+import ctypes
 import threading as tr
 from rpcf.rpcbase import *
 
@@ -67,8 +67,8 @@ class CEchoClient:
         tupRet = self.sendRequestAsync(
             CEchoClient.Echo2Cb,
             self._ifName_, "Echo2",
-            np.int32( i1 ),
-            np.float64( i2 ) )
+            ctypes.c_int32( i1 ),
+            ctypes.c_float( i2 ) )
 
         ret = tupRet[ 0 ]
 
@@ -92,7 +92,7 @@ class CEchoClient:
         tupRet = self.sendRequestAsync(
             CEchoClient.EchoCfgCb,
             self._ifName_, "EchoCfg",
-            np.int32( iCount ), pObj )
+            ctypes.c_int32( iCount ), pObj )
 
         ret = tupRet[ 0 ]
 

@@ -16,7 +16,7 @@ swig apache-commons-cli httpd mod_ssl ifconfig procps-ng python3-urwid gettext
 ${SUDO} dnf -y install java-latest-openjdk-devel java-latest-openjdk-headless java-latest-openjdk || \
  ${SUDO} dnf -y install java-1.8.0-openjdk-devel java-1.8.0-openjdk-headless java-1.8.0-openjdk   
 ${SUDO} dnf -y install sip5 || ${SUDO} dnf -y install sip6
-${SUDO} dnf -y install python3-wheel python3-numpy rpmdevtools || pip3 install wheel numpy
+${SUDO} dnf -y install python3-wheel rpmdevtools || pip3 install wheel
 
 npm -g install browserify buffer long lz4 process put safe-buffer stream xxhashjs webpack webpack-cli minify events js-sha1 stream-browserify
 

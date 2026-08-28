@@ -1439,7 +1439,8 @@ gint32 CIoManager::Start()
             break;
         }
 
-        OutputMsg( 0, "IoMgr is starting..." );
+        DebugPrintEx( logInfo,
+            0, "IoMgr is starting..." );
 
         m_bInit = true;
         m_bStop = false;
@@ -1746,7 +1747,10 @@ gint32 CIoManager::RescheduleTaskByTid(
 gint32 CIoManager::Stop()
 {
     gint32 ret = 0;
-    DebugPrint( 0, "IoMgr is stopping..." );
+
+    DebugPrintEx( logInfo,
+        0, "IoMgr is stopping..." );
+
     LOGINFO( this, 0, "IoMgr is shuting down..." );
     m_oLogger.Stop();
 
@@ -1784,6 +1788,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
     SetLogModName( strModName );
 
     do{
+        GetHomeDirCached();
         CParamList a;
         a.SetPointer( propIoMgr, this );
         a.SetStrProp( propConfigPath,
@@ -2184,52 +2189,7 @@ gint32 CIoManager::TryFindDescFile(
                 break;
             }
         }
-
-        ret = GetCmdLineOpt(
-            propSearchPaths, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        StrVecPtr pvecPaths( pObj );
-        if( pvecPaths.IsEmpty() )
-        {
-            ret = -ENOENT;
-            break;
-        }
-        bool bFound = false;
-        std::string strFullPath;
-        for( auto& elem : ( *pvecPaths )() )
-        {
-            strFullPath = elem + "/" +  strFile;
-            ret = access(
-                strFullPath.c_str(), R_OK );
-
-            if( ret == 0 )
-            {
-                bFound = true;
-                break;
-            }
-
-            strFullPath = elem + "/../etc/rpcf/" + strFile;
-            ret = access(
-                strFullPath.c_str(), R_OK );
-            if( ret == 0 )
-            {
-                bFound = true;
-                break;
-            }
-            ret = -errno;
-        }
-
-        if( bFound )
-        {
-            strPath = strFullPath;
-            ret = 0;
-            break;
-        }
-
-        ret = FindInstCfg(
-            strFile, strPath );
+        ret = FindInstCfg( strFile, strPath );
 
     }while( 0 );
 

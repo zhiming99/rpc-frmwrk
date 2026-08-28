@@ -1,6 +1,6 @@
 import sys
 import time
-import numpy as np
+import ctypes
 from rpcf.rpcbase import *
 
 from rpcf.proxy import PyRpcContext, PyRpcServer
@@ -51,11 +51,11 @@ class CPauseResumeServer:
         callback, i1, i2, i3, i4, i5, strText ) :
         listResp = [ 0 ]
         listParams = [
-            np.int32( i1 + 1 ),
-            np.int16( i2 + 1 ),
-            np.int64( i3 + 1 ),
-            np.float32( i4 + 1 ),
-            np.float64( i5 + 1 ),
+            ctypes.c_int32( i1 + 1 ),
+            ctypes.c_int16( i2 + 1 ),
+            ctypes.c_int64( i3 + 1 ),
+            ctypes.c_float( i4 + 1 ),
+            ctypes.c_double( i5 + 1 ),
             strText + " 2" ]
         listResp.append( listParams )
         return listResp

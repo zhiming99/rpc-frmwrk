@@ -8,6 +8,7 @@ import errno
 import re
 import subprocess
 import glob
+from pathlib import Path
 
 class InstPkg :
     def __init__( self ):
@@ -422,11 +423,14 @@ upstream {AppName} {{
             )
         fp.write( cfg )
     fp.close()
-    strMonCliPkg = "/usr/local/etc/rpcf/appmonui.tar.gz"
+    strMonCliPkg = str( Path.home() / ".rpcf/etc/rpcf/appmonui.tar.gz" )
     if not os.access( strMonCliPkg, os.R_OK ):
-        strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
+        strMonCliPkg = "/usr/local/etc/rpcf/appmonui.tar.gz"
         if not os.access( strMonCliPkg, os.R_OK ):
-            strMonCliPkg = ""
+            strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
+            if not os.access( strMonCliPkg, os.R_OK ):
+                strMonCliPkg = ""
+
     if strDist == "debian" or strDist == "ubuntu" :
         cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
         cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf;"
@@ -610,11 +614,13 @@ def Config_Apache( initCfg : object )->int:
         if ret < 0:
             print( "Warning: Failed to update ssl.conf with new cert and key paths" )
 
-    strMonCliPkg = "/usr/local/etc/rpcf/appmonui.tar.gz"
+    strMonCliPkg = str( Path.home() / ".rpcf/etc/rpcf/appmonui.tar.gz" )
     if not os.access( strMonCliPkg, os.R_OK ):
-        strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
+        strMonCliPkg = "/usr/local/etc/rpcf/appmonui.tar.gz"
         if not os.access( strMonCliPkg, os.R_OK ):
-            strMonCliPkg = ""
+            strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
+            if not os.access( strMonCliPkg, os.R_OK ):
+                strMonCliPkg = ""
 
     if strDist == "debian" or strDist == "ubuntu" :
         cmdline += "{sudo} a2enmod headers request ssl remoteip rewrite proxy proxy_wstunnel;"

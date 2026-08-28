@@ -24,6 +24,7 @@
  *
  * =====================================================================================
  */
+
 #include <iostream>
 #include <vector>
 #include <string>
@@ -144,7 +145,7 @@ gint32 DestroyContext()
     }
 
     CoUninitialize();
-    DebugPrintEx( logErr, 0,
+    DebugPrintEx( logInfo, 0,
         "#Leaked objects is %d",
         CObjBase::GetActCount() );
     return STATUS_SUCCESS;
@@ -539,6 +540,7 @@ void Usage(const char* szProg)
               << "  -l              List the users of each stored credentials."
                   "[*] is the default user, [g] indicates the credential is"
                   "GmSSL credential. \n"
+              << "  -L <log level>  Set the vobose degree, 0-6, 6 to be the most vbose.\n"
               << "  -g              Use GmSSL to encrypt the key hash, should be used with '-s' option\n";
 }
 
@@ -587,6 +589,7 @@ gint32 CheckRegistry()
     return ret;
 }
 
+extern EnumLogLvl rpcf::g_dwLogLevel;
 int main( int nArgc, char* pszArgv[] )
 {
     int nOpt;
@@ -597,7 +600,7 @@ int main( int nArgc, char* pszArgv[] )
     gint32 ret = 0;
     std::string strUserName, strPassword, strNewDef;
 
-    while( (nOpt = getopt(nArgc, pszArgv, "d:s:p:r:glh" ) ) != -1 )
+    while( (nOpt = getopt(nArgc, pszArgv, "d:s:p:r:glhL:" ) ) != -1 )
     {
         switch (nOpt) {
             case 'd':
@@ -621,6 +624,14 @@ int main( int nArgc, char* pszArgv[] )
             case 'g':
                 g_bGmSSL = true;
                 break;
+            case 'L':
+                {
+                    EnumLogLvl dwLevel =
+                        ( EnumLogLvl )atoi( optarg );
+                    if( dwLevel <= logInfo && dwLevel >= logEmerg )
+                        g_dwLogLevel = dwLevel;
+                    break;
+                }
             case 'h':
             default:
                 Usage(pszArgv[0]);

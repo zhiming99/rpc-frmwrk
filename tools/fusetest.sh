@@ -14,8 +14,10 @@ dumpfile=$basedir/logdump.txt
 function stressTest()
 {
     pushd testdir
+
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
+    make sync
 
     >$dumpfile
 

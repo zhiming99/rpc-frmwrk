@@ -370,17 +370,26 @@ gint32 FindInstCfg(
         return -EINVAL;
 
     // relative path
-    std::string strFile = "./";
     char buf[ 1024 ];
     buf[ sizeof( buf ) - 1 ] = 0;
     size_t iSize = std::min(
         strFileName.size() + 1, sizeof( buf ) - 1 );
     strncpy( buf,
         strFileName.c_str(), iSize );
-    strFile += basename( buf );
 
+    stdstr strFile = basename( buf );
     do{
-        std::string strFullPath = "/etc/rpcf/";
+        auto& strHome = GetHomeDirCached();
+        stdstr strFullPath = strHome +
+            "/.rpcf/etc/rpcf/" + strFile;
+        ret = access( strFullPath.c_str(), R_OK );
+        if( ret == 0 )
+        {
+            strPath = strFullPath;
+            break;
+        }
+
+        strFullPath = "/etc/rpcf/";
         strFullPath += strFile;
         ret = access( strFullPath.c_str(), R_OK );
         if( ret == 0 )
@@ -397,16 +406,18 @@ gint32 FindInstCfg(
             strPath = strFullPath;
             break;
         }
-
         strFullPath.clear();
         ret = GetLibPath( strFullPath );
         if( ERROR( ret ) )
             break;
-
-        strFullPath += "/../etc/rpcf/" + strFile;
+        strFullPath +=
+            "/../etc/rpcf/" + strFile;
         ret = access( strFullPath.c_str(), R_OK );
         if( ret == 0 )
+        {
             strPath = strFullPath;
+            break;
+        }
 
     }while( 0 );
 
@@ -1357,8 +1368,43 @@ gint32 CSharedLock::TryLockWrite()
 #include <pwd.h>
 stdstr GetHomeDir()
 {
-    struct passwd* pwd = getpwuid( getuid() );
-    return stdstr( pwd->pw_dir );
+    const char* szHome = std::getenv("HOME");
+    if( szHome && szHome[ 0 ] != '\0' )
+        return stdstr( szHome );
+
+    // Allocate a buffer for getpwuid_r
+    long lSize  = sysconf( _SC_GETPW_R_SIZE_MAX );
+    if (lSize == -1)
+        lSize = 4096;
+
+    std::vector<char> buffer( lSize );
+
+    uid_t uid = getuid();
+    struct passwd pwd;
+    struct passwd* result = nullptr;
+    
+    if( getpwuid_r(uid, &pwd, buffer.data(),
+        buffer.size(), &result ) == 0 &&
+        result != nullptr)
+    {
+        if( result->pw_dir && result->pw_dir[0] != '\0' )
+            return stdstr( result->pw_dir );
+    }
+    return "/tmp"; 
+}
+
+const stdstr& GetHomeDirCached()
+{
+    static stdstr strHome;
+    static bool bInitialized = false;
+
+    // Guaranteed thread-safe, fast execution path after the first call
+    if( !bInitialized )
+    {
+        strHome = GetHomeDir();
+        bInitialized = true;
+    }
+    return strHome;
 }
 
 
@@ -1709,6 +1755,35 @@ stdstr GetThreadName()
         return stdstr( "Unknown" );
 
     return stdstr( szBuf );
+}
+
+bool CopyFile(
+    const stdstr& src, const stdstr& dst )
+{
+    std::ifstream srcFile(src, std::ios::binary);
+    std::ofstream dstFile(dst, std::ios::binary);
+
+    if( !srcFile || !dstFile )
+        return false;
+
+    dstFile << srcFile.rdbuf();
+    return srcFile.good() && dstFile.good();
+}
+
+bool IsSameFile(
+    const stdstr& p1, const stdstr& p2 )
+{
+    struct stat stat1, stat2;
+
+    // stat automatically resolves symbolic links and relative paths
+    if (stat(p1.c_str(), &stat1) != 0)
+        return false; 
+    if (stat(p2.c_str(), &stat2) != 0)
+        return false; 
+
+    // Compare device ID and Inode ID
+    return (stat1.st_dev == stat2.st_dev) &&
+        (stat1.st_ino == stat2.st_ino);
 }
 
 }

@@ -1,6 +1,6 @@
 import sys
 import time
-import numpy as np
+import ctypes
 from rpcf.rpcbase import *
 
 from rpcf.proxy import PyRpcContext, PyRpcServer
@@ -49,7 +49,7 @@ class CEchoServer:
     #return sum of i1+i2
     def Echo2( self, callback, i1, i2 ):
         listResp = [ 0 ]
-        result = np.int32( i1 ) + np.float64( i2 )
+        result = ctypes.c_float64( i1 + i2 )
         listParams = [  result ]
         listResp.append( listParams )
         return listResp
@@ -65,8 +65,7 @@ class CEchoServer:
         #2 seconds
         context = [ callback, iCount, pObj ]
         ret = self.oInst.AddTimer(
-            np.int32( 2 ),
-            CEchoServer.EchoCfgCb,
+            2, CEchoServer.EchoCfgCb,
             context )
         if ret[ 0 ] < 0 :
             return [ ret[ 0 ],  ]

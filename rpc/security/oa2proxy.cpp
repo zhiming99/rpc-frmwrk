@@ -181,6 +181,7 @@ gint32 COAuth2LoginProxy::DoLogin(
     return ret;
 }
 
+extern const stdstr& GetHomeDirCached();
 gint32 COAuth2LoginProxy::DecryptCookie(
     const stdstr& strHex,
     stdstr& strCookie )
@@ -199,8 +200,8 @@ gint32 COAuth2LoginProxy::DecryptCookie(
         if( ERROR( ret ) )
             break;
 
-        stdstr strHome = GetHomeDir();
-        strHome += "/.rpcf/openssl/";
+        stdstr strHome = GetHomeDirCached() +
+            "/.rpcf/openssl/";
         std::vector< stdstr > vecKeys = {
              "clientkey.pem", "signkey.pem" };
 

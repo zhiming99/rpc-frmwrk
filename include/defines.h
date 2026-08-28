@@ -352,6 +352,7 @@ gint32 GenStrHash( const stdstr& strMsg,
     guint32& dwHash );
 
 stdstr GetHomeDir();
+const stdstr& GetHomeDirCached();
 
 const char* Version();
 
@@ -917,5 +918,11 @@ gint32 GetHostAndPortFromUrl(
     stdstr& strHost, guint32& dwPort );
 
 gint32 StartDBus();
+
+bool CopyFile(
+    const stdstr& src, const stdstr& dst );
+
+bool IsSameFile(
+    const stdstr& p1, const stdstr& p2 );
 
 }

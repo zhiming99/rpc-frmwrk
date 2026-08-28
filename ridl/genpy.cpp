@@ -1121,6 +1121,7 @@ gint32 CDeclarePyStruct::Output()
     return ret;
 }
 
+
 static gint32 GenStructsFilePy(
     CPyWriter* m_pWriter, ObjPtr& pRoot )
 {
@@ -1137,19 +1138,21 @@ static gint32 GenStructsFilePy(
             break;
         }
 
-        stdstr strCmd = "rm ";
         stdstr strSeribase =
         m_pWriter->GetOutPath() +  "/seribase.py";
-        strCmd += strSeribase + ";cp ";
         {
             stdstr strPath;
             ret = FindInstCfg(
                 "./seribase.py", strPath );
             if( ERROR( ret ) )
-                break;
-            strCmd +=
-                strPath + " " + strSeribase;
-            system( strCmd.c_str() );
+            {
+                ret = access( "./seribase.py", R_OK );
+                if( ERROR( ret ) )
+                    break;
+                strPath = "./seribase.py";
+            }
+            if( !IsSameFile( strPath, strSeribase ) )
+                CopyFile( strPath, strSeribase );
         }
 
         m_pWriter->SelectStructsFile();

@@ -53,21 +53,16 @@ file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/appmancli")
 add_custom_command(
     OUTPUT ${GENERATED_PY_FILES}
     
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/etc/rpcf"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${top_dir}/ridl/seribase.py"
-        "${CMAKE_BINARY_DIR}/etc/rpcf/"
-
-    # Stage boilerplate code-generation tracking tools securely
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${top_dir}/ridl/mktpl" "${top_dir}/ridl/mktplsvr" 
         "${top_dir}/ridl/pymktpl" "${top_dir}/ridl/mktplcli" 
         "${top_dir}/ridl/drvtpl.json" "${top_dir}/ridl/odesctpl2.json" 
         "${top_dir}/ridl/synccfg.py"
+        "${top_dir}/ridl/seribase.py"
         "${CMAKE_CURRENT_BINARY_DIR}/appmancli/"
         
     # Execute internal IDL tool compiler mapping environments
-    COMMAND $<TARGET_FILE:ridlc> --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  "${mon_dir}/appmon/appmon.ridl"
+    COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${CMAKE_BINARY_DIR}/tools:${CMAKE_SOURCE_DIR}/tools" $<TARGET_FILE:ridlc> --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client -pslO .  "${mon_dir}/appmon/appmon.ridl"
     DEPENDS "${mon_dir}/appmon/appmon.ridl"
         
     # override
@@ -75,7 +70,7 @@ add_custom_command(
         "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/AppManagercli.py"
         "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/maincli.py"
         "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/apptimer.py"
-        "${CMAKE_CURRENT_SOURCE_DIR}/appmancli/"
+        "${CMAKE_CURRENT_BINARY_DIR}/appmancli/"
 
     # Cleanup trailing tracking files
     COMMAND ${CMAKE_COMMAND} -E rm -f 
