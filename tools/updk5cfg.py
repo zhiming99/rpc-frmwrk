@@ -10,6 +10,7 @@ import re
 from krbparse import *
 from updwscfg import IsSudoAvailable, rpcf_system, GetDistName
 import traceback
+from pathlib import Path
 
 def GetKrb5ConfTempl():
         return '''[logging]
@@ -342,10 +343,10 @@ def GetKdcConfPath() -> str:
     return ""
 
 def GetTestKeytabPath()->str:
-    return os.path.expanduser( "~" ) + "/.rpcf/krb5/krb5.keytab"
+    return str( Path.home() / ".rpcf/krb5/krb5.keytab" )
 
 def GetTestAdminKeytabPath()->str:
-    return os.path.expanduser( "~" ) + "/.rpcf/krb5/krb5adm.keytab"
+    return str( Path.home() / ".rpcf/krb5/krb5adm.keytab" )
 
 def IsTestKdcSet() :
     strPath = os.path.dirname( GetTestKeytabPath() )

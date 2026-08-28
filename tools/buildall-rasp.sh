@@ -19,7 +19,7 @@ libcommons-cli-java ccache curl fuse3 gettext attr
 ${SUDO} apt-get -y install sip-tools || ${SUDO} apt-get -y install sip-dev python3-sip python3-sip-dev || true
 
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim
-${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
+${SUDO} apt-get -y install python3-wheel || pip3 install wheel
 pip3 install --break-system-packages urwid
 
 NODE_MAJOR=18

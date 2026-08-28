@@ -1,7 +1,7 @@
 #asynchronous version proxy for CPauseResumeServer
 
 import sys
-import numpy as np
+import ctypes
 import threading as tr
 from rpcf.rpcbase import *
 
@@ -66,11 +66,11 @@ class CPauseResumeClient:
         tupRet = self.sendRequestAsync(
             CPauseResumeClient.EchoManyCb,
             self._ifName_, "EchoMany",
-            np.int32( i1 ),
-            np.int16( i2 ),
-            np.int64( i3 ),
-            np.float32( i4 ),
-            np.float64( i5 ),
+            ctypes.c_int32( i1 ),
+            ctypes.c_int16( i2 ),
+            ctypes.c_int64( i3 ),
+            ctypes.c_float( i4 ),
+            ctypes.c_double( i5 ),
             strText )
 
         ret = tupRet[ 0 ]

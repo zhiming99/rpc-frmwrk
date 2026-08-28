@@ -821,7 +821,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
         const char* szName =
             dbus_bus_get_unique_name( m_pDBusConn );
 
-        OutputMsg( 0,
+        DebugPrintEx( logInfo, 0,
             "dbus unique name: %s", szName );
 
         CParamList oParams;

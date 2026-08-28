@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 packages = ["appmancli"]
 
 [tool.setuptools.package-data]
-"appmancli" = ["README.md"]
+#"appmancli" = ["README.md"]
 
 [project.scripts]
 #start_appmancli = "maincli:StartAppManagercli"
@@ -23,7 +23,7 @@ description = "An IPC client to AppManager for Python."
 authors = [
     { name = "zhiming", email = "woodhead99@gmail.com" }
 ]
-readme = "README.md"
+#readme = "README.md"
 keywords = ["rpc", "appmanager", "client"]
 classifiers = [
     "Programming Language :: Python :: 3",

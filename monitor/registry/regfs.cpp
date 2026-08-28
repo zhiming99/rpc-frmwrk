@@ -206,7 +206,8 @@ gint32 CRegistryFs::Stop()
     do{
         WRITE_LOCK( this );
         if( m_mapOpenFiles.size() )
-            DebugPrint( m_mapOpenFiles.size(),
+            DebugPrintEx( logNotice,
+                m_mapOpenFiles.size(),
                 "there are some open files to close" );
         for( auto& elem : m_mapOpenFiles )
         {

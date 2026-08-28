@@ -1,6 +1,5 @@
 import sys
 import time
-import numpy as np
 import threading as tr
 import getpass
 import errno
@@ -43,9 +42,9 @@ class PyFileTransfer :
     def UploadFile( self,
         callback,
         fileName:   str,
-        chanHash:   np.uint64, 
-        offset:     np.uint64,
-        size:       np.uint64 )->[ int, list ]:
+        chanHash:   int, 
+        offset:     int,
+        size:       int )->[ int, list ]:
         pass
 
     ''' rpc method
@@ -53,9 +52,9 @@ class PyFileTransfer :
     def DownloadFile( self,
         callback,
         fileName:   str,
-        chanHash:   np.uint64,
-        offset:     np.uint64,
-        size:       np.uint64 )->[ int, list ]:
+        chanHash:   int,
+        offset:     int,
+        size:       int )->[ int, list ]:
         pass
 
     ''' rpc method

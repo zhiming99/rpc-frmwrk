@@ -1,6 +1,5 @@
 import sys
 import time
-import numpy as np
 import threading as tr
 from rpcf.rpcbase import *
 

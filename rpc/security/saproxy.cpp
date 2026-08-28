@@ -242,13 +242,7 @@ static gint32 GetDefaultUser(
     return ret;
 }
 
-static std::string GetClientRegPath()
-{
-    stdstr strCliReg = GetHomeDir();
-    strCliReg += "/.rpcf/clientreg.dat";
-    return strCliReg;
-}
-
+extern const stdstr& GetHomeDirCached();
 gint32 GetPassHash( stdstr& strUser,
     BufPtr& pPassHash,
     const stdstr& strSalt,
@@ -256,7 +250,8 @@ gint32 GetPassHash( stdstr& strUser,
 {
     gint32 ret = 0;
     RegFsPtr pfs;
-    stdstr strCliReg = GetClientRegPath();
+    stdstr strCliReg = GetHomeDirCached() +
+        + "/.rpcf/clientreg.dat";
 
     try{
         CProcessLock oProcLock( strCliReg );

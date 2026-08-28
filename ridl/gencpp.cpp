@@ -9407,6 +9407,19 @@ gint32 CExportObjDesc::Output()
             ( g_bBuiltinRt ? "True" : "False" ) +
             ":";
 
+        stdstr strDrv = GetHomeDir() +
+            "/.rpcf/etc/rpcf/echodesc.json";
+        ret = access( strDrv.c_str(), R_OK );
+        if( SUCCEEDED( ret ) )
+        {
+            strCmdLine +=
+                ";s:srcPath = .*$:srcPath = \"";
+            strCmdLine += strDrv + "\":";
+        }
+        else
+        {
+            ret = 0;
+        }
         const char* args[5];
 
         args[ 0 ] = "/bin/sed";

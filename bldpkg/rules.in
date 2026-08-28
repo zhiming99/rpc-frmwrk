@@ -14,4 +14,4 @@ cfgopt:= @GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @KRB5_CFGOPT@ @JAVA_CFGO
 	dh $@ $(dhopt)
 
 override_dh_auto_configure:
-	dh_auto_configure -- $(cfgopt) "CPPFLAGS=-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
+	dh_auto_configure -- $(cfgopt) --disable-static "CPPFLAGS=-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"

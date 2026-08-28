@@ -1,6 +1,6 @@
 import sys
 import time
-import numpy as np
+import ctypes
 
 from rpcf.rpcbase import *
 
@@ -86,7 +86,7 @@ def test_main() :
                 ret = tupRet[ 0 ]
                 break
 
-            qwTaskId = np.int64( tupRet[ 1 ] )
+            qwTaskId = tupRet[ 1 ]
             time.sleep( 2 )
             ret = oProxy.oInst.CancelRequest( qwTaskId )
             if ret == 0 :

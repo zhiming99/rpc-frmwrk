@@ -25,13 +25,19 @@ else
     SUDO=
 fi
 
-$SUDO python3 /usr/local/bin/rpcf/rpcfgnui.py $output
+python3 /usr/local/bin/rpcf/rpcfgnui.py $output
 
 popd
 
 if [ ! -d reqfwdr ]; then
     mkdir reqfwdr
 fi
-python3 ./tools/updgmskey.py /usr/local/etc/rpcf/driver.json $keydir > reqfwdr/driver.json
+if [ -f "$HOME/.rpcf/etc/rpcf/driver.json" ]; then
+    drvPath="$HOME/.rpcf/etc/rpcf/driver.json"
+else
+    drvPath=/usr/local/etc/rpcf/driver.json 
+fi
+
+python3 ./tools/updgmskey.py $drvPath $keydir > reqfwdr/driver.json
 
 

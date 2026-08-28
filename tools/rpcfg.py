@@ -1761,7 +1761,7 @@ class ConfigDlg(Gtk.Dialog):
         cnum = dialog.cnumEdit.get_text().strip()
         snum = dialog.snumEdit.get_text().strip()
 
-        strCurPath = os.path.expanduser( "~" ) + "/.rpcf"
+        strCurPath  = str( Path.home() / ".rpcf" )
         bGmSSL = self.gmsslCheck.props.active
         if bGmSSL :
             strCurPath += "/gmssl"

@@ -33,7 +33,7 @@ RUN python3 -m venv /opt/venv
 # Inject the environment paths globally for all future layers and execution tasks
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN pip install --upgrade pip && pip install sip wheel numpy urwid
+RUN pip install --upgrade pip && pip install sip wheel urwid
 
 # ubuntu 22.04's official version of nodejs is outdated, lets install node 20 from nodejs'
 # site instead.

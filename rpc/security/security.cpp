@@ -1502,8 +1502,8 @@ gint32 CRpcReqForwarderAuth::GetCookieByHash(
     bool bStop = false;
     do{
         CParamList oParams;
-        stdstr strHome = GetHomeDir();
-        strHome += "/.rpcf/";
+        stdstr strHome =
+            GetHomeDirCached() + "/.rpcf/";
         oParams.SetStrProp(
             propConfigPath, strHome + CLI_REG );
         ret = pRegfs.NewObj(
