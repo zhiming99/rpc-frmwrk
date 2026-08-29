@@ -80,3 +80,4 @@
   * [教程8-调试](./Tut-Debug_cn-8.md)
   * [教程9-如何编译rpc-frmwrk](./Tut-HowToBuild_cn-9.md)
   * [教程10-如何手搓一个观察记录温度的监控程序](../examples/python/thermalog/README_cn.md)![new](../pics/new.png)
+  * [教程11-如何配置rpc-frmwrk](./Tut-HowToConfig_cn-11.md)
