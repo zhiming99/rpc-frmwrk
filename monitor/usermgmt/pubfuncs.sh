@@ -101,16 +101,20 @@ function check_user_mount()
     export rootdir=
     if (( $mt == 1 ));then
         rootdir=`echo $appmp | awk '{print $3}'`
+        echo path to mount: $rootdir
         if [ -d "$rootdir/usereg/users" ]; then
             rootdir="$rootdir/usereg"
             #echo find mount at $rootdir...
+            echo usereg rootdir is $rootdir
             return 0
         fi
     elif (( $mt == 0 ));then
         mp+=" invalidpath"
+        echo candidate paths to mount: $mp
         for rootdir in $mp; do
             if [ -d "$rootdir/users" ]; then
                 #echo find mount at $rootdir...
+                echo usereg rootdir is $rootdir
                 return 0
             fi
         done
