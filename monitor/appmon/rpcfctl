@@ -386,7 +386,7 @@ case "$cmd" in
         fi
 
         if command -v expect > /dev/null; then
-            expect - << EOF > /dev/null
+            expect - << EOF
 #!/usr/bin/expect -f
 set timeout -1
 send_user "initializing user registry...\n"
