@@ -3953,8 +3953,12 @@ gint32 CExportObjDesc2::OutputROS()
         args[ 4 ] = nullptr;
         char* env[ 1 ] = { nullptr };
 
-        Execve( "/bin/sed",
+        gint32 iRet = Execve( "/bin/sed",
             const_cast< char* const*>( args ), env );
+
+        OutputMsg( iRet, "update file %s with 'sed -i %s'",
+            strDstPy.c_str(),
+            strCmdLine.c_str() );
 
     }while( 0 );
 
