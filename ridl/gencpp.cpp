@@ -9377,7 +9377,8 @@ gint32 CExportObjDesc::Output()
             // this is the case when the ridlc is
             // not installed
             strSrcPy = "./synccfg.py";
-            ret = access( strSrcPy.c_str(), F_OK );
+            ret = access( strSrcPy.c_str(),
+                R_OK | W_OK );
             if( ret < 0 )
             {
                 ret = 0;
@@ -9385,7 +9386,8 @@ gint32 CExportObjDesc::Output()
             }
         }
 
-        if( !CopyFile( strSrcPy, strDstPy ) )
+        if( !IsSameFile( strSrcPy, strDstPy ) 
+            && !CopyFile( strSrcPy, strDstPy ) )
         {
             ret = ERROR_FAIL;
             OutputMsg( ret,
