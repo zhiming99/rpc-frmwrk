@@ -32,9 +32,7 @@ appmancli/__init__.py:
     if(($$bexit==0));then echo all files are ready;exit 0;fi; \
     if true; then \
         if [ ! -f ./mktpl ];then \
-            echo copying files...;\
             cp $(top_dir)/ridl/{mktpl,mktplsvr,pymktpl,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py,seribase.py} . ;\
-            cat ./synccfg.py;\
         fi;\
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
@@ -47,8 +45,7 @@ appmancli/__init__.py:
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl pymktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
-    rm -f *.new; rm -f appmondesc.json driver.json *.md;\
-    cat ./synccfg.py;\
+    rm -f *.new; rm -f appmondesc.json driver.json *.md cmdline synccfg.py;\
     popd
 
 # Install the Python package using pip
