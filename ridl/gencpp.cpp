@@ -8909,8 +8909,7 @@ gint32 CExportMakefile::Output()
         char* env[ 1 ] = { nullptr };
 
         Execve( "/bin/sed",
-            const_cast< char* const*>( args ),
-            env, nullptr, true );
+            const_cast< char* const*>( args ), env );
 
     }while( 0 );
 
@@ -9386,6 +9385,16 @@ gint32 CExportObjDesc::Output()
             }
         }
 
+        if( !CopyFile( strSrcPy, strDstPy ) )
+        {
+            ret = ERROR_FAIL;
+            OutputMsg( ret,
+                "Failed to copy file %s to %s",
+                strSrcPy.c_str(),
+                strDstPy.c_str() );
+            break;
+        }
+
         stdstr strObjList;
         for( int i = 0; i < vecSvcs.size(); i++ )
         {
@@ -9424,14 +9433,14 @@ gint32 CExportObjDesc::Output()
         const char* args[5];
 
         args[ 0 ] = "/bin/sed";
-        args[ 1 ] = strCmdLine.c_str();
-        args[ 2 ] = strSrcPy.c_str();
-        args[ 3 ] = nullptr;
+        args[ 1 ] = "-i";
+        args[ 2 ] = strCmdLine.c_str();
+        args[ 3 ] = strDstPy.c_str();
+        args[ 4 ] = nullptr;
         char* env[ 1 ] = { nullptr };
 
         Execve( "/bin/sed",
-            const_cast< char* const*>( args ),
-            env, strDstPy.c_str(), true );
+            const_cast< char* const*>( args ), env );
 
     }while( 0 );
 

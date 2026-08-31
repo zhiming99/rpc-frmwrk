@@ -16,7 +16,7 @@ all: appmancli/__init__.py dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl
 IS_VENV := $(shell python3 -c "import sys; print('true' if sys.prefix != sys.base_prefix else 'false')")
 command := $(if $(filter false,$(IS_VENV)),python3 -m build --wheel --no-isolation --outdir dist/ ., pip wheel . --no-deps --no-build-isolation -w dist/ )
 
-dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/AppManagercli.py appmancli/maincli.py appmancli/apptimer.py
+dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/__init__.py appmancli/AppManagercli.py appmancli/maincli.py appmancli/apptimer.py
 	cp ../../../../LICENSE ./LICENSE
 	if ! grep 'dynamic = ' pyproject.toml; then \
 	python3 -c "import setuptools; v=int(setuptools.__version__.split('.')[0]); f=open('pyproject.toml', 'a'); f.write('dynamic = [\"license\"]\n') if v>=61 else True; f.close()";\
@@ -45,7 +45,7 @@ appmancli/__init__.py:
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl pymktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
-    rm -f *.new; rm -f appmondesc.json driver.json *.md cmdline synccfg.py;\
+    rm -f *.new; rm -f appmondesc.json driver.json *.md;\
     popd
 
 # Install the Python package using pip
