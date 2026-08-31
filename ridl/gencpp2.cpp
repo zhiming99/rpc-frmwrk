@@ -3944,7 +3944,7 @@ gint32 CExportObjDesc2::OutputROS()
 
         Execve( "/bin/sed",
             const_cast< char* const*>( args ),
-            env, strDstPy.c_str() );
+            env, strDstPy.c_str(), true );
 
     }while( 0 );
 

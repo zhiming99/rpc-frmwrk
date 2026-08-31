@@ -8909,7 +8909,8 @@ gint32 CExportMakefile::Output()
         char* env[ 1 ] = { nullptr };
 
         Execve( "/bin/sed",
-            const_cast< char* const*>( args ), env );
+            const_cast< char* const*>( args ),
+            env, nullptr, true );
 
     }while( 0 );
 
@@ -9430,7 +9431,7 @@ gint32 CExportObjDesc::Output()
 
         Execve( "/bin/sed",
             const_cast< char* const*>( args ),
-            env, strDstPy.c_str() );
+            env, strDstPy.c_str(), true );
 
     }while( 0 );
 
