@@ -111,6 +111,7 @@ void lexerr(const char *s) {
 
 %}
 
+%option     nounistd
 %option     8bit bison-bridge
 %option     bison-locations
 %option     warn

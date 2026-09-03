@@ -78,7 +78,7 @@ struct CSTAstNodeBase :
     virtual std::string GetSignature() const
     { return std::string( "" ); }
 
-    inline void SetLocation( YYLTYPE2& oLoc )
+    inline void SetLocation( const YYLTYPE2& oLoc )
     { m_oLocation = oLoc; }
 
     const YYLTYPE2& GetLocation() const
@@ -87,6 +87,8 @@ struct CSTAstNodeBase :
     YYLTYPE2& GetLocation()
     { return m_oLocation; }
 
+    virtual std::string GetNodeInfo() const 
+    { return ""; }
 };
 
 

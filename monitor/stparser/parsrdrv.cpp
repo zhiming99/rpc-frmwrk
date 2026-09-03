@@ -548,7 +548,7 @@ gint32 StartParse(
                     ParserPrint( pCtx->GetCurFileName().c_str(),
                         current_lloc.first_line,
                         "error, "
-                        "unexpected elsif or endif." );
+                        "unexpected elsif or endif.", true );
                     break;
                 }
                 current_tok = TOK_VSTART_PRAGMA;
@@ -721,14 +721,14 @@ gint32 StartParse(
         ParserPrint( basename(
             pCtx->GetCurFileName().c_str() ),
             current_lloc.first_line, 
-            "Parsing successfully" );
+            "Parsing successfully", false );
     }
     else
     {
         ParserPrint( basename(
             pCtx->GetCurFileName().c_str() ),
             current_lloc.first_line, 
-            "Parsing failed with errors" );
+            "Parsing failed with errors", true );
     }
     yylex_destroy( yyscanner );
     pCtx->SetScanner( nullptr );
