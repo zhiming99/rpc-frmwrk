@@ -110,6 +110,199 @@ std::string CStEnumValueListNode::GetNodeInfo() const
 }
 
 // ========================================================================
+// CStDataTypeSpecNode Implementation
+// ========================================================================
+
+std::string CStDataTypeSpecNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "DataTypeSpec{ ";
+    if( !m_pTypeSpec.IsEmpty() )
+        oss << "type_spec set";
+    else
+        oss << "no type_spec";
+    oss << " }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStTypeSpecNode Implementation
+// ========================================================================
+
+std::string CStTypeSpecNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "TypeSpec{ ";
+    if( !m_pType.IsEmpty() )
+        oss << "type set";
+    else
+        oss << "no type";
+    oss << " }";
+    return oss.str();
+}
+
+std::string CStTypeDefinitionBlockNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "TypeDefinitionBlock{ " << m_vecTypeDecls.size() << " declarations }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStLValueNode Implementation
+// ========================================================================
+
+std::string CStLValueNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "LValue";
+    if( !m_pExpression.IsEmpty() )
+    {
+        CSTAstNodeBase* pBase = dynamic_cast< CSTAstNodeBase* >(
+            ( CObjBase* )m_pExpression );
+        if( pBase )
+            oss << "{" << pBase->GetNodeInfo() << "}";
+    }
+    return oss.str();
+}
+
+// ========================================================================
+// CStLValueExtNode Implementation
+// ========================================================================
+
+std::string CStLValueExtNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "LValueExt";
+    if( !m_pExpression.IsEmpty() )
+    {
+        CSTAstNodeBase* pBase = dynamic_cast< CSTAstNodeBase* >(
+            ( CObjBase* )m_pExpression );
+        if( pBase )
+            oss << "{" << pBase->GetNodeInfo() << "}";
+    }
+    return oss.str();
+}
+
+// ========================================================================
+// CStInstancePathNode Implementation
+// ========================================================================
+
+std::string CStInstancePathNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "InstancePath{ " << GetDottedName() << ", ";
+    if( !m_pExpression.IsEmpty() )
+        oss << "expr set";
+    else
+        oss << "no expr";
+    oss << " }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStFullExpressionNode Implementation
+// ========================================================================
+
+std::string CStFullExpressionNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "FullExpr{ ";
+    if( !m_pExpression.IsEmpty() )
+        oss << "expr set";
+    else
+        oss << "no expr";
+    oss << " }";
+    return oss.str();
+}
+
+std::string CStFullExpressionNode::GetSignature() const
+{
+    CStExprNode* pInner = m_pExpression;
+    if( pInner != nullptr )
+        return pInner->GetSignature();
+    return std::string();
+}
+
+// ========================================================================
+// CStSubrangeNode Implementation
+// ========================================================================
+
+std::string CStSubrangeNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "Subrange{ ";
+    if( !m_pStart.IsEmpty() )
+        oss << "expr";
+    else
+        oss << "none";
+    oss << "..";
+    if( !m_pEnd.IsEmpty() )
+        oss << "expr";
+    else
+        oss << "none";
+    oss << " }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStSubrangeListNode Implementation
+// ========================================================================
+
+std::string CStSubrangeListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "SubrangeList{ dims: " << m_vecRanges.size() << " }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStStmtListNode Implementation
+// ========================================================================
+
+std::string CStStmtListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "StmtList{ stmts: " << m_vecStatements.size() << " }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStIfBranchListNode Implementation
+// ========================================================================
+
+std::string CStIfBranchListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "IfBranchList{ branches: " << m_vecBranches.size() << " }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStCallExpr Implementation
+// ========================================================================
+
+std::string CStCallExpr::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "CallExpr{ positional: " << m_vecArgs.size()
+        << ", named: " << m_vecNamedArgs.size() << " }";
+    return oss.str();
+}
+
+// ========================================================================
+// CStArgListNode Implementation
+// ========================================================================
+
+std::string CStArgListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "ArgList{ positional: " << m_vecArgs.size()
+        << ", named: " << m_vecNamed.size() << " }";
+    return oss.str();
+}
+
+// ========================================================================
 // CStArrayInitNode Implementation
 // ========================================================================
 
@@ -166,11 +359,15 @@ IMPL_GETNODEINFO( CStLiteralExpr )
 // CStIdentifierExpr has inline impl in header
 IMPL_GETNODEINFO( CStBinaryExpr )
 IMPL_GETNODEINFO( CStUnaryExpr )
-IMPL_GETNODEINFO( CStCallExpr )
+// CStCallExpr has explicit implementation
 IMPL_GETNODEINFO( CStArrayAccessExpr )
 IMPL_GETNODEINFO( CStMemberAccessExpr )
 IMPL_GETNODEINFO( CStDereferenceExpr )
 IMPL_GETNODEINFO( CStPointerMemberExpr )
+
+// L-value wrapper nodes (explicit implementations above)
+// CStLValueNode has explicit implementation
+// CStLValueExtNode has explicit implementation
 
 // Type nodes
 IMPL_GETNODEINFO( CStTypeNode )
@@ -179,6 +376,8 @@ IMPL_GETNODEINFO( CStBasicTypeNode )
 IMPL_GETNODEINFO( CStArrayTypeNode )
 IMPL_GETNODEINFO( CStStructTypeNode )
 IMPL_GETNODEINFO( CStEnumTypeNode )
+// CStDataTypeSpecNode has explicit implementation
+// CStTypeSpecNode has explicit implementation
 IMPL_GETNODEINFO( CStPointerTypeNode )
 IMPL_GETNODEINFO( CStReferenceTypeNode )
 IMPL_GETNODEINFO( CStDerivedTypeNode )

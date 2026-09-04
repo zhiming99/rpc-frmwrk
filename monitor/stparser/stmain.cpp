@@ -80,10 +80,19 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStBinaryExpr );
     INIT_MAP_ENTRY( CStUnaryExpr );
     INIT_MAP_ENTRY( CStCallExpr );
+    INIT_MAP_ENTRY( CStArgListNode );
     INIT_MAP_ENTRY( CStArrayAccessExpr );
     INIT_MAP_ENTRY( CStMemberAccessExpr );
     INIT_MAP_ENTRY( CStDereferenceExpr );
     INIT_MAP_ENTRY( CStPointerMemberExpr );
+    INIT_MAP_ENTRY( CStLValueNode );
+    INIT_MAP_ENTRY( CStLValueExtNode );
+    INIT_MAP_ENTRY( CStInstancePathNode );
+    INIT_MAP_ENTRY( CStFullExpressionNode );
+    INIT_MAP_ENTRY( CStSubrangeNode );
+    INIT_MAP_ENTRY( CStSubrangeListNode );
+    INIT_MAP_ENTRY( CStStmtListNode );
+    INIT_MAP_ENTRY( CStIfBranchListNode );
 
     // AST Type Nodes
     INIT_MAP_ENTRY( CStBasicTypeNode );
@@ -92,6 +101,9 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStEnumTypeNode );
     INIT_MAP_ENTRY( CStEnumValueNode );
     INIT_MAP_ENTRY( CStEnumValueListNode );
+    INIT_MAP_ENTRY( CStDataTypeSpecNode );
+    INIT_MAP_ENTRY( CStTypeSpecNode );
+    INIT_MAP_ENTRY( CStTypeDefinitionBlockNode );
     INIT_MAP_ENTRY( CStPointerTypeNode );
     INIT_MAP_ENTRY( CStReferenceTypeNode );
     INIT_MAP_ENTRY( CStDerivedTypeNode );

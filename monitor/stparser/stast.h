@@ -51,7 +51,7 @@ struct CSTAstNodeBase :
     guint32 m_dwFlags = 0;
     CSTAstNodeBase():super()
     {} 
-    CSTAstNodeBase* m_pParent;
+    CSTAstNodeBase* m_pParent = nullptr;
     gint32 m_iToken = YYUNDEF;
     YYLTYPE2  m_oLocation;
 

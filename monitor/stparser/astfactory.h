@@ -94,6 +94,8 @@ public:
             p->m_eOperator = eOp;
             p->m_pLeft = pLeft;
             p->m_pRight = pRight;
+            SetParent( pLeft, p );
+            SetParent( pRight, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -109,13 +111,16 @@ public:
         {
             p->m_eOperator = eOp;
             p->m_pOperand = pOperand;
+            SetParent( pOperand, p );
             p->SetLocation( oLoc );
         }
         return pNode;
     }
 
     ObjPtr CreateCallExpr( ObjPtr pCallee,
-        const std::vector< ObjPtr >& vecArgs, const YYLTYPE2& oLoc )
+        const std::vector< ObjPtr >& vecArgs, const YYLTYPE2& oLoc,
+        const std::vector< CStCallExpr::CNamedArg >& vecNamedArgs =
+            std::vector< CStCallExpr::CNamedArg >() )
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CStCallExpr ) );
@@ -124,6 +129,23 @@ public:
         {
             p->m_pCallee = pCallee;
             p->m_vecArgs = vecArgs;
+            p->m_vecNamedArgs = vecNamedArgs;
+            SetParent( pCallee, p );
+            SetParents( vecArgs, p );
+            for( size_t i = 0; i < vecNamedArgs.size(); i++ )
+                SetParent( vecNamedArgs[ i ].m_pValue, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateArgListNode( const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStArgListNode ) );
+        CStArgListNode* p = pNode;
+        if( p != nullptr )
+        {
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -139,6 +161,8 @@ public:
         {
             p->m_pArray = pArray;
             p->m_vecIndices = vecIndices;
+            SetParent( pArray, p );
+            SetParents( vecIndices, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -155,6 +179,7 @@ public:
             p->m_eAccessType = eType;
             p->m_pObject = pObject;
             p->m_strMember = strMember;
+            SetParent( pObject, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -168,6 +193,7 @@ public:
         if( p != nullptr )
         {
             p->m_pPointer = pPointer;
+            SetParent( pPointer, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -183,6 +209,108 @@ public:
         {
             p->m_pPointer = pPointer;
             p->m_strMember = strMember;
+            SetParent( pPointer, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateLValueNode( ObjPtr pExpression, const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStLValueNode ) );
+        CStLValueNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_pExpression = pExpression;
+            SetParent( pExpression, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateLValueExtNode( ObjPtr pExpression, const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStLValueExtNode ) );
+        CStLValueExtNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_pExpression = pExpression;
+            SetParent( pExpression, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateInstancePathNode(
+        const std::vector< std::string >& vecNameComponents,
+        ObjPtr pExpression, const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStInstancePathNode ) );
+        CStInstancePathNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_vecNameComponents = vecNameComponents;
+            p->m_pExpression = pExpression;
+            SetParent( pExpression, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateFullExpressionNode( ObjPtr pExpression,
+        const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStFullExpressionNode ) );
+        CStFullExpressionNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_pExpression = pExpression;
+            SetParent( pExpression, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateSubrangeNode( ObjPtr pStart, ObjPtr pEnd,
+        const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStSubrangeNode ) );
+        CStSubrangeNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_pStart = pStart;
+            p->m_pEnd = pEnd;
+            SetParent( pStart, p );
+            SetParent( pEnd, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateStmtListNode( const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStStmtListNode ) );
+        CStStmtListNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateIfBranchListNode( const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStIfBranchListNode ) );
+        CStIfBranchListNode* p = pNode;
+        if( p != nullptr )
+        {
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -215,6 +343,7 @@ public:
         {
             p->m_pElementType = pElementType;
             p->m_vecDims = vecDims;
+            SetParent( pElementType, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -231,6 +360,11 @@ public:
         {
             p->m_strName = strName;
             p->m_vecMembers = vecMembers;
+            for( size_t i = 0; i < vecMembers.size(); i++ )
+            {
+                SetParent( vecMembers[ i ].m_pType, p );
+                SetParent( vecMembers[ i ].m_pInitialValue, p );
+            }
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -250,6 +384,48 @@ public:
             p->m_vecValues = vecValues;
             p->m_pBaseType = pBaseType;
             p->m_strDefaultInit = strDefaultInit;
+            SetParents( vecValues, p );
+            SetParent( pBaseType, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateDataTypeSpecNode( ObjPtr pTypeSpec, const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStDataTypeSpecNode ) );
+        CStDataTypeSpecNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_pTypeSpec = pTypeSpec;
+            SetParent( pTypeSpec, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateTypeSpecNode( ObjPtr pType, const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStTypeSpecNode ) );
+        CStTypeSpecNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_pType = pType;
+            SetParent( pType, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateTypeDefinitionBlockNode( const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStTypeDefinitionBlockNode ) );
+        CStTypeDefinitionBlockNode* p = pNode;
+        if( p != nullptr )
+        {
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -263,6 +439,7 @@ public:
         if( p != nullptr )
         {
             p->m_pTargetType = pTargetType;
+            SetParent( pTargetType, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -276,6 +453,7 @@ public:
         if( p != nullptr )
         {
             p->m_pTargetType = pTargetType;
+            SetParent( pTargetType, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -317,6 +495,8 @@ public:
             p->m_pInitialValue = pInitialValue;
             p->m_strDirectAddress = strDirectAddress;
             p->m_bAtDirectAddress = bAtDirectAddress;
+            SetParent( pType, p );
+            SetParent( pInitialValue, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -332,6 +512,8 @@ public:
         {
             p->m_pLValue = pLValue;
             p->m_pRValue = pRValue;
+            SetParent( pLValue, p );
+            SetParent( pRValue, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -345,6 +527,7 @@ public:
         if( p != nullptr )
         {
             p->m_pCallExpr = pCallExpr;
+            SetParent( pCallExpr, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -365,6 +548,14 @@ public:
             p->m_vecThenStatements = vecThen;
             p->m_vecElseIfBranches = vecElseIf;
             p->m_vecElseStatements = vecElse;
+            SetParent( pCondition, p );
+            SetParents( vecThen, p );
+            for( size_t i = 0; i < vecElseIf.size(); i++ )
+            {
+                SetParent( vecElseIf[ i ].m_pCondition, p );
+                SetParents( vecElseIf[ i ].m_vecStatements, p );
+            }
+            SetParents( vecElse, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -385,6 +576,10 @@ public:
             p->m_pEndValue = pEnd;
             p->m_pStepValue = pStep;
             p->m_vecBody = vecBody;
+            SetParent( pStart, p );
+            SetParent( pEnd, p );
+            SetParent( pStep, p );
+            SetParents( vecBody, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -401,6 +596,8 @@ public:
         {
             p->m_pCondition = pCondition;
             p->m_vecBody = vecBody;
+            SetParent( pCondition, p );
+            SetParents( vecBody, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -416,6 +613,8 @@ public:
         {
             p->m_vecBody = vecBody;
             p->m_pCondition = pCondition;
+            SetParents( vecBody, p );
+            SetParent( pCondition, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -434,6 +633,18 @@ public:
             p->m_pExpression = pExpression;
             p->m_vecBranches = vecBranches;
             p->m_vecElseStatements = vecElse;
+            SetParent( pExpression, p );
+            for( size_t i = 0; i < vecBranches.size(); i++ )
+            {
+                const CStCaseStmt::CCaseBranch& oBranch = vecBranches[ i ];
+                for( size_t j = 0; j < oBranch.m_vecSelectors.size(); j++ )
+                {
+                    SetParent( oBranch.m_vecSelectors[ j ].m_pStartValue, p );
+                    SetParent( oBranch.m_vecSelectors[ j ].m_pEndValue, p );
+                }
+                SetParents( oBranch.m_vecStatements, p );
+            }
+            SetParents( vecElse, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -452,6 +663,7 @@ public:
             p->m_strName = strName;
             p->m_strValue = strValue;
             p->m_pCondition = pCondition;
+            SetParent( pCondition, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -481,6 +693,12 @@ public:
             p->m_vecTempVars = vecTemp;
             p->m_vecStatements = vecStmts;
             p->m_vecUsingNamespaces = vecUsing;
+            SetParents( vecInput, p );
+            SetParents( vecOutput, p );
+            SetParents( vecInOut, p );
+            SetParents( vecLocal, p );
+            SetParents( vecTemp, p );
+            SetParents( vecStmts, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -515,6 +733,13 @@ public:
             p->m_vecTempVars = vecTemp;
             p->m_vecMethods = vecMethods;
             p->m_vecStatements = vecStatements;
+            SetParents( vecInput, p );
+            SetParents( vecOutput, p );
+            SetParents( vecInOut, p );
+            SetParents( vecLocal, p );
+            SetParents( vecTemp, p );
+            SetParents( vecMethods, p );
+            SetParents( vecStatements, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -543,6 +768,13 @@ public:
             p->m_vecLocalVars = vecLocal;
             p->m_vecTempVars = vecTemp;
             p->m_vecStatements = vecStmts;
+            SetParent( pReturnType, p );
+            SetParents( vecInput, p );
+            SetParents( vecOutput, p );
+            SetParents( vecInOut, p );
+            SetParents( vecLocal, p );
+            SetParents( vecTemp, p );
+            SetParents( vecStmts, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -563,6 +795,9 @@ public:
             p->m_pReturnType = pReturnType;
             p->m_vecVariables = vecVars;
             p->m_vecStatements = vecStmts;
+            SetParent( pReturnType, p );
+            SetParents( vecVars, p );
+            SetParents( vecStmts, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -580,6 +815,7 @@ public:
         {
             p->m_strName = strName;
             p->m_vecDeclarations = vecDecls;
+            SetParents( vecDecls, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -607,6 +843,7 @@ public:
         {
             p->m_strName.clear();  // Empty name = global scope
             p->m_vecDeclarations = vecDecls;
+            SetParents( vecDecls, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -623,6 +860,7 @@ public:
         {
             p->m_strName = strName;
             p->m_vecMethodDecls = vecMethods;
+            SetParents( vecMethods, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -639,6 +877,7 @@ public:
         {
             p->m_strName = strName;
             p->m_pTypeDefinition = pTypeDef;
+            SetParent( pTypeDef, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -654,6 +893,7 @@ public:
         {
             p->m_strInstancePath = strPath;
             p->m_pType = pType;
+            SetParent( pType, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -676,6 +916,21 @@ public:
     }
 
 private:
+    /* attach child nodes to their parent, enabling upward navigation */
+    static void SetParent( const ObjPtr& pChild, CSTAstNodeBase* pParent )
+    {
+        CSTAstNodeBase* p = pChild;
+        if( p != nullptr && pParent != nullptr )
+            p->SetParent( pParent );
+    }
+
+    static void SetParents( const std::vector< ObjPtr >& vecChildren,
+        CSTAstNodeBase* pParent )
+    {
+        for( size_t i = 0; i < vecChildren.size(); i++ )
+            SetParent( vecChildren[ i ], pParent );
+    }
+
     CSTParserContext* m_pCtx;
 };
 
@@ -684,6 +939,29 @@ inline CStAstFactory* GetAstFactory( CSTParserContext* pCtx )
 {
     static CStAstFactory oFactory( pCtx );
     return &oFactory;
+}
+
+/**
+ * @brief Strip the CStFullExpressionNode boundary wrapper
+ *
+ * Statement-position expressions are wrapped in CStFullExpressionNode.
+ * Expression-internal consumers (parenthesized factors, array indices,
+ * subrange bounds) need the bare expression and must unwrap. The wrapper
+ * is transient: detach the inner expression so it does not point back to
+ * a node that is about to be released.
+ */
+inline ObjPtr UnwrapFullExpression( ObjPtr pExpr )
+{
+    CStFullExpressionNode* pWrapper = pExpr;
+    if( pWrapper != nullptr )
+    {
+        ObjPtr pInner = pWrapper->m_pExpression;
+        CSTAstNodeBase* pBase = pInner;
+        if( pBase != nullptr )
+            pBase->m_pParent = nullptr;
+        return pInner;
+    }
+    return pExpr;
 }
 
 } // namespace rpcf

@@ -1,5 +1,5 @@
 EXTRA_DIST=updconst.sh stscript.y stlexer.l stparser.y CMakeLists.txt \
-test_ast.cpp
+test_ast.cpp astdebug.h astdebug.cpp
 
 BUILT_SOURCES = stparser.h stlexer.h
 CLEANFILES = stparser.cpp stparser.h stlexer.cpp stlexer.h
@@ -7,7 +7,7 @@ CLEANFILES = stparser.cpp stparser.h stlexer.cpp stlexer.h
 check_PROGRAMS=rpcfstc
 dep_files=lvalvar.h nonterm.h parsrctx.cpp parsrctx.h parsrdrv.cpp stast.h \
 stbase.cpp stbase.h stclsids.h stmain.cpp astnodes.cpp astnodes.h astfactory.h \
-astbuilder.h
+astbuilder.h 
 
 rpcfstc_SOURCES= stparser.cpp stlexer.cpp stparser.h stlexer.h $(dep_files) \
 stgenbase.cpp stgenbase.h

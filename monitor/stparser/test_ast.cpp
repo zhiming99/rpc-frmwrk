@@ -5,6 +5,7 @@
 #include "stclsids.h"
 #include "astnodes.h"
 #include "astfactory.h"
+#include "astdebug.h"
 
 using namespace rpcf;
 
@@ -12,53 +13,70 @@ using namespace rpcf;
 ObjPtr g_pAstRoot;
 
 /**
- * @brief Print AST tree recursively
+ * @brief Helper: create an enum value node with the given name
  */
-void PrintAstNode( CObjBase* pNode, gint32 iDepth = 0 )
+static ObjPtr MakeEnumValue( const std::string& strName, const YYLTYPE2& oLoc )
 {
-    if( pNode == nullptr )
-        return;
+    ObjPtr pNode;
+    pNode.NewObj( clsid( CStEnumValueNode ) );
+    CStEnumValueNode* pVal = pNode;
+    if( pVal != nullptr )
+    {
+        pVal->m_strName = strName;
+        pVal->SetLocation( oLoc );
+    }
+    return pNode;
+}
 
-    // Print indentation
-    for( gint32 i = 0; i < iDepth; i++ )
-        std::cout << "  ";
+/**
+ * @brief Test type definition block
+ */
+void TestTypeDefinitionBlock( CStAstFactory& factory, YYLTYPE2& oLoc )
+{
+    std::cout << "\n=== Testing Type Definition Block ===" << std::endl;
 
-    // Print node type
-    std::cout << "[" << pNode->GetClsid() << "] ";
+    // Create a basic type node
+    ObjPtr pIntType = factory.CreateBasicTypeNode(
+        CStBasicTypeNode::btInt, 0, oLoc );
 
-    // Print node-specific information based on class ID
-    EnumClsid eClsid = pNode->GetClsid();
-    
-    if( eClsid == clsid( CStLiteralExpr ) )
+    // Create a data type spec wrapper
+    ObjPtr pDataTypeSpec = factory.CreateDataTypeSpecNode( pIntType, oLoc );
+
+    // Create a type spec wrapper
+    ObjPtr pTypeSpec = factory.CreateTypeSpecNode( pDataTypeSpec, oLoc );
+
+    // Create a type declaration for MyInt : INT;
+    ObjPtr pTypeDecl = factory.CreateTypeDecl( "MyInt", pTypeSpec, oLoc );
+
+    // Create type definition block
+    ObjPtr pTypeBlock = factory.CreateTypeDefinitionBlockNode( oLoc );
+    CStTypeDefinitionBlockNode* pBlock = pTypeBlock;
+    if( pBlock )
     {
-        CStLiteralExpr* p = dynamic_cast< CStLiteralExpr* >( pNode );
-        std::cout << "Literal: type=" << p->m_eLiteralType;
-    }
-    else if( eClsid == clsid( CStIdentifierExpr ) )
-    {
-        CStIdentifierExpr* p = dynamic_cast< CStIdentifierExpr* >( pNode );
-        std::cout << "Identifier: " << p->m_strName;
-    }
-    else if( eClsid == clsid( CStBinaryExpr ) )
-    {
-        CStBinaryExpr* p = dynamic_cast< CStBinaryExpr* >( pNode );
-        std::cout << "Binary: op=" << p->m_eOperator;
-    }
-    else if( eClsid == clsid( CStAssignStmt ) )
-    {
-        std::cout << "Assignment";
-    }
-    else if( eClsid == clsid( CStProgramDecl ) )
-    {
-        CStProgramDecl* p = dynamic_cast< CStProgramDecl* >( pNode );
-        std::cout << "Program: " << p->m_strName;
-    }
-    else if( eClsid == clsid( CStRootNode ) )
-    {
-        std::cout << "Root";
+        pBlock->m_vecTypeDecls.push_back( pTypeDecl );
     }
 
-    std::cout << std::endl;
+    DumpAstTree( pTypeBlock );
+}
+
+/**
+ * @brief Test enum type
+ */
+void TestEnumType( CStAstFactory& factory, YYLTYPE2& oLoc )
+{
+    std::cout << "\n=== Testing Enum Type ===" << std::endl;
+
+    // Create enum values
+    std::vector< ObjPtr > vecValues;
+    vecValues.push_back( MakeEnumValue( "Red", oLoc ) );
+    vecValues.push_back( MakeEnumValue( "Green", oLoc ) );
+    vecValues.push_back( MakeEnumValue( "Blue", oLoc ) );
+
+    // Create enum type node
+    ObjPtr pEnumType = factory.CreateEnumTypeNode(
+        "Color", vecValues, nullptr, "", oLoc );
+
+    DumpAstTree( pEnumType );
 }
 
 /**
@@ -66,8 +84,8 @@ void PrintAstNode( CObjBase* pNode, gint32 iDepth = 0 )
  */
 gint32 main( gint32 argc, char* argv[] )
 {
-    std::cout << "ST Parser AST Building Test" << std::endl;
-    std::cout << "================================" << std::endl;
+    std::cout << "ST Parser AST Debug Utility Test" << std::endl;
+    std::cout << "=================================" << std::endl;
 
     // Create a factory
     CSTParserContext oCtx;
@@ -75,8 +93,8 @@ gint32 main( gint32 argc, char* argv[] )
 
     YYLTYPE2 oLoc;
 
-    // Create a simple program for testing
-    // Program: TestProgram with statement x := 10 + 5;
+    // Test 1: Simple program with expression
+    std::cout << "\n=== Test 1: Simple Program ===" << std::endl;
     std::vector< ObjPtr > vecInput, vecOutput, vecInOut, vecLocal, vecTemp;
     std::vector< ObjPtr > vecStmts;
 
@@ -104,11 +122,40 @@ gint32 main( gint32 argc, char* argv[] )
         "TestProgram", vecInput, vecOutput, vecInOut,
         vecLocal, vecTemp, vecStmts, {}, oLoc );
 
-    // Print the AST
-    std::cout << "\nGenerated AST for Program TestProgram:" << std::endl;
-    PrintAstNode( pTestProg );
+    // Print the AST using the new utility
+    DumpAstTree( pTestProg );
 
-    std::cout << "\nTest completed successfully!" << std::endl;
+    // Test 2: Type definition block
+    TestTypeDefinitionBlock( factory, oLoc );
+
+    // Test 3: Enum type
+    TestEnumType( factory, oLoc );
+
+    // Test 4: String literal
+    std::cout << "\n=== Test 4: String Literal ===" << std::endl;
+    ObjPtr pStringLit = factory.CreateLiteralExpr(
+        CStLiteralExpr::ltString, Variant( "Hello, ST!" ), oLoc );
+    DumpAstTree( pStringLit );
+
+    // Test 5: Array type
+    std::cout << "\n=== Test 5: Array Type ===" << std::endl;
+    ObjPtr pElemType = factory.CreateBasicTypeNode(
+        CStBasicTypeNode::btInt, 0, oLoc );
+    CStArrayTypeNode::CArrayDim oDim;
+    oDim.m_iStart = 0;
+    oDim.m_iEnd = 9;
+    std::vector< CStArrayTypeNode::CArrayDim > vecDims;
+    vecDims.push_back( oDim );
+    ObjPtr pArrayType = factory.CreateArrayTypeNode(
+        pElemType, vecDims, oLoc );
+    DumpAstTree( pArrayType );
+
+    // Test 6: Reference type
+    std::cout << "\n=== Test 6: Reference Type ===" << std::endl;
+    ObjPtr pRefType = factory.CreateReferenceTypeNode( pElemType, oLoc );
+    DumpAstTree( pRefType );
+
+    std::cout << "\nAll tests completed successfully!" << std::endl;
 
     return 0;
 }

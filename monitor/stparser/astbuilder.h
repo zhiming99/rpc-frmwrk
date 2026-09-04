@@ -67,18 +67,46 @@ inline std::string GetString( const YYSTYPE& oVal )
 }
 
 /**
- * @brief Extract number from token value
+ * @brief Extract an int_type number from token value
+ *
+ * Only integer-typed variants are accepted. A float or double value
+ * is NOT silently truncated to int: contexts that require an
+ * int_type number (e.g. the array length or the repetition count
+ * 'n(value)') would otherwise hide the error. Instead the error is
+ * reported via the parser context and 0 is returned.
  */
-inline gint32 GetNumber( const YYSTYPE& oVal )
+inline gint32 GetNumber( const YYSTYPE& oVal,
+    CSTParserContext* pCtx = nullptr )
 {
     if( oVal == nullptr )
         return 0;
-    Variant oVar = oVal->first;
-    // Use GetTypeId to check the type
-    gint32 iType = oVar.GetTypeId();
-    // Try to get numeric value
-    // The actual implementation depends on the Variant type
-    // For now, return 0 as placeholder
+    const Variant& oVar = oVal->first;
+    switch( oVar.GetTypeId() )
+    {
+        case typeByte:
+            return ( gint32 )( const guint8& )oVar;
+        case typeUInt16:
+            return ( gint32 )( const guint16& )oVar;
+        case typeUInt32:
+            return ( gint32 )( const guint32& )oVar;
+        case typeUInt64:
+            return ( gint32 )( const guint64& )oVar;
+        default:
+            break;
+    }
+    if( pCtx != nullptr )
+    {
+        const char* szType = "unknown";
+        if( oVar.GetTypeId() == typeFloat )
+            szType = "float";
+        else if( oVar.GetTypeId() == typeDouble )
+            szType = "double";
+        fprintf( stderr,
+            "Error: an int_type number is required, got %s at "
+            "line %d, column %d\n", szType,
+            oVal->second.first_line, oVal->second.first_column );
+        pCtx->IncError();
+    }
     return 0;
 }
 
@@ -112,7 +140,7 @@ inline std::string GetIdentifier( const YYSTYPE& oVal )
 
 #define ID(tok) GetIdentifier(tok)
 
-#define NUM(tok) GetNumber(tok)
+#define NUM(tok) GetNumber(tok, pCtx)
 
 #define STR(tok) GetString(tok)
 

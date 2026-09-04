@@ -161,11 +161,41 @@ struct CStCallExpr : public CStExprNode
 {
     typedef CStExprNode super;
 
+    struct CNamedArg
+    {
+        std::string m_strName;   // formal parameter name
+        ObjPtr m_pValue;         // argument expression
+        bool m_bOutput;          // true for formal output params (Q => lvalue)
+
+        CNamedArg() : m_bOutput( false ){}
+    };
+
     ObjPtr m_pCallee;
-    std::vector< ObjPtr > m_vecArgs;
+    std::vector< ObjPtr > m_vecArgs;         // positional arguments
+    std::vector< CNamedArg > m_vecNamedArgs; // named arguments
 
     CStCallExpr() : super()
     { SetClassId( clsid( CStCallExpr ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Argument list node (parser accumulator)
+ *
+ * Collects positional and named arguments during parsing. Its contents
+ * are flattened into CStCallExpr when the enclosing call is reduced,
+ * so this node is transient and does not appear in the final AST.
+ */
+struct CStArgListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecArgs;                  // positional
+    std::vector< CStCallExpr::CNamedArg > m_vecNamed; // named
+
+    CStArgListNode() : super()
+    { SetClassId( clsid( CStArgListNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -241,6 +271,166 @@ struct CStPointerMemberExpr : public CStExprNode
     virtual std::string GetNodeInfo() const override;
 };
 
+/**
+ * @brief L-Value wrapper node
+ *
+ * Wraps expressions that are valid l-values (writable memory locations).
+ * This provides a clear boundary for semantic analysis to distinguish
+ * l-values from r-values.
+ */
+struct CStLValueNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pExpression;  // The actual l-value expression (identifier, member access, etc.)
+
+    CStLValueNode() : super()
+    { SetClassId( clsid( CStLValueNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Extended L-Value wrapper node
+ *
+ * Wraps extended l-values that include direct addresses and bit access.
+ * This provides a clear boundary for semantic analysis to distinguish
+ * extended l-values from standard l-values.
+ */
+struct CStLValueExtNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pExpression;  // The actual extended l-value expression
+
+    CStLValueExtNode() : super()
+    { SetClassId( clsid( CStLValueExtNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Instance path wrapper node
+ *
+ * Wraps a dotted instance path (e.g. MainProg.Motor1.SensorIn) and carries
+ * both views of it:
+ *  - m_pExpression: the expression form (CStIdentifierExpr, or a
+ *    CStMemberAccessExpr chain) for use in value/l-value contexts;
+ *  - m_vecNameComponents: the path components for name-extraction contexts
+ *    (derived types, USING namespaces, FOR loop variables).
+ */
+struct CStInstancePathNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< std::string > m_vecNameComponents;
+    ObjPtr m_pExpression;
+
+    CStInstancePathNode() : super()
+    { SetClassId( clsid( CStInstancePathNode ) ); }
+
+    /**
+     * @brief Join the path components with '.' (e.g. "MainProg.Motor1")
+     */
+    std::string GetDottedName() const
+    {
+        std::string strName;
+        for( size_t i = 0; i < m_vecNameComponents.size(); i++ )
+        {
+            if( i > 0 )
+                strName += ".";
+            strName += m_vecNameComponents[ i ];
+        }
+        return strName;
+    }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Boundary wrapper for a full expression
+ *
+ * Marks the root of an expression used in statement position (conditions,
+ * loop bounds, case selectors, initializers, call arguments). Like the
+ * l-value boundary nodes, it gives the semantic checker a uniform handle
+ * on 'a complete expression' and a place to hang result-type info.
+ * Expression-internal consumers (parenthesized factors, array indices,
+ * subrange bounds) unwrap it via UnwrapFullExpression().
+ */
+struct CStFullExpressionNode : public CStExprNode
+{
+    typedef CStExprNode super;
+
+    ObjPtr m_pExpression;
+
+    CStFullExpressionNode() : super()
+    { SetClassId( clsid( CStFullExpressionNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+    virtual std::string GetSignature() const override;
+};
+
+/**
+ * @brief One array dimension: 'start .. end'
+ *
+ * Holds the bound expressions as parsed. Per the spec the bounds are
+ * constant expressions, but they may reference named constants or
+ * enum values and involve arithmetic, so evaluating them requires
+ * the variable tables of the semantic phase. The parser performs
+ * no numeric evaluation.
+ */
+struct CStSubrangeNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pStart;
+    ObjPtr m_pEnd;
+
+    CStSubrangeNode() : super()
+    { SetClassId( clsid( CStSubrangeNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Subrange list node (parser accumulator)
+ *
+ * Collects the dimensions of an array type during parsing. Its contents
+ * are flattened into CStArrayTypeNode::m_vecDims when the array type is
+ * reduced, so this node is transient and does not appear in the final AST.
+ */
+struct CStSubrangeListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecRanges;  // CStSubrangeNode items
+
+    CStSubrangeListNode() : super()
+    { SetClassId( clsid( CStSubrangeListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Statement list node (parser accumulator)
+ *
+ * Collects the statements of a block (if/for/while/repeat bodies, POU
+ * bodies) during parsing. Its contents are flattened into the owning
+ * statement/declaration node when the block is reduced, so this node
+ * is transient and does not appear in the final AST.
+ */
+struct CStStmtListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecStatements;
+
+    CStStmtListNode() : super()
+    { SetClassId( clsid( CStStmtListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
 // ============================================================================
 // Type Nodes
 // ============================================================================
@@ -281,6 +471,11 @@ struct CStBasicTypeNode : public CStTypeNode
     enumBasicType m_eBasicType;
     bool m_bSigned;
     gint32 m_iStringLength;
+    // String length as a constant expression for the STRING( n ) /
+    // WSTRING( n ) forms. The parser keeps the expression; the
+    // numeric m_iStringLength is filled by the semantic phase after
+    // constant evaluation.
+    ObjPtr m_pStringLength;
 
     CStBasicTypeNode() : super(),
         m_eBasicType(btInt),
@@ -301,8 +496,15 @@ struct CStArrayTypeNode : public CStTypeNode
     // Array dimension
     struct CArrayDim
     {
-        gint32 m_iStart;
-        gint32 m_iEnd;
+        // Evaluated bounds, filled in by the semantic phase once the
+        // bound expressions are resolved against the variable tables
+        // (named constants, enum values, arithmetic). The parser
+        // does not evaluate them; they stay 0 here.
+        gint32 m_iStart = 0;
+        gint32 m_iEnd = 0;
+        // The bound expressions as parsed (start..end)
+        ObjPtr m_pStart;
+        ObjPtr m_pEnd;
     };
 
     ObjPtr m_pElementType;
@@ -388,10 +590,69 @@ struct CStEnumValueListNode : public CSTAstNodeBase
 {
     typedef CSTAstNodeBase super;
 
+    // Temporary storage for enum type name during parsing
+    // This is extracted and stored in CStEnumTypeNode.m_strName later
+    std::string m_strTypeName;
     std::vector< ObjPtr > m_vecValues;  // Contains CStEnumValueNode
 
     CStEnumValueListNode() : super()
     { SetClassId( clsid( CStEnumValueListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Data type specification wrapper node
+ *
+ * This node wraps various type specifications (basic types, strings, implicit enums)
+ * into a uniform node for use in type_spec. This allows type_spec to have a
+ * consistent child type instead of handling multiple node type variants.
+ */
+struct CStDataTypeSpecNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pTypeSpec;  // Can be CStBasicTypeNode, CStEnumTypeNode, etc.
+
+    CStDataTypeSpecNode() : super()
+    { SetClassId( clsid( CStDataTypeSpecNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Type spec wrapper node
+ *
+ * Wraps all type_spec alternatives (data_type_spec, array_type,
+ * reference_type, pointer_type, derived_type) into a uniform node type.
+ * This allows the parent rules to handle a consistent node type.
+ */
+struct CStTypeSpecNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pType;  // Can be CStDataTypeSpecNode, CStArrayTypeNode, CStReferenceTypeNode, etc.
+
+    CStTypeSpecNode() : super()
+    { SetClassId( clsid( CStTypeSpecNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Type definition block node
+ *
+ * Contains all type declarations within a TYPE ... END_TYPE block.
+ * This wraps the type_assignments to provide a uniform container.
+ */
+struct CStTypeDefinitionBlockNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecTypeDecls;  // CStTypeDeclNode or CStEnumTypeNode, etc.
+
+    CStTypeDefinitionBlockNode() : super()
+    { SetClassId( clsid( CStTypeDefinitionBlockNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -568,6 +829,26 @@ struct CStIfStmt : public CStStmtNode
 
     CStIfStmt() : super()
     { SetClassId( clsid( CStIfStmt ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief If-branch list node (parser accumulator)
+ *
+ * Collects the else-if branches of an if statement during parsing.
+ * Its contents are flattened into CStIfStmt::m_vecElseIfBranches when
+ * the if statement is reduced, so this node is transient and does not
+ * appear in the final AST.
+ */
+struct CStIfBranchListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< CStIfStmt::CIfBranch > m_vecBranches;
+
+    CStIfBranchListNode() : super()
+    { SetClassId( clsid( CStIfBranchListNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };

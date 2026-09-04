@@ -46,21 +46,23 @@ add_flex_bison_dependency(StLexer StParser)
 # 3. Define Testing Utility Binary Target (rpcfstc)
 # ==============================================================================
 set(dep_files
-    lvalvar.h 
-    nonterm.h 
-    parsrctx.cpp 
-    parsrctx.h 
-    parsrdrv.cpp 
-    stast.h 
-    stbase.cpp 
-    stbase.h 
-    stclsids.h 
+    lvalvar.h
+    nonterm.h
+    parsrctx.cpp
+    parsrctx.h
+    parsrdrv.cpp
+    stast.h
+    stbase.cpp
+    stbase.h
+    stclsids.h
     stgenbase.h
     stgenbase.cpp
     astnodes.h
     astnodes.cpp
     astbuilder.h
     astfactory.h
+    astdebug.h
+    astdebug.cpp
 )
 
 # Consolidate target blueprint files list
