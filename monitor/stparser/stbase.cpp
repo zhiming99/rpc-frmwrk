@@ -272,7 +272,7 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
                 ParserPrint( 
                     pCtx->GetCurFileName().c_str(), 
                     iLineNo,
-                    "Error, 'incomplete address' cannot specify 'P' flag" );
+                    "Error, 'incomplete address' cannot specify 'P' flag", true );
                 ret = -EINVAL;
                 break;
             }
@@ -328,7 +328,7 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
             ParserPrint( 
                 pCtx->GetCurFileName().c_str(), 
                 iLineNo,
-                szBuf );
+                szBuf, true );
             break;
         }
 
@@ -398,7 +398,7 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
             ParserPrint( 
                 pCtx->GetCurFileName().c_str(), 
                 iLineNo,
-                "Error, Invalid rpcf address" );
+                "Error, Invalid rpcf address", true );
             ret = -EINVAL;
             break;
         }

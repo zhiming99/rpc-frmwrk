@@ -111,6 +111,7 @@ void lexerr(const char *s) {
 
 %}
 
+%option     nounistd
 %option     8bit bison-bridge
 %option     bison-locations
 %option     warn
@@ -121,9 +122,12 @@ void lexerr(const char *s) {
 
 
  /* Definitions */
-ST_TYPE     (?i:BOOL|BYTE|WORD|DWORD|LWORD|SINT|INT|DINT|LINT|USINT|UINT|UDINT|ULINT|REAL|LREAL)
+ST_TYPE     (?i:BOOL|BYTE|WORD|DWORD|LWORD|SINT|INT|DINT|LINT|USINT|UINT|UDINT|ULINT)
+REAL_TYPE   (?i:REAL|LREAL)
 DIGIT       [0-9]
 HEX_DIGIT   [0-9a-fA-F]
+UNSIGNED_INT ({DIGIT}+(_?{DIGIT}+)*)
+SIGNED_INT  ([-+]?{UNSIGNED_INT})
 
  /* Short and Long prefixes */
 D_PREFIX    (?i:date|d)#
@@ -280,31 +284,78 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 \"[^\"\n]* { lexerr("Unterminated wide string literal"); }
 
 
- /* Match Typed Literals like INT#10, DWORD#16#FFFF, REAL#10.5 */
- /* Match Typed Hex/Binary like WORD#16#FF or BYTE#2#1010 */
-{ST_TYPE}#([-+]?{DIGIT}+(_?{DIGIT}+)*(\.{DIGIT}+(_?{DIGIT}+)*)?) |
-{ST_TYPE}#{DIGIT}+#({HEX_DIGIT}+(_?{HEX_DIGIT}+)*) {
+ /* Typed REAL/LREAL literal per EBNF:
+    Real_Type_Name: REAL | LREAL
+    Real_Type_Name '#' Signed_Int ( '.' Unsigned_Int ( 'E' Signed_Int )? )?
+    e.g. REAL#10, LREAL#-1.5, REAL#1.5E-3 */
+{REAL_TYPE}#{SIGNED_INT}("."{UNSIGNED_INT}("E"{SIGNED_INT})?)? {
     std::string s(yytext);
     size_t hashPos = s.find('#');
     std::string type = s.substr(0, hashPos);
     std::string valStr = s.substr(hashPos + 1);
-
-    // Remove underscores from value string
+    /* strip the underscores allowed between digits */
     valStr.erase(std::remove(
         valStr.begin(), valStr.end(), '_'), valStr.end());
-
-    if (type == "REAL" || type == "LREAL") {
-        printf("f32.const %s\n", valStr.c_str());
-    } else {
-        // Handle hex if 16# is present
-        int32_t finalVal;
-        if (valStr.find("16#") == 0) {
-            finalVal = std::stol(valStr.substr(3), nullptr, 16);
-        } else {
-            finalVal = std::stol(valStr);
-        }
-        printf("i32.const %d\n", finalVal);
+    try
+    {
+        double dVal = std::stod( valStr );
+        /* LREAL# is double precision, REAL# is single */
+        if( tolower( type[ 0 ] ) == 'l' )
+            yylval->get()->first = dVal;
+        else
+            yylval->get()->first = ( float )dVal;
     }
+    catch( ... )
+    {
+        lexerr( "invalid real literal" );
+        return YYerror;
+    }
+    return TOK_NUMBER;
+}
+
+ /* Typed integer literals: INT#10, INT#-5, DWORD#16#FF, WORD#2#1010 */
+{ST_TYPE}#{SIGNED_INT} |
+{ST_TYPE}#{DIGIT}+#({HEX_DIGIT}+(_?{HEX_DIGIT}+)*) {
+    std::string s(yytext);
+    size_t hashPos = s.find('#');
+    std::string valStr = s.substr(hashPos + 1);
+    /* strip the underscores allowed between digits */
+    valStr.erase(std::remove(
+        valStr.begin(), valStr.end(), '_'), valStr.end());
+    gint32 iVal = 0;
+    try
+    {
+        size_t basePos = valStr.find('#');
+        if( basePos != std::string::npos )
+        {
+            /* based literal, the base must be 2, 8, 10 or 16 */
+            gint32 iBase = std::stoi( valStr.substr( 0, basePos ) );
+            std::string strDigits = valStr.substr( basePos + 1 );
+            if( iBase != 2 && iBase != 8 && iBase != 10 &&
+                iBase != 16 )
+            {
+                lexerr( "unsupported numeric base" );
+                return YYerror;
+            }
+            size_t pos = 0;
+            iVal = ( gint32 )std::stol( strDigits, &pos, iBase );
+            if( pos != strDigits.size() )
+            {
+                lexerr( "invalid digits for the numeric base" );
+                return YYerror;
+            }
+        }
+        else
+        {
+            iVal = std::stoi( valStr );
+        }
+    }
+    catch( ... )
+    {
+        lexerr( "invalid integer literal" );
+        return YYerror;
+    }
+    yylval->get()->first = ( guint32 )iVal;
     return TOK_NUMBER;
 }
 
@@ -321,12 +372,80 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
  /* 2. Based Literals (e.g., 16#FF) */
  /* This wins if it sees digits followed by "#" */
 {DIGIT}+#[0-9a-fA-F_]+ {
+    std::string s(yytext);
+    size_t hashPos = s.find('#');
+    std::string strDigits = s.substr(hashPos + 1);
+    /* strip the underscores allowed between digits */
+    strDigits.erase(std::remove(
+        strDigits.begin(), strDigits.end(), '_'), strDigits.end());
+    try
+    {
+        gint32 iBase = std::stoi( s.substr( 0, hashPos ) );
+        if( iBase != 2 && iBase != 8 && iBase != 10 && iBase != 16 )
+        {
+            lexerr( "unsupported numeric base" );
+            return YYerror;
+        }
+        size_t pos = 0;
+        gint32 iVal = ( gint32 )std::stol( strDigits, &pos, iBase );
+        if( pos != strDigits.size() )
+        {
+            lexerr( "invalid digits for the numeric base" );
+            return YYerror;
+        }
+        yylval->get()->first = ( guint32 )iVal;
+    }
+    catch( ... )
+    {
+        lexerr( "invalid integer literal" );
+        return YYerror;
+    }
     return TOK_NUMBER;
 }
 
- /* 3. Simple Decimal (e.g., 123) */
+ /* 3. Real Literals (e.g., 1.5, 1.5E-3) per EBNF:
+    Real_Literal: Signed_Int '.' Unsigned_Int ( 'E' Signed_Int )?
+    Design note: the lexer intentionally does NOT take the leading
+    sign of Signed_Int. If it did, flex longest-match would turn
+    '3-1.5' into '3' '-1.5' and swallow the binary minus. A negative
+    real literal (e.g. '-1.5') is therefore composed by the parser's
+    unary minus (TOK_MINUS), same as integer literals. The exponent
+    sign stays in the token since 'E' is unambiguous. */
+{UNSIGNED_INT}"."{UNSIGNED_INT}("E"{SIGNED_INT})? {
+    std::string s(yytext);
+    /* strip the underscores allowed between digits */
+    s.erase(std::remove(
+        s.begin(), s.end(), '_'), s.end());
+    try
+    {
+        /* an untyped real literal defaults to REAL (single) */
+        yylval->get()->first = ( float )std::stod( s );
+    }
+    catch( ... )
+    {
+        lexerr( "invalid real literal" );
+        return YYerror;
+    }
+    return TOK_NUMBER;
+}
+
+ /* 4. Simple Decimal (e.g., 123) */
  /* This is the fallback for any sequence of digits without a "#" */
 [0-9][0-9_]* {
+    std::string s(yytext);
+    s.erase(std::remove(
+        s.begin(), s.end(), '_'), s.end());
+    gint32 iVal = 0;
+    try
+    {
+        iVal = std::stoi( s );
+    }
+    catch( ... )
+    {
+        lexerr( "invalid integer literal" );
+        return YYerror;
+    }
+    yylval->get()->first = ( guint32 )iVal;
     return TOK_NUMBER;
 }
 

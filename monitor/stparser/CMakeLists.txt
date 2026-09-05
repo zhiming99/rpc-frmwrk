@@ -46,24 +46,32 @@ add_flex_bison_dependency(StLexer StParser)
 # 3. Define Testing Utility Binary Target (rpcfstc)
 # ==============================================================================
 set(dep_files
-    lvalvar.h 
-    nonterm.h 
-    parsrctx.cpp 
-    parsrctx.h 
-    parsrdrv.cpp 
-    stast.h 
-    stbase.cpp 
-    stbase.h 
-    stclsids.h 
-    stmain.cpp
+    lvalvar.h
+    nonterm.h
+    parsrctx.cpp
+    parsrctx.h
+    parsrdrv.cpp
+    stast.h
+    stbase.cpp
+    stbase.h
+    stclsids.h
+    stgenbase.h
+    stgenbase.cpp
+    astnodes.h
+    astnodes.cpp
+    astbuilder.h
+    astfactory.h
+    astdebug.h
+    astdebug.cpp
+    stsymtab.h
 )
 
 # Consolidate target blueprint files list
 set(rpcfstc_SOURCES
+    stmain.cpp
     ${dep_files}
     ${BISON_StParser_OUTPUTS}
     ${FLEX_StLexer_OUTPUTS}
-    "${CMAKE_CURRENT_BINARY_DIR}/stparser.cpp.hook" # Enforces the script hook sequencing
 )
 
 foreach(_file ${dep_files})
@@ -101,4 +109,37 @@ target_link_libraries(rpcfstc PRIVATE
 # Usually test utilities (check_PROGRAMS) are skipped in system deployment blocks,
 # but we add this here to stay consistent with the legacy assignment.
 install(TARGETS rpcfstc DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# ==============================================================================
+# 6. AST Test Executable
+# ==============================================================================
+set(asttest_SOURCES
+    ${dep_files}
+    ${BISON_StParser_OUTPUTS}
+    ${FLEX_StLexer_OUTPUTS}
+    test_ast.cpp
+)
+
+foreach(_file ${dep_files})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_file}")
+        list(APPEND asttest_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${_file}")
+    else()
+        list(APPEND asttest_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/${_file}")
+    endif()
+endforeach()
+
+add_executable(asttest ${asttest_SOURCES})
+
+target_include_directories(asttest PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/include"
+)
+
+set_target_properties(asttest PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+target_link_directories(asttest PRIVATE "${CMAKE_BINARY_DIR}/combase")
+target_link_libraries(asttest PRIVATE combase)
+
+install(TARGETS asttest DESTINATION ${CMAKE_INSTALL_BINDIR})
 

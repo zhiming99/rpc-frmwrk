@@ -31,9 +31,14 @@
 #include "stlexer.h"
 #include "stparser.h"
 #include "lvalvar.h"
+#include "astnodes.h"
+#include "stsymtab.h"
 
 using namespace rpcf;
 std::shared_ptr< CSTParserContext > g_pParserCtx;
+
+// Global AST root
+ObjPtr g_pAstRoot;
 
 gint32 StartParse(
     CSTParserContext* pCtx,
@@ -69,6 +74,80 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CLValueVariableDataMember  );
     INIT_MAP_ENTRY( CLValueVariableDefPtr  );
     INIT_MAP_ENTRY( CLValueVariableArrayAccess );
+
+    // AST Expression Nodes
+    INIT_MAP_ENTRY( CStLiteralExpr );
+    INIT_MAP_ENTRY( CStIdentifierExpr );
+    INIT_MAP_ENTRY( CStDirectAddressNode );
+    INIT_MAP_ENTRY( CStBinaryExpr );
+    INIT_MAP_ENTRY( CStUnaryExpr );
+    INIT_MAP_ENTRY( CStCallExpr );
+    INIT_MAP_ENTRY( CStArgListNode );
+    INIT_MAP_ENTRY( CStArrayAccessExpr );
+    INIT_MAP_ENTRY( CStMemberAccessExpr );
+    INIT_MAP_ENTRY( CStDereferenceExpr );
+    INIT_MAP_ENTRY( CStPointerMemberExpr );
+    INIT_MAP_ENTRY( CStLValueNode );
+    INIT_MAP_ENTRY( CStLValueExtNode );
+    INIT_MAP_ENTRY( CStInstancePathNode );
+    INIT_MAP_ENTRY( CStFullExpressionNode );
+    INIT_MAP_ENTRY( CStSubrangeNode );
+    INIT_MAP_ENTRY( CStSubrangeListNode );
+    INIT_MAP_ENTRY( CStStmtListNode );
+    INIT_MAP_ENTRY( CStIfBranchListNode );
+
+    // AST Type Nodes
+    INIT_MAP_ENTRY( CStBasicTypeNode );
+    INIT_MAP_ENTRY( CStArrayTypeNode );
+    INIT_MAP_ENTRY( CStStructTypeNode );
+    INIT_MAP_ENTRY( CStEnumTypeNode );
+    INIT_MAP_ENTRY( CStEnumValueNode );
+    INIT_MAP_ENTRY( CStEnumValueListNode );
+    INIT_MAP_ENTRY( CStDataTypeSpecNode );
+    INIT_MAP_ENTRY( CStTypeSpecNode );
+    INIT_MAP_ENTRY( CStTypeDefinitionBlockNode );
+    INIT_MAP_ENTRY( CStPointerTypeNode );
+    INIT_MAP_ENTRY( CStReferenceTypeNode );
+    INIT_MAP_ENTRY( CStDerivedTypeNode );
+
+    // AST Variable Declaration
+    INIT_MAP_ENTRY( CStVarDeclNode );
+
+    // AST Statement Nodes
+    INIT_MAP_ENTRY( CStAssignStmt );
+    INIT_MAP_ENTRY( CStCallStmt );
+    INIT_MAP_ENTRY( CStIfStmt );
+    INIT_MAP_ENTRY( CStForStmt );
+    INIT_MAP_ENTRY( CStWhileStmt );
+    INIT_MAP_ENTRY( CStRepeatStmt );
+    INIT_MAP_ENTRY( CStCaseStmt );
+    INIT_MAP_ENTRY( CStPragmaStmt );
+
+    // AST POU Declaration Nodes
+    INIT_MAP_ENTRY( CStProgramDecl );
+    INIT_MAP_ENTRY( CStFunctionBlockDecl );
+    INIT_MAP_ENTRY( CStFunctionBlockHeaderNode );
+    INIT_MAP_ENTRY( CStFunctionDecl );
+    INIT_MAP_ENTRY( CStMethodDecl );
+
+    // AST Other Declaration Nodes
+    INIT_MAP_ENTRY( CStNamespaceDecl );
+    INIT_MAP_ENTRY( CStInterfaceDecl );
+    INIT_MAP_ENTRY( CStTypeDecl );
+    INIT_MAP_ENTRY( CStVarConfigDecl );
+    INIT_MAP_ENTRY( CStUsingDirective );
+    INIT_MAP_ENTRY( CStInitialValueNode );
+    INIT_MAP_ENTRY( CStArrayInitNode );
+    INIT_MAP_ENTRY( CStArrayRepeatNode );
+    INIT_MAP_ENTRY( CStStructInitNode );
+    INIT_MAP_ENTRY( CStIdentifierListNode );
+    INIT_MAP_ENTRY( CStVarDeclListNode );
+
+    // AST Root Node
+    INIT_MAP_ENTRY( CStRootNode );
+
+    // Symbol table
+    INIT_MAP_ENTRY( CStSymbol );
 
     END_FACTORY_MAPS;
 };
