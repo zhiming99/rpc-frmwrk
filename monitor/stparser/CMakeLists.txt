@@ -63,6 +63,7 @@ set(dep_files
     astfactory.h
     astdebug.h
     astdebug.cpp
+    stsymtab.h
 )
 
 # Consolidate target blueprint files list
