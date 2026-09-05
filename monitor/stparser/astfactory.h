@@ -83,6 +83,41 @@ public:
         return pNode;
     }
 
+    ObjPtr CreateDirectAddressNode( const std::string& strAddress,
+        CStDirectAddressNode::enumAddrType eAddrType,
+        ObjPtr pParsed, ObjPtr pIndex, const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStDirectAddressNode ) );
+        CStDirectAddressNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_strAddress = strAddress;
+            p->m_eAddrType = eAddrType;
+            p->m_pParsed = pParsed;
+            p->m_pIndex = pIndex;
+            SetParent( pIndex, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateArrayRepeatNode( gint32 iCount, ObjPtr pElement,
+        const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStArrayRepeatNode ) );
+        CStArrayRepeatNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_iCount = iCount;
+            p->m_pElement = pElement;
+            SetParent( pElement, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
     ObjPtr CreateBinaryExpr( CStBinaryExpr::enumBinaryOp eOp,
         ObjPtr pLeft, ObjPtr pRight, const YYLTYPE2& oLoc )
     {
@@ -479,7 +514,7 @@ public:
         ObjPtr pType, CStVarDeclNode::enumVarCategory eCategory,
         CStVarDeclNode::enumVarQualifier eQualifier,
         ObjPtr pInitialValue, const std::string& strDirectAddress,
-        bool bAtDirectAddress, const YYLTYPE2& oLoc )
+        bool bAtDirectAddress, ObjPtr pDirectAddr, const YYLTYPE2& oLoc )
     {
         ObjPtr pNode;
         pNode.NewObj( clsid( CStVarDeclNode ) );
@@ -495,8 +530,10 @@ public:
             p->m_pInitialValue = pInitialValue;
             p->m_strDirectAddress = strDirectAddress;
             p->m_bAtDirectAddress = bAtDirectAddress;
+            p->m_pDirectAddr = pDirectAddr;
             SetParent( pType, p );
             SetParent( pInitialValue, p );
+            SetParent( pDirectAddr, p );
             p->SetLocation( oLoc );
         }
         return pNode;
@@ -699,6 +736,26 @@ public:
             SetParents( vecLocal, p );
             SetParents( vecTemp, p );
             SetParents( vecStmts, p );
+            p->SetLocation( oLoc );
+        }
+        return pNode;
+    }
+
+    ObjPtr CreateFunctionBlockHeaderNode( const std::string& strName,
+        CStFunctionBlockDecl::enumFbModifier eModifier,
+        const std::string& strExtends,
+        const std::vector< std::string >& vecImplements,
+        const YYLTYPE2& oLoc )
+    {
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStFunctionBlockHeaderNode ) );
+        CStFunctionBlockHeaderNode* p = pNode;
+        if( p != nullptr )
+        {
+            p->m_strName = strName;
+            p->m_eModifier = eModifier;
+            p->m_strExtends = strExtends;
+            p->m_vecImplements = vecImplements;
             p->SetLocation( oLoc );
         }
         return pNode;

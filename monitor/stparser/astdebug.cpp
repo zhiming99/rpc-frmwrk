@@ -169,10 +169,14 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "FunctionDecl";
     if( eClsid == clsid( CStFunctionBlockDecl ) )
         return "FunctionBlockDecl";
+    if( eClsid == clsid( CStFunctionBlockHeaderNode ) )
+        return "FunctionBlockHeaderNode";
     if( eClsid == clsid( CStLiteralExpr ) )
         return "LiteralExpr";
     if( eClsid == clsid( CStIdentifierExpr ) )
         return "IdentifierExpr";
+    if( eClsid == clsid( CStDirectAddressNode ) )
+        return "DirectAddressNode";
     if( eClsid == clsid( CStBinaryExpr ) )
         return "BinaryExpr";
     if( eClsid == clsid( CStUnaryExpr ) )
@@ -183,6 +187,10 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "ArgListNode";
     if( eClsid == clsid( CStArrayAccessExpr ) )
         return "ArrayAccessExpr";
+    if( eClsid == clsid( CStArrayInitNode ) )
+        return "ArrayInitNode";
+    if( eClsid == clsid( CStArrayRepeatNode ) )
+        return "ArrayRepeatNode";
     if( eClsid == clsid( CStMemberAccessExpr ) )
         return "MemberAccessExpr";
     if( eClsid == clsid( CStDereferenceExpr ) )
@@ -205,6 +213,8 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "StmtListNode";
     if( eClsid == clsid( CStIfBranchListNode ) )
         return "IfBranchListNode";
+    if( eClsid == clsid( CStVarDeclListNode ) )
+        return "VarDeclListNode";
     if( eClsid == clsid( CStVarDeclNode ) )
         return "VarDeclNode";
     if( eClsid == clsid( CStBasicTypeNode ) )
@@ -271,6 +281,38 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
         CStIdentifierExpr* p = dynamic_cast< CStIdentifierExpr* >( pBase );
         if( p )
             oss << "name=" << p->m_strName;
+    }
+    else if( eClsid == clsid( CStDirectAddressNode ) )
+    {
+        CStDirectAddressNode* p =
+            dynamic_cast< CStDirectAddressNode* >( pBase );
+        if( p )
+        {
+            oss << "addr=" << p->m_strAddress;
+            if( p->m_eAddrType == CStDirectAddressNode::datRpcf )
+                oss << ", rpcf";
+            else if( p->m_eAddrType ==
+                CStDirectAddressNode::datPeripheral )
+                oss << ", peripheral";
+            else if( p->m_eAddrType ==
+                CStDirectAddressNode::datPeripheralOffset )
+                oss << ", peripheral+offset";
+            if( !p->m_pIndex.IsEmpty() )
+                oss << ", indexed";
+        }
+    }
+    else if( eClsid == clsid( CStArrayInitNode ) )
+    {
+        CStArrayInitNode* p = dynamic_cast< CStArrayInitNode* >( pBase );
+        if( p )
+            oss << "values=" << p->m_vecValues.size();
+    }
+    else if( eClsid == clsid( CStArrayRepeatNode ) )
+    {
+        CStArrayRepeatNode* p =
+            dynamic_cast< CStArrayRepeatNode* >( pBase );
+        if( p )
+            oss << "count=" << p->m_iCount;
     }
     else if( eClsid == clsid( CStBinaryExpr ) )
     {
@@ -361,6 +403,13 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
         if( p )
             oss << "stmts=" << p->m_vecStatements.size();
     }
+    else if( eClsid == clsid( CStVarDeclListNode ) )
+    {
+        CStVarDeclListNode* p =
+            dynamic_cast< CStVarDeclListNode* >( pBase );
+        if( p )
+            oss << "varDecls=" << p->m_vecVarDecls.size();
+    }
     else if( eClsid == clsid( CStIfBranchListNode ) )
     {
         CStIfBranchListNode* p =
@@ -391,11 +440,28 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
         if( p )
             oss << "name=" << p->m_strName;
     }
+    else if( eClsid == clsid( CStFunctionBlockHeaderNode ) )
+    {
+        CStFunctionBlockHeaderNode* p =
+            dynamic_cast< CStFunctionBlockHeaderNode* >( pBase );
+        if( p )
+        {
+            oss << "name=" << p->m_strName;
+            if( !p->m_strExtends.empty() )
+                oss << ", extends=" << p->m_strExtends;
+            if( !p->m_vecImplements.empty() )
+                oss << ", implements=" << p->m_vecImplements.size();
+        }
+    }
     else if( eClsid == clsid( CStVarDeclNode ) )
     {
         CStVarDeclNode* p = dynamic_cast< CStVarDeclNode* >( pBase );
         if( p )
+        {
             oss << "name=" << p->m_strName;
+            if( !p->m_strDirectAddress.empty() )
+                oss << ", at=" << p->m_strDirectAddress;
+        }
     }
     else if( eClsid == clsid( CStBasicTypeNode ) )
     {
@@ -561,6 +627,33 @@ void DumpAstTree(
                 DumpAstTree( index, os, iDepth + 1, strIndent );
         }
     }
+    else if( eClsid == clsid( CStDirectAddressNode ) )
+    {
+        CStDirectAddressNode* p =
+            dynamic_cast< CStDirectAddressNode* >( pBase );
+        if( p && !p->m_pIndex.IsEmpty() )
+        {
+            DumpAstTree( p->m_pIndex, os, iDepth + 1, strIndent );
+        }
+    }
+    else if( eClsid == clsid( CStArrayInitNode ) )
+    {
+        CStArrayInitNode* p = dynamic_cast< CStArrayInitNode* >( pBase );
+        if( p )
+        {
+            for( const auto& val : p->m_vecValues )
+                DumpAstTree( val, os, iDepth + 1, strIndent );
+        }
+    }
+    else if( eClsid == clsid( CStArrayRepeatNode ) )
+    {
+        CStArrayRepeatNode* p =
+            dynamic_cast< CStArrayRepeatNode* >( pBase );
+        if( p )
+        {
+            DumpAstTree( p->m_pElement, os, iDepth + 1, strIndent );
+        }
+    }
     else if( eClsid == clsid( CStMemberAccessExpr ) )
     {
         CStMemberAccessExpr* p = dynamic_cast< CStMemberAccessExpr* >( pBase );
@@ -630,6 +723,16 @@ void DumpAstTree(
                 DumpAstTree( p->m_vecStatements[ i ], os, iDepth + 1, strIndent );
         }
     }
+    else if( eClsid == clsid( CStVarDeclListNode ) )
+    {
+        CStVarDeclListNode* p =
+            dynamic_cast< CStVarDeclListNode* >( pBase );
+        if( p )
+        {
+            for( size_t i = 0; i < p->m_vecVarDecls.size(); i++ )
+                DumpAstTree( p->m_vecVarDecls[ i ], os, iDepth + 1, strIndent );
+        }
+    }
     else if( eClsid == clsid( CStIfBranchListNode ) )
     {
         CStIfBranchListNode* p =
@@ -666,7 +769,31 @@ void DumpAstTree(
                 DumpAstTree( stmt, os, iDepth + 1, strIndent );
         }
     }
-    else if( eClsid == clsid( CStFunctionDecl ) || eClsid == clsid( CStFunctionBlockDecl ) )
+    else if( eClsid == clsid( CStFunctionBlockDecl ) )
+    {
+        CStFunctionBlockDecl* pFB =
+            dynamic_cast< CStFunctionBlockDecl* >( pBase );
+        if( pFB )
+        {
+            for( const auto& decl : pFB->m_vecInputVars )
+                DumpAstTree( decl, os, iDepth + 1, strIndent );
+            for( const auto& decl : pFB->m_vecOutputVars )
+                DumpAstTree( decl, os, iDepth + 1, strIndent );
+            for( const auto& decl : pFB->m_vecInOutVars )
+                DumpAstTree( decl, os, iDepth + 1, strIndent );
+            for( const auto& decl : pFB->m_vecLocalVars )
+                DumpAstTree( decl, os, iDepth + 1, strIndent );
+            for( const auto& decl : pFB->m_vecTempVars )
+                DumpAstTree( decl, os, iDepth + 1, strIndent );
+            for( const auto& decl : pFB->m_vecVariables )
+                DumpAstTree( decl, os, iDepth + 1, strIndent );
+            for( const auto& decl : pFB->m_vecMethods )
+                DumpAstTree( decl, os, iDepth + 1, strIndent );
+            for( const auto& stmt : pFB->m_vecStatements )
+                DumpAstTree( stmt, os, iDepth + 1, strIndent );
+        }
+    }
+    else if( eClsid == clsid( CStFunctionDecl ) )
     {
         CStFunctionDecl* pFunc = dynamic_cast< CStFunctionDecl* >( pBase );
         if( pFunc )

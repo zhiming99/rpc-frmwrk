@@ -32,6 +32,7 @@
 #include "stparser.h"
 #include "lvalvar.h"
 #include "astnodes.h"
+#include "stsymtab.h"
 
 using namespace rpcf;
 std::shared_ptr< CSTParserContext > g_pParserCtx;
@@ -77,6 +78,7 @@ static FactoryPtr InitClassFactory()
     // AST Expression Nodes
     INIT_MAP_ENTRY( CStLiteralExpr );
     INIT_MAP_ENTRY( CStIdentifierExpr );
+    INIT_MAP_ENTRY( CStDirectAddressNode );
     INIT_MAP_ENTRY( CStBinaryExpr );
     INIT_MAP_ENTRY( CStUnaryExpr );
     INIT_MAP_ENTRY( CStCallExpr );
@@ -124,6 +126,7 @@ static FactoryPtr InitClassFactory()
     // AST POU Declaration Nodes
     INIT_MAP_ENTRY( CStProgramDecl );
     INIT_MAP_ENTRY( CStFunctionBlockDecl );
+    INIT_MAP_ENTRY( CStFunctionBlockHeaderNode );
     INIT_MAP_ENTRY( CStFunctionDecl );
     INIT_MAP_ENTRY( CStMethodDecl );
 
@@ -135,11 +138,17 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStUsingDirective );
     INIT_MAP_ENTRY( CStInitialValueNode );
     INIT_MAP_ENTRY( CStArrayInitNode );
+    INIT_MAP_ENTRY( CStArrayRepeatNode );
     INIT_MAP_ENTRY( CStStructInitNode );
     INIT_MAP_ENTRY( CStIdentifierListNode );
+    INIT_MAP_ENTRY( CStVarDeclListNode );
 
     // AST Root Node
     INIT_MAP_ENTRY( CStRootNode );
+
+    // Symbol table
+    INIT_MAP_ENTRY( CStSymbol );
+
     END_FACTORY_MAPS;
 };
 

@@ -57,6 +57,58 @@ inline YYLTYPE2 GetLocationRange( const YYSTYPE& oStart, const YYSTYPE& oEnd )
 }
 
 /**
+ * @brief Split a var_declarations accumulator by category
+ *
+ * The CStVarDeclNode::m_eCategory applied at block level decides
+ * the target vector of each declaration. Categories without a
+ * target vector (external/stat for now) are collected in vecOther
+ * so nothing gets dropped silently.
+ */
+inline void SplitVarDeclList( ObjPtr pList,
+    std::vector< ObjPtr >& vecInput,
+    std::vector< ObjPtr >& vecOutput,
+    std::vector< ObjPtr >& vecInOut,
+    std::vector< ObjPtr >& vecLocal,
+    std::vector< ObjPtr >& vecTemp,
+    std::vector< ObjPtr >& vecOther )
+{
+    if( pList.IsEmpty() )
+        return;
+    CStVarDeclListNode* pNode = pList;
+    if( pNode == nullptr )
+        return;
+    for( guint32 i = 0; i < pNode->m_vecVarDecls.size(); ++i )
+    {
+        ObjPtr pDecl = pNode->m_vecVarDecls[ i ];
+        CStVarDeclNode* pVar = pDecl;
+        if( pVar == nullptr )
+            continue;
+        switch( pVar->m_eCategory )
+        {
+        case CStVarDeclNode::vcInput:
+            vecInput.push_back( pDecl );
+            break;
+        case CStVarDeclNode::vcOutput:
+            vecOutput.push_back( pDecl );
+            break;
+        case CStVarDeclNode::vcInOut:
+            vecInOut.push_back( pDecl );
+            break;
+        case CStVarDeclNode::vcLocal:
+            vecLocal.push_back( pDecl );
+            break;
+        case CStVarDeclNode::vcTemp:
+            vecTemp.push_back( pDecl );
+            break;
+        default:
+            vecOther.push_back( pDecl );
+            break;
+        }
+    }
+    return;
+}
+
+/**
  * @brief Extract string from token value
  */
 inline std::string GetString( const YYSTYPE& oVal )

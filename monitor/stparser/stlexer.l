@@ -405,10 +405,12 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 
  /* 3. Real Literals (e.g., 1.5, 1.5E-3) per EBNF:
     Real_Literal: Signed_Int '.' Unsigned_Int ( 'E' Signed_Int )?
-    Note: the leading sign is left to the parser's unary minus, same
-    as integer literals; otherwise '3-1.5' would lex as '3' '-1.5'
-    and swallow the binary minus. The exponent sign stays in the
-    token since 'E' is unambiguous. */
+    Design note: the lexer intentionally does NOT take the leading
+    sign of Signed_Int. If it did, flex longest-match would turn
+    '3-1.5' into '3' '-1.5' and swallow the binary minus. A negative
+    real literal (e.g. '-1.5') is therefore composed by the parser's
+    unary minus (TOK_MINUS), same as integer literals. The exponent
+    sign stays in the token since 'E' is unambiguous. */
 {UNSIGNED_INT}"."{UNSIGNED_INT}("E"{SIGNED_INT})? {
     std::string s(yytext);
     /* strip the underscores allowed between digits */

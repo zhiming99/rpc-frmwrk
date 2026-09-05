@@ -109,6 +109,45 @@ struct CStIdentifierExpr : public CStExprNode
 };
 
 /**
+ * @brief Direct address wrapper node, e.g. %IW0.1, %Q*, @IBx.I0
+ *
+ * Direct addresses are translated quite differently from normal
+ * identifiers, so they get a dedicated node instead of reusing
+ * CStIdentifierExpr. The node carries both views of the address:
+ *  - m_strAddress: the address source text
+ *  - m_eAddrType:  the address kind (rpcf, peripheral, or
+ *                  peripheral address with a runtime offset)
+ *  - m_pParsed:    the parsed address object from the lexer
+ *                  (IntVecPtr for peripheral addresses, StrVecPtr
+ *                  for rpcf addresses)
+ *  - m_pIndex:     the index expression of the indexed form
+ *                  '%IW[expr]', empty if not indexed
+ */
+struct CStDirectAddressNode : public CStExprNode
+{
+    typedef CStExprNode super;
+
+    enum enumAddrType
+    {
+        datRpcf,             // '@' rpcf address
+        datPeripheral,       // '%' peripheral address
+        datPeripheralOffset  // '%' address with a runtime offset, '%IW[expr]'
+    };
+
+    std::string m_strAddress;
+    enumAddrType m_eAddrType;
+    ObjPtr m_pParsed;
+    ObjPtr m_pIndex;
+
+    CStDirectAddressNode() : super(),
+        m_eAddrType( datRpcf )
+    { SetClassId( clsid( CStDirectAddressNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+    virtual std::string GetSignature() const override;
+};
+
+/**
  * @brief Binary expression (arithmetic, logical, comparison)
  */
 struct CStBinaryExpr : public CStExprNode
@@ -747,6 +786,9 @@ struct CStVarDeclNode : public CSTAstNodeBase
     bool m_bExternal;
     std::string m_strDirectAddress;
     bool m_bAtDirectAddress;
+    // The CStDirectAddressNode wrapper; kept as a marker for the
+    // translator, which emits different code for direct addresses
+    ObjPtr m_pDirectAddr;
 
     CStVarDeclNode() : super(),
         m_eCategory(vcLocal),
@@ -1050,6 +1092,29 @@ struct CStFunctionBlockDecl : public CStPouDeclNode
 };
 
 /**
+ * @brief Transient accumulator for the function block header
+ *
+ * Holds the header information (name, modifier, EXTENDS and
+ * IMPLEMENTS clauses) until the function_block rule builds the
+ * final CStFunctionBlockDecl.
+ */
+struct CStFunctionBlockHeaderNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::string m_strName;
+    CStFunctionBlockDecl::enumModifier m_eModifier;
+    std::string m_strExtends;
+    std::vector< std::string > m_vecImplements;
+
+    CStFunctionBlockHeaderNode() : super(),
+        m_eModifier( CStFunctionBlockDecl::fbmNone )
+    { SetClassId( clsid( CStFunctionBlockHeaderNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
  * @brief Function declaration
  */
 struct CStFunctionDecl : public CStPouDeclNode
@@ -1265,6 +1330,32 @@ struct CStArrayInitNode : public CSTAstNodeBase
 };
 
 /**
+ * @brief Repeated array element, e.g. '3(5)' in [ 1, 3(5), 2 ]
+ *
+ * The repetition is kept unexpanded: expanding '10000(5)' at parse
+ * time would create 10000 AST entries. The semantic phase expands
+ * the node when it materializes the runtime initial values. Nested
+ * repetitions never occur: the parser multiplies the counts, e.g.
+ * 3(5("h")) becomes 15("h"), since neither the C++ nor the wasm
+ * translator cares about the nesting. This node is an element of
+ * CStArrayInitNode::m_vecValues.
+ */
+struct CStArrayRepeatNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    gint32 m_iCount;    // repeat count, from TOK_NUMBER
+    ObjPtr m_pElement;  // the repeated element: an initial value
+                        // expression
+
+    CStArrayRepeatNode() : super(),
+        m_iCount( 0 )
+    { SetClassId( clsid( CStArrayRepeatNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
  * @brief Struct initialization node
  */
 struct CStStructInitNode : public CSTAstNodeBase
@@ -1296,8 +1387,29 @@ struct CStIdentifierListNode : public CSTAstNodeBase
 };
 
 /**
+ * @brief Transient accumulator for var_declarations
+ *
+ * Collects the variable declarations of the VAR...END_VAR blocks of
+ * a POU. Each CStVarDeclNode in the list carries its category
+ * (input, output, ...) applied at block level, so the consumers can
+ * split the list into the input/output/local/temp vectors of the
+ * POU declaration.
+ */
+struct CStVarDeclListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecVarDecls;
+
+    CStVarDeclListNode() : super()
+    { SetClassId( clsid( CStVarDeclListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
  * @brief Root node for the entire AST
- * 
+ *
  * The root node contains all top-level declarations and provides
  * access to the global namespace scope for absolute path resolution.
  */

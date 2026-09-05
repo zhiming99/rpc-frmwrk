@@ -335,6 +335,52 @@ std::string CStIdentifierListNode::GetNodeInfo() const
     return oss.str();
 }
 
+std::string CStVarDeclListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "VarDeclList{ decls: " << m_vecVarDecls.size() << " }";
+    return oss.str();
+}
+
+std::string CStDirectAddressNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "DirectAddr{ " << m_strAddress;
+    switch( m_eAddrType )
+    {
+        case datRpcf:
+            oss << ", rpcf";
+            break;
+        case datPeripheral:
+            oss << ", peripheral";
+            break;
+        case datPeripheralOffset:
+            oss << ", peripheral+offset";
+            break;
+        default:
+            break;
+    }
+    if( !m_pIndex.IsEmpty() )
+        oss << "[expr]";
+    oss << " }";
+    return oss.str();
+}
+
+std::string CStDirectAddressNode::GetSignature() const
+{ return m_strAddress; }
+
+std::string CStArrayRepeatNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "Repeat{ count: " << m_iCount << ", element ";
+    if( !m_pElement.IsEmpty() )
+        oss << "set";
+    else
+        oss << "none";
+    oss << " }";
+    return oss.str();
+}
+
 // ========================================================================
 // Default implementations for AST nodes
 // These use base class dummy implementation via override
@@ -400,6 +446,7 @@ IMPL_GETNODEINFO( CStPragmaStmt )
 IMPL_GETNODEINFO( CStPouDeclNode )
 IMPL_GETNODEINFO( CStProgramDecl )
 IMPL_GETNODEINFO( CStFunctionBlockDecl )
+IMPL_GETNODEINFO( CStFunctionBlockHeaderNode )
 IMPL_GETNODEINFO( CStFunctionDecl )
 IMPL_GETNODEINFO( CStMethodDecl )
 

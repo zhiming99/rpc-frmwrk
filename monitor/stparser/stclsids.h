@@ -37,6 +37,7 @@ typedef enum
     // AST Expression Nodes
     DECL_CLSID( CStLiteralExpr ),
     DECL_CLSID( CStIdentifierExpr ),
+    DECL_CLSID( CStDirectAddressNode ),
     DECL_CLSID( CStBinaryExpr ),
     DECL_CLSID( CStUnaryExpr ),
     DECL_CLSID( CStCallExpr ),
@@ -84,6 +85,7 @@ typedef enum
     // AST POU Declaration Nodes
     DECL_CLSID( CStProgramDecl ),
     DECL_CLSID( CStFunctionBlockDecl ),
+    DECL_CLSID( CStFunctionBlockHeaderNode ),
     DECL_CLSID( CStFunctionDecl ),
     DECL_CLSID( CStMethodDecl ),
 
@@ -95,11 +97,16 @@ typedef enum
     DECL_CLSID( CStUsingDirective ),
     DECL_CLSID( CStInitialValueNode ),
     DECL_CLSID( CStArrayInitNode ),
+    DECL_CLSID( CStArrayRepeatNode ),
     DECL_CLSID( CStStructInitNode ),
     DECL_CLSID( CStIdentifierListNode ),
+    DECL_CLSID( CStVarDeclListNode ),
 
     // AST Root Node
     DECL_CLSID( CStRootNode ),
+
+    // Symbol table
+    DECL_CLSID( CStSymbol ),
 
 }EnumSTParserClsid;
 
