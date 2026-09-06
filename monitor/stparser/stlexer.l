@@ -247,6 +247,7 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 (?i:END_NAMESPACE)          return TOK_END_NAMESPACE;
 (?i:USING)                  return TOK_USING;
 (?i:VAR_STAT)               return TOK_VAR_STAT;
+(?i:OVERLAP)                return TOK_OVERLAP;
 
 
  /* Matches D#2024-12-25 */

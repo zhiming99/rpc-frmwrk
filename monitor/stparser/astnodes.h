@@ -434,9 +434,12 @@ struct CStSubrangeNode : public CSTAstNodeBase
 /**
  * @brief Subrange list node (parser accumulator)
  *
- * Collects the dimensions of an array type during parsing. Its contents
- * are flattened into CStArrayTypeNode::m_vecDims when the array type is
- * reduced, so this node is transient and does not appear in the final AST.
+ * Collects subranges of the same { start, end } shape during parsing:
+ * the dimensions of an array type (flattened into
+ * CStArrayTypeNode::m_vecDims) and the case_list_selector labels of a
+ * CASE branch (converted to CStCaseStmt::CSelectRange when the case
+ * element is reduced). This node is transient and does not appear in
+ * the final AST.
  */
 struct CStSubrangeListNode : public CSTAstNodeBase
 {
@@ -573,6 +576,7 @@ struct CStStructTypeNode : public CStTypeNode
     std::string m_strName;
     std::string m_strTypeName;
     std::vector< CStructMember > m_vecMembers;
+    bool m_bOverlap = false;
 
     CStStructTypeNode() : super()
     { SetClassId( clsid( CStStructTypeNode ) ); }
@@ -1146,7 +1150,8 @@ struct CStMethodDecl : public CStPouDeclNode
     enum enumAccessModifier {
         amPublic,
         amProtected,
-        amPrivate
+        amPrivate,
+        amInternal
     };
 
     enumAccessModifier m_eAccessModifier;
@@ -1403,6 +1408,46 @@ struct CStVarDeclListNode : public CSTAstNodeBase
 
     CStVarDeclListNode() : super()
     { SetClassId( clsid( CStVarDeclListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Transient accumulator for method_declaration_list
+ *
+ * Collects the METHOD declarations of a function block; the
+ * function_block rule flattens it into
+ * CStFunctionBlockDecl::m_vecMethods.
+ */
+struct CStMethodDeclListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecMethods;
+
+    CStMethodDeclListNode() : super()
+    { SetClassId( clsid( CStMethodDeclListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief CASE branch list node (parser accumulator)
+ *
+ * Collects the case_element branches of a CASE statement. Each element
+ * carries its selector labels (already converted to
+ * CStCaseStmt::CSelectRange) and the statements of that branch. The
+ * list is consumed by case_statement and does not appear in the final
+ * AST.
+ */
+struct CStCaseBranchListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< CStCaseStmt::CCaseBranch > m_vecBranches;
+
+    CStCaseBranchListNode() : super()
+    { SetClassId( clsid( CStCaseBranchListNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };

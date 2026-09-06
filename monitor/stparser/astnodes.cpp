@@ -342,6 +342,20 @@ std::string CStVarDeclListNode::GetNodeInfo() const
     return oss.str();
 }
 
+std::string CStMethodDeclListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "MethodList{ methods: " << m_vecMethods.size() << " }";
+    return oss.str();
+}
+
+std::string CStCaseBranchListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "CaseBranchList{ branches: " << m_vecBranches.size() << " }";
+    return oss.str();
+}
+
 std::string CStDirectAddressNode::GetNodeInfo() const
 {
     std::ostringstream oss;

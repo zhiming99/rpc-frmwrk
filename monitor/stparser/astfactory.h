@@ -838,8 +838,13 @@ public:
     }
 
     ObjPtr CreateMethodDecl( const std::string& strName,
+        CStMethodDecl::enumAccessModifier eAccess,
         ObjPtr pReturnType,
-        const std::vector< ObjPtr >& vecVars,
+        const std::vector< ObjPtr >& vecInput,
+        const std::vector< ObjPtr >& vecOutput,
+        const std::vector< ObjPtr >& vecInOut,
+        const std::vector< ObjPtr >& vecLocal,
+        const std::vector< ObjPtr >& vecTemp,
         const std::vector< ObjPtr >& vecStmts,
         const YYLTYPE2& oLoc )
     {
@@ -849,11 +854,20 @@ public:
         if( p != nullptr )
         {
             p->m_strName = strName;
+            p->m_eAccessModifier = eAccess;
             p->m_pReturnType = pReturnType;
-            p->m_vecVariables = vecVars;
+            p->m_vecInputVars = vecInput;
+            p->m_vecOutputVars = vecOutput;
+            p->m_vecInOutVars = vecInOut;
+            p->m_vecLocalVars = vecLocal;
+            p->m_vecTempVars = vecTemp;
             p->m_vecStatements = vecStmts;
             SetParent( pReturnType, p );
-            SetParents( vecVars, p );
+            SetParents( vecInput, p );
+            SetParents( vecOutput, p );
+            SetParents( vecInOut, p );
+            SetParents( vecLocal, p );
+            SetParents( vecTemp, p );
             SetParents( vecStmts, p );
             p->SetLocation( oLoc );
         }
@@ -965,8 +979,14 @@ public:
         if( p != nullptr )
         {
             p->m_vecNamespace = vecNamespace;
-            if( !vecNamespace.empty() )
-                p->m_strNamespace = vecNamespace.back();
+            /* the dotted namespace name, e.g. 'A.B' for
+               USING A.B; */
+            for( guint32 i = 0; i < vecNamespace.size(); ++i )
+            {
+                if( i > 0 )
+                    p->m_strNamespace += ".";
+                p->m_strNamespace += vecNamespace[ i ];
+            }
             p->SetLocation( oLoc );
         }
         return pNode;

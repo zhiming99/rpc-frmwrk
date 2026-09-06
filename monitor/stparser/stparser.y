@@ -145,7 +145,7 @@ void yyerror (YYLTYPE* yyloc,
 %token TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE TOK_INTERFACE TOK_END_INTERFACE
-%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT
+%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT TOK_OVERLAP
 
 %token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
 // virtual tokens
@@ -187,8 +187,11 @@ start_point:
         $$ = $1;
     }
     | conditional_pragma
+    { $$ = $1; }
     | TOK_EOF
+    { $$ = $1; }
     | case_selector_check
+    { $$ = $1; }
     ;
 
 source_file:
@@ -270,12 +273,19 @@ namespace_elements : namespace_element
 
 namespace_element :
     pou_declaration
+    { $$ = $1; }
     | type_definition_block
+    { $$ = $1; }
     | var_config_declaration
+    { $$ = $1; }
     | pragma_statement
+    { $$ = $1; }
     | namespace_declaration
+    { $$ = $1; }
     | global_var
+    { $$ = $1; }
     | using_directive
+    { $$ = $1; }
     ;
 
 namespace_declaration
@@ -298,57 +308,103 @@ namespace_declaration
     ;
 
 global_var:
-    TOK_VAR_GLOBAL opt_qualifier var_list TOK_END_VAR 
+    TOK_VAR_GLOBAL opt_qualifier var_list TOK_END_VAR
+    {
+        /* Apply the block-level qualifier to every declaration, the
+           same way 'VAR RETAIN ... END_VAR' blocks do inside POUs,
+           then carry the list for the semantic phase */
+        ObjPtr pList = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
+            ToObjPtrVal( $3 ) : nullptr;
+        CStVarDeclListNode* pNode = pList;
+        if( pNode != nullptr )
+        {
+            CStVarDeclNode::enumVarQualifier eQualifier =
+                ( CStVarDeclNode::enumVarQualifier )NUM( $2 );
+            for( guint32 i = 0;
+                i < pNode->m_vecVarDecls.size(); ++i )
+            {
+                CStVarDeclNode* pVar = pNode->m_vecVarDecls[ i ];
+                if( pVar == nullptr )
+                    continue;
+                pVar->m_eQualifier = eQualifier;
+                if( eQualifier == CStVarDeclNode::vqConst )
+                    pVar->m_bConstant = true;
+            }
+        }
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $4) );
+    }
     ;
 
 pou_declaration:
     program
+    { $$ = $1; }
     | function_block
+    { $$ = $1; }
     | function
+    { $$ = $1; }
     ;
 
 program:
-    TOK_PROGRAM TOK_ID program_unit TOK_END_PROGRAM
+    TOK_PROGRAM TOK_ID opt_using_directive_list var_declarations body
+        TOK_END_PROGRAM
       {
           CStAstFactory* pFactory = GET_FACTORY(pCtx);
           std::string strName = ID($2);
 
-          // Parse program_unit to extract components
+          /* The using directives, the var declarations and the
+             body are all visible directly; no carrier needed */
           std::vector< ObjPtr > vecStatements;
           std::vector< ObjPtr > vecInput, vecOutput, vecInOut;
           std::vector< ObjPtr > vecLocal, vecTemp;
+          std::vector< ObjPtr > vecOther;
           std::vector< std::string > vecUsing;
 
-          /* The statement list comes from the program unit body;
-             the var/using extraction is still pending */
           if( $3 != nullptr && IsObjPtrVal( $3 ) )
           {
+              /* the accumulated namespace names, e.g. 'A.B' */
               ObjPtr pList = ToObjPtrVal( $3 );
+              CStIdentifierListNode* pIdList = pList;
+              if( pIdList != nullptr )
+                  vecUsing = pIdList->m_vecIdentifiers;
+          }
+          if( $4 != nullptr && IsObjPtrVal( $4 ) )
+          {
+              /* Split the accumulated declarations by category */
+              SplitVarDeclList( ToObjPtrVal( $4 ),
+                  vecInput, vecOutput, vecInOut,
+                  vecLocal, vecTemp, vecOther );
+          }
+          if( $5 != nullptr && IsObjPtrVal( $5 ) )
+          {
+              ObjPtr pList = ToObjPtrVal( $5 );
               CStStmtListNode* pStmtList = pList;
               if( pStmtList != nullptr )
                   vecStatements = pStmtList->m_vecStatements;
           }
-          // TODO: Parse program_unit properly to extract var groups
 
           ObjPtr pProgram = pFactory->CreateProgramDecl(
               strName, vecInput, vecOutput, vecInOut,
               vecLocal, vecTemp, vecStatements, vecUsing,
-              LOC_RANGE($1, $4) );
+              LOC_RANGE($1, $6) );
 
-          $$ = MAKE_VALUE( Variant( pProgram ), LOC_RANGE($1, $4) );
+          $$ = MAKE_VALUE( Variant( pProgram ), LOC_RANGE($1, $6) );
       }
     ;
 
-program_unit:
-    using_directive_list var_declarations body
+/* Handles the optional USING directives of a program */
+opt_using_directive_list:
+    /* empty */
       {
-          /* Propagate the body statement list; var extraction pending */
-          $$ = $3;
+          /* no USING clause: an empty identifier list */
+          ObjPtr pNode;
+          pNode.NewObj( clsid( CStIdentifierListNode ) );
+          $$ = MAKE_VALUE( Variant( pNode ), YYLTYPE2() );
       }
-    | var_declarations body
+    | using_directive_list
       {
-          $$ = $2;
+          $$ = $1;
       }
+    ;
 
 body:
     /* empty */
@@ -516,14 +572,32 @@ enum_value:
     ;
 
 opt_base_type:
-    /* empty */ 
+    /* empty */
+    {
+        /* no explicit base type */
+        $$ = MAKE_EMPTY();
+    }
     | int_type
+    {
+        $$ = $1;
+    }
 
  /* the default initialization for variables of this enum */
 opt_assign_enum_val:
-    /* empty */ 
+    /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | TOK_ID /* one of the enum value */
+    {
+        $$ = $1;
+    }
     | TOK_ID TOK_PUNC TOK_ID /* enum_type_name#member */
+    {
+        /* keep the qualified name; enum_type_definition reads it with STR() */
+        $$ = MAKE_VALUE( Variant( ID($1) + "#" + ID($3) ),
+            LOC_RANGE($1, $3) );
+    }
 
 enum_type_head:
     TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
@@ -595,24 +669,38 @@ type_assignment:
     }
     ;
 
+opt_overlap:
+    /* empty */
+    | TOK_OVERLAP
+    { $$ = $1; }
+
 struct_definition:
-      TOK_STRUCT member_list TOK_END_STRUCT
+      TOK_STRUCT opt_overlap member_list TOK_END_STRUCT
       {
           CStAstFactory* pFactory = GET_FACTORY(pCtx);
           std::string strTypeName = "";
           std::vector< CStStructTypeNode::CStructMember > vecMembers;
-          if( $2 != nullptr && IsObjPtrVal( $2 ) )
+          ObjPtr pNode;
+          if( $3 != nullptr && IsObjPtrVal( $3 ) )
           {
-              CStStructTypeNode* pStruct = ToObjPtrVal( $2 );
+              CStStructTypeNode* pStruct = ToObjPtrVal( $3 );
               if( pStruct != nullptr )
               {
                   strTypeName = pStruct->m_strTypeName;
                   vecMembers = pStruct->m_vecMembers;
               }
           }
-          ObjPtr pNode = pFactory->CreateStructTypeNode(
-              strTypeName, vecMembers, LOC_RANGE($1, $3) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
+          else
+          {
+              pNode = pFactory->CreateStructTypeNode(
+                  strTypeName, vecMembers, LOC_RANGE($1, $4) );
+          }
+          if( $2 != nullptr )
+          {
+              CStStructTypeNode* pst = pNode;
+              pst->m_bOverlap = true;
+          }
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
       }
     ;
 
@@ -622,11 +710,7 @@ member_list:
           CStAstFactory* pFactory = GET_FACTORY(pCtx);
           std::vector< CStStructTypeNode::CStructMember > vecMembers;
           if( $1 != nullptr && IsObjPtrVal( $1 ) )
-          {
-              CStStructTypeNode::CStructMember member;
-              member.m_pType = ToObjPtrVal( $1 );
-              vecMembers.push_back(member);
-          }
+              vecMembers = MakeStructMembers( ToObjPtrVal( $1 ) );
           ObjPtr pNode = pFactory->CreateStructTypeNode(
               "", vecMembers, LOC($1) );
           $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
@@ -643,9 +727,10 @@ member_list:
           }
           if( $2 != nullptr && IsObjPtrVal( $2 ) )
           {
-              CStStructTypeNode::CStructMember member;
-              member.m_pType = ToObjPtrVal( $2 );
-              vecMembers.push_back(member);
+              std::vector< CStStructTypeNode::CStructMember > vecNew =
+                  MakeStructMembers( ToObjPtrVal( $2 ) );
+              vecMembers.insert( vecMembers.end(),
+                  vecNew.begin(), vecNew.end() );
           }
           ObjPtr pNode = pFactory->CreateStructTypeNode(
               "", vecMembers, LOC_RANGE($1, $3) );
@@ -654,19 +739,12 @@ member_list:
     ;
 
 member_declaration:
-      TOK_ID TOK_COLON type_spec
+      var_declaration
       {
-          CStAstFactory* pFactory = GET_FACTORY(pCtx);
-          std::string strName = ID($1);
-          ObjPtr pType = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
-              ToObjPtrVal( $3 ) : nullptr;
-          // Create a struct member node
-          CStStructTypeNode::CStructMember member;
-          member.m_strName = strName;
-          member.m_pType = pType;
-          ObjPtr pNode = pFactory->CreateStructTypeNode(
-              "", {member}, LOC_RANGE($1, $3) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
+          /* var_declaration already builds the CStVarDeclNode; the
+             member_list accumulator converts it to CStructMember
+             entries, one per declared name */
+          $$ = $1;
       }
     ;
 
@@ -1126,8 +1204,10 @@ var_declaration:
               LOC_RANGE($1, $5) );
           $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
       }
-    | TOK_ID TOK_AT direct_address
+    | TOK_ID TOK_AT direct_address type_spec
       {
+          /* Located declaration per the spec, e.g.
+             'head AT %B0 INT;' in a STRUCT */
           CStAstFactory* pFactory = GET_FACTORY(pCtx);
           std::string strName = ID($1);
           std::string strAddr = "";
@@ -1142,14 +1222,18 @@ var_declaration:
               if( pDirect != nullptr )
                   strAddr = pDirect->m_strAddress;
           }
+          ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
+              ToObjPtrVal( $4 ) : nullptr;
           ObjPtr pNode = pFactory->CreateVarDeclNode(
-              std::vector<std::string>{strName}, nullptr, CStVarDeclNode::vcLocal,
+              std::vector<std::string>{strName}, pType, CStVarDeclNode::vcLocal,
               CStVarDeclNode::vqNone, nullptr, strAddr, true,
-              pDirectAddr, LOC_RANGE($1, $3) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
+              pDirectAddr, LOC_RANGE($1, $4) );
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
       }
-    | TOK_ID TOK_AT direct_address TOK_ASSIGN initial_value
+    | TOK_ID TOK_AT direct_address type_spec TOK_ASSIGN initial_value
       {
+          /* Colon variant, e.g. 'head AT %B0 : INT;', consistent
+             with the VAR_CONFIG binding form */
           CStAstFactory* pFactory = GET_FACTORY(pCtx);
           std::string strName = ID($1);
           std::string strAddr = "";
@@ -1164,13 +1248,15 @@ var_declaration:
               if( pDirect != nullptr )
                   strAddr = pDirect->m_strAddress;
           }
-          ObjPtr pInit = ( $5 != nullptr && IsObjPtrVal( $5 ) ) ?
-              ToObjPtrVal( $5 ) : nullptr;
+          ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
+              ToObjPtrVal( $4 ) : nullptr;
+          ObjPtr pInit = ( $6 != nullptr && IsObjPtrVal( $6 ) ) ?
+              ToObjPtrVal( $6 ) : nullptr;
           ObjPtr pNode = pFactory->CreateVarDeclNode(
-              std::vector<std::string>{strName}, nullptr, CStVarDeclNode::vcLocal,
+              std::vector<std::string>{strName}, pType, CStVarDeclNode::vcLocal,
               CStVarDeclNode::vqNone, pInit, strAddr, true,
               pDirectAddr, LOC_RANGE($1, $5) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
       }
     ;
 
@@ -1780,13 +1866,20 @@ derived_type: instance_path
 
 
 statement:
-    assignment_statement 
+    assignment_statement
+    { $$ = $1; }
     | if_statement
+    { $$ = $1; }
     | for_statement
+    { $$ = $1; }
     | while_statement
+    { $$ = $1; }
     | repeat_statement
+    { $$ = $1; }
     | function_call_statement
+    { $$ = $1; }
     | case_statement
+    { $$ = $1; }
     ;
 
 pragma_statement:
@@ -1810,15 +1903,23 @@ pragma_statement:
 
 conditional_pragma:
     TOK_VSTART_PRAGMA TOK_IF full_expression TOK_RBRACE
+    {
+        /* conditional pragmas carry no AST value */
+        $$ = MAKE_EMPTY();
+    }
     | TOK_VSTART_PRAGMA TOK_ELSIF full_expression TOK_RBRACE
+    { $$ = MAKE_EMPTY(); }
     | TOK_VSTART_PRAGMA TOK_ELSE TOK_RBRACE
+    { $$ = MAKE_EMPTY(); }
     | TOK_VSTART_PRAGMA TOK_END_IF TOK_RBRACE
+    { $$ = MAKE_EMPTY(); }
     | TOK_VSTART_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
         // Access string value from $3 which is YYSTYPE (shared_ptr<YYSPAIR>)
         stdstr strMsg = GetVariantVal( $3 );
         YYLTYPE2 oLoc;
         ParserPrint( pCtx->GetCurFileName().c_str(),
             oLoc.first_line, strMsg.c_str(), true );
+        $$ = MAKE_EMPTY();
     }
     | TOK_VSTART_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
 
@@ -1878,17 +1979,29 @@ conditional_pragma:
         pCtx->GetCurFileName() = strFullPath;
         yyset_lineno( 1, yyscanner );
         yyset_column( 1, yyscanner );
+        $$ = MAKE_EMPTY();
     }
-    | TOK_VSTART_PRAGMA TOK_ATTRIBUTE TOK_STRING opt_attr_values TOK_RBRACE {}
+    | TOK_VSTART_PRAGMA TOK_ATTRIBUTE TOK_STRING opt_attr_values TOK_RBRACE
+    { $$ = MAKE_EMPTY(); }
     ;
 
 string_list:
     TOK_STRING
+    { $$ = $1; }
     | string_list TOK_COMMA TOK_STRING
+    { $$ = $1; }
+    ;
 
 opt_attr_values :
     /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | TOK_ASSIGN string_list
+    {
+        $$ = $2;
+    }
+    ;
 
     
 /* Rule for Assignments: Only allows memory locations on the LHS */
@@ -2091,6 +2204,7 @@ l_value_ext:
 pointer:
     TOK_CARET TOK_DOT
     /* This is just syntactic - the actual node creation happens in the parent rule */
+    { $$ = MAKE_EMPTY(); }
     ;
 
 l_value_var:
@@ -2662,7 +2776,14 @@ else_branch:
 
 opt_semicolons:
     /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | semicolons
+    {
+        $$ = $1;
+    }
+    ;
 
 if_statement:
     TOK_IF full_expression TOK_THEN block_statements elseif_branch else_branch TOK_END_IF
@@ -2708,7 +2829,12 @@ if_statement:
 
 opt_by_step:
     /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | TOK_BY full_expression
+    { $$ = $2; }
+    ;
 
 block_statements_1:
     statement
@@ -2741,6 +2867,10 @@ block_statements_1:
     ;
 block_statements:
     block_statements_1 opt_semicolons
+    {
+        $$ = $1;
+    }
+    ;
 
 for_statement:
     TOK_FOR instance_path TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO block_statements TOK_END_FOR
@@ -2854,7 +2984,9 @@ positional_args:
 
 arg_list:
       positional_args
+      { $$ = $1; }
     | param_assignments
+      { $$ = $1; }
     ;
 
 param_assignments:
@@ -3031,21 +3163,56 @@ param_assignment:
 
 method_declaration_list:
     method_declaration
+      {
+          ObjPtr pNode;
+          pNode.NewObj( clsid( CStMethodDeclListNode ) );
+          CStMethodDeclListNode* pList = pNode;
+          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+              pList->m_vecMethods.push_back( ToObjPtrVal( $1 ) );
+          $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+      }
     | method_declaration_list method_declaration
+      {
+          /* rebuild-and-copy: the previous methods plus the new
+             one */
+          ObjPtr pNode;
+          pNode.NewObj( clsid( CStMethodDeclListNode ) );
+          CStMethodDeclListNode* pList = pNode;
+          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+          {
+              ObjPtr pPrev = ToObjPtrVal( $1 );
+              CStMethodDeclListNode* pPrevList = pPrev;
+              if( pPrevList != nullptr )
+                  pList->m_vecMethods = pPrevList->m_vecMethods;
+          }
+          if( pList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+              pList->m_vecMethods.push_back( ToObjPtrVal( $2 ) );
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+      }
     /* error recovery for method declarations */
     | method_declaration_list error
-    {
-        pCtx->IncError();
-        ParserPrint( basename(pCtx->GetCurFileName().c_str()),
-            @2.last_line,
-            "invalid method declaration, skipping", true );
-        yyerrok;
-    }
+      {
+          pCtx->IncError();
+          ParserPrint( basename(pCtx->GetCurFileName().c_str()),
+              @2.last_line,
+              "invalid method declaration, skipping", true );
+          yyerrok;
+          /* Keep the methods accumulated so far */
+          $$ = $1;
+      }
     ;
 
 opt_global_namespace:
     /* empty */
+      {
+          $$ = MAKE_VALUE( ( guint32 )0, YYLTYPE2() );
+      }
     | TOK_DOT
+      {
+          /* the return type is anchored at the global namespace,
+             e.g. METHOD m : .Robotics.Timer */
+          $$ = MAKE_VALUE( ( guint32 )1, LOC($1) );
+      }
     ;
 
 method_declaration:
@@ -3053,6 +3220,38 @@ method_declaration:
         var_declarations
         block_statements
     TOK_END_METHOD
+      {
+          CStAstFactory* pFactory = GET_FACTORY(pCtx);
+          std::string strName = ID($3);
+          CStMethodDecl::enumAccessModifier eAccess =
+              ( CStMethodDecl::enumAccessModifier )NUM( $2 );
+          ObjPtr pReturnType = ( $5 != nullptr && IsObjPtrVal( $5 ) ) ?
+              ToObjPtrVal( $5 ) : nullptr;
+
+          /* Split the accumulated declarations by category */
+          std::vector< ObjPtr > vecInput, vecOutput, vecInOut;
+          std::vector< ObjPtr > vecLocal, vecTemp, vecOther;
+          if( $6 != nullptr && IsObjPtrVal( $6 ) )
+              SplitVarDeclList( ToObjPtrVal( $6 ),
+                  vecInput, vecOutput, vecInOut,
+                  vecLocal, vecTemp, vecOther );
+
+          std::vector< ObjPtr > vecStatements;
+          if( $7 != nullptr && IsObjPtrVal( $7 ) )
+          {
+              /* Extract the body statements from the accumulator */
+              ObjPtr pList = ToObjPtrVal( $7 );
+              CStStmtListNode* pStmtList = pList;
+              if( pStmtList != nullptr )
+                  vecStatements = pStmtList->m_vecStatements;
+          }
+
+          ObjPtr pNode = pFactory->CreateMethodDecl(
+              strName, eAccess, pReturnType,
+              vecInput, vecOutput, vecInOut, vecLocal, vecTemp,
+              vecStatements, LOC_RANGE($1, $8) );
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $8) );
+      }
     /*| TOK_METHOD opt_access_modifier TOK_ID TOK_COLON derived_type
         var_declarations
         block_statements
@@ -3062,15 +3261,83 @@ method_declaration:
         var_declarations
         block_statements
     TOK_END_METHOD
+      {
+          CStAstFactory* pFactory = GET_FACTORY(pCtx);
+          std::string strName = ID($3);
+          CStMethodDecl::enumAccessModifier eAccess =
+              ( CStMethodDecl::enumAccessModifier )NUM( $2 );
+          bool bGlobal = ( NUM( $5 ) != 0 );
+
+          /* The qualified return type, e.g. '::Robotics.Timer';
+             same node the derived_type rule builds */
+          std::vector< std::string > vecQualifiedName;
+          if( $6 != nullptr && IsObjPtrVal( $6 ) )
+          {
+              ObjPtr pPath = ToObjPtrVal( $6 );
+              CStInstancePathNode* pInstPath = pPath;
+              if( pInstPath != nullptr )
+                  vecQualifiedName = pInstPath->m_vecNameComponents;
+          }
+          ObjPtr pReturnType;
+          if( !vecQualifiedName.empty() )
+              pReturnType = pFactory->CreateDerivedTypeNode(
+                  vecQualifiedName, bGlobal, LOC_RANGE($5, $7) );
+
+          /* Split the accumulated declarations by category */
+          std::vector< ObjPtr > vecInput, vecOutput, vecInOut;
+          std::vector< ObjPtr > vecLocal, vecTemp, vecOther;
+          if( $8 != nullptr && IsObjPtrVal( $8 ) )
+              SplitVarDeclList( ToObjPtrVal( $8 ),
+                  vecInput, vecOutput, vecInOut,
+                  vecLocal, vecTemp, vecOther );
+
+          std::vector< ObjPtr > vecStatements;
+          if( $9 != nullptr && IsObjPtrVal( $9 ) )
+          {
+              /* Extract the body statements from the accumulator */
+              ObjPtr pList = ToObjPtrVal( $9 );
+              CStStmtListNode* pStmtList = pList;
+              if( pStmtList != nullptr )
+                  vecStatements = pStmtList->m_vecStatements;
+          }
+
+          ObjPtr pNode = pFactory->CreateMethodDecl(
+              strName, eAccess, pReturnType,
+              vecInput, vecOutput, vecInOut, vecLocal, vecTemp,
+              vecStatements, LOC_RANGE($1, $10) );
+          CStMethodDecl* pMethod = pNode;
+          if( pMethod != nullptr )
+              pMethod->m_bGlobalNamespace = bGlobal;
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $10) );
+      }
     ;
 
 opt_access_modifier:
     /* empty - defaults to PUBLIC in most ST dialects */
-
+      {
+          $$ = MAKE_VALUE(
+              ( guint32 )CStMethodDecl::amPublic, YYLTYPE2() );
+      }
     | TOK_PUBLIC
+      {
+          $$ = MAKE_VALUE(
+              ( guint32 )CStMethodDecl::amPublic, LOC($1) );
+      }
     | TOK_PROTECTED
+      {
+          $$ = MAKE_VALUE(
+              ( guint32 )CStMethodDecl::amProtected, LOC($1) );
+      }
     | TOK_PRIVATE
+      {
+          $$ = MAKE_VALUE(
+              ( guint32 )CStMethodDecl::amPrivate, LOC($1) );
+      }
     | TOK_INTERNAL
+      {
+          $$ = MAKE_VALUE(
+              ( guint32 )CStMethodDecl::amInternal, LOC($1) );
+      }
     ;
 
 function_block:
@@ -3105,6 +3372,14 @@ function_block:
             SplitVarDeclList( ToObjPtrVal( $3 ),
                 vecInput, vecOutput, vecInOut,
                 vecLocal, vecTemp, vecOther );
+        }
+        if( $4 != nullptr && IsObjPtrVal( $4 ) )
+        {
+            /* Extract the accumulated methods */
+            ObjPtr pList = ToObjPtrVal( $4 );
+            CStMethodDeclListNode* pMethodList = pList;
+            if( pMethodList != nullptr )
+                vecMethods = pMethodList->m_vecMethods;
         }
         if( $5 != nullptr && IsObjPtrVal( $5 ) )
         {
@@ -3144,7 +3419,7 @@ function_block:
         }
         /* method extraction is pending its accumulator */
         std::vector< ObjPtr > vecInput, vecOutput, vecInOut, vecLocal, vecTemp;
-        std::vector< ObjPtr > vecStatements;
+        std::vector< ObjPtr > vecMethods, vecStatements;
         std::vector< ObjPtr > vecOther;
         if( $2 != nullptr && IsObjPtrVal( $2 ) )
         {
@@ -3152,6 +3427,14 @@ function_block:
             SplitVarDeclList( ToObjPtrVal( $2 ),
                 vecInput, vecOutput, vecInOut,
                 vecLocal, vecTemp, vecOther );
+        }
+        if( $3 != nullptr && IsObjPtrVal( $3 ) )
+        {
+            /* Extract the accumulated methods */
+            ObjPtr pList = ToObjPtrVal( $3 );
+            CStMethodDeclListNode* pMethodList = pList;
+            if( pMethodList != nullptr )
+                vecMethods = pMethodList->m_vecMethods;
         }
         if( $4 != nullptr && IsObjPtrVal( $4 ) )
         {
@@ -3165,7 +3448,7 @@ function_block:
         ObjPtr pNode = pFactory->CreateFunctionBlockDecl(
             strName, eModifier, strExtends, vecImplements,
             vecInput, vecOutput, vecInOut, vecLocal, vecTemp,
-            {}, vecStatements, LOC_RANGE($1, $5) );
+            vecMethods, vecStatements, LOC_RANGE($1, $5) );
         $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
     }
 
@@ -3346,39 +3629,120 @@ case_statement:
         CStAstFactory* pFactory = GET_FACTORY(pCtx);
         ObjPtr pExpr = ( $2 != nullptr && IsObjPtrVal( $2 ) ) ?
             ToObjPtrVal( $2 ) : nullptr;
-        
+
         std::vector< CStCaseStmt::CCaseBranch > vecBranches;
+        if( $4 != nullptr && IsObjPtrVal( $4 ) )
+        {
+            ObjPtr pList = ToObjPtrVal( $4 );
+            CStCaseBranchListNode* pBranchList = pList;
+            if( pBranchList != nullptr )
+                vecBranches = pBranchList->m_vecBranches;
+        }
+
         std::vector< ObjPtr > vecElse;
-        // TODO: Extract from case_element_list and opt_else_statement
-        
+        if( $5 != nullptr && IsObjPtrVal( $5 ) )
+        {
+            ObjPtr pList = ToObjPtrVal( $5 );
+            CStStmtListNode* pStmtList = pList;
+            if( pStmtList != nullptr )
+                vecElse = pStmtList->m_vecStatements;
+        }
+
         ObjPtr pNode = pFactory->CreateCaseStmt(
-            pExpr, vecBranches, vecElse, LOC_RANGE($1, $5) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
+            pExpr, vecBranches, vecElse, LOC_RANGE($1, $6) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
     }
     ;
 
 opt_else_statement:
     /* empty */
+    {
+        /* no ELSE clause: an empty statement list */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode = pFactory->CreateStmtListNode( YYLTYPE2() );
+        $$ = MAKE_VALUE( Variant( pNode ), YYLTYPE2() );
+    }
     |TOK_ELSE block_statements
+    {
+        $$ = $2;
+    }
     ;
 
 case_element_list:
     case_element
-    | case_element_list case_element 
+    { $$ = $1; }
+    | case_element_list case_element
+    {
+        /* Accumulate the case branches */
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStCaseBranchListNode ) );
+        CStCaseBranchListNode* pBranchList = pNode;
+        if( pBranchList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStCaseBranchListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pBranchList->m_vecBranches = pPrevList->m_vecBranches;
+        }
+        if( pBranchList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+        {
+            ObjPtr pNext = ToObjPtrVal( $2 );
+            CStCaseBranchListNode* pNextList = pNext;
+            if( pNextList != nullptr )
+            {
+                pBranchList->m_vecBranches.insert(
+                    pBranchList->m_vecBranches.end(),
+                    pNextList->m_vecBranches.begin(),
+                    pNextList->m_vecBranches.end() );
+            }
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+    }
     ;
 
 semicolons:
     TOK_SEMICOLON
+    { $$ = $1; }
     | TOK_SEMICOLON semicolons
+    { $$ = $1; }
+    ;
 
 cinner_statements_1:
     statement
+    {
+        /* First statement - create the accumulator */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStStmtListNode ) );
+        CStStmtListNode* pStmtList = pList;
+        if( pStmtList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pStmtList->m_vecStatements.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
+    }
     | cinner_statements_1 TOK_SEMICOLON statement
-    {}
+    {
+        /* Accumulate statements */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStStmtListNode ) );
+        CStStmtListNode* pStmtList = pList;
+        if( pStmtList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStStmtListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pStmtList->m_vecStatements = pPrevList->m_vecStatements;
+        }
+        if( pStmtList != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
+            pStmtList->m_vecStatements.push_back( ToObjPtrVal( $3 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $3) );
+    }
     | cinner_statements_1 TOK_SEMICOLON
+    {
+        /* trailing semicolon - keep the statements so far */
+        $$ = $1;
+    }
     /* error check */
     | cinner_statements_1 error statement
-    { 
+    {
         pCtx->IncError();
         stdstr strCurFile = basename(
             pCtx->GetCurFileName().c_str() );
@@ -3386,22 +3750,84 @@ cinner_statements_1:
             @2.last_line,
             "';' is expected", true );
         yyerrok;
+        /* keep the recovery statement in the list */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStStmtListNode ) );
+        CStStmtListNode* pStmtList = pList;
+        if( pStmtList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStStmtListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pStmtList->m_vecStatements = pPrevList->m_vecStatements;
+        }
+        if( pStmtList != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
+            pStmtList->m_vecStatements.push_back( ToObjPtrVal( $3 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $3) );
     }
     ;
 
 
-cinner_statements: cinner_statements_1 
+cinner_statements: cinner_statements_1
+    { $$ = $1; }
+    ;
 
 case_element:
     // case_list_selector cinner_statements TOK_SEMICOLON
     // TOK_VCASE_SEP does not come from source, it is used to resolve the
     // shift/reduce conflict
     case_list_selector cinner_statements TOK_VCASE_SEP
+    {
+        /* One branch with its selector labels and statements */
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStCaseBranchListNode ) );
+        CStCaseBranchListNode* pBranchList = pNode;
+        if( pBranchList != nullptr )
+        {
+            CStCaseStmt::CCaseBranch oBranch;
+
+            /* Convert the selector labels { start, end } */
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+            {
+                ObjPtr pPrev = ToObjPtrVal( $1 );
+                CStSubrangeListNode* pRanges = pPrev;
+                if( pRanges != nullptr )
+                {
+                    for( size_t i = 0;
+                        i < pRanges->m_vecRanges.size(); i++ )
+                    {
+                        CStSubrangeNode* pRange = pRanges->m_vecRanges[ i ];
+                        if( pRange == nullptr )
+                            continue;
+                        CStCaseStmt::CSelectRange oSel;
+                        oSel.m_pStartValue = pRange->m_pStart;
+                        oSel.m_pEndValue = pRange->m_pEnd;
+                        oBranch.m_vecSelectors.push_back( oSel );
+                    }
+                }
+            }
+
+            /* Extract the branch statements from the accumulator */
+            if( $2 != nullptr && IsObjPtrVal( $2 ) )
+            {
+                ObjPtr pList = ToObjPtrVal( $2 );
+                CStStmtListNode* pStmtList = pList;
+                if( pStmtList != nullptr )
+                    oBranch.m_vecStatements =
+                        pStmtList->m_vecStatements;
+            }
+
+            pBranchList->m_vecBranches.push_back( oBranch );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+    }
     ;
 
 case_check_statement:
     assignment_statement
+    { $$ = $1; }
     | function_call_statement
+    { $$ = $1; }
 
 case_selector_check:
     TOK_VSTART_CASESEL case_list_selector
@@ -3448,7 +3874,32 @@ case_selector_check:
 
 case_list_selector:
     case_selector TOK_COLON
+    {
+        /* First selector label - create the accumulator */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStSubrangeListNode ) );
+        CStSubrangeListNode* pRangeList = pList;
+        if( pRangeList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pRangeList->m_vecRanges.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $1) );
+    }
     | case_list_selector TOK_COMMA case_selector TOK_COLON
+    {
+        /* Accumulate selector labels */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStSubrangeListNode ) );
+        CStSubrangeListNode* pRangeList = pList;
+        if( pRangeList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStSubrangeListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pRangeList->m_vecRanges = pPrevList->m_vecRanges;
+        }
+        if( pRangeList != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
+            pRangeList->m_vecRanges.push_back( ToObjPtrVal( $3 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $3) );
+    }
     /* error recovery for case selectors */
     | case_list_selector TOK_COMMA error TOK_COLON
     {
@@ -3457,33 +3908,80 @@ case_list_selector:
             @3.last_line,
             "invalid case selector, skipping", true );
         yyerrok;
+        /* keep the labels accumulated so far */
+        $$ = $1;
     }
     ;
 
 case_selector:
     case_constant_expression
+    {
+        CStAstFactory* pFactory = GET_FACTORY( pCtx );
+        ObjPtr pValue = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
+            ToObjPtrVal( $1 ) : nullptr;
+        ObjPtr pNode = pFactory->CreateSubrangeNode(
+            pValue, nullptr, LOC( $1 ) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC( $1 ) );
+    }
 
     | case_constant_expression TOK_RANGE case_constant_expression
+    {
+        CStAstFactory* pFactory = GET_FACTORY( pCtx );
+        ObjPtr pStart = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
+            ToObjPtrVal( $1 ) : nullptr;
+        ObjPtr pEnd = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
+            ToObjPtrVal( $3 ) : nullptr;
+        ObjPtr pNode = pFactory->CreateSubrangeNode(
+            pStart, pEnd, LOC_RANGE( $1, $3 ) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE( $1, $3 ) );
+    }
     ;
 
 case_constant_expression:
-    full_expression { /* evaluate the full_expression to get a constant value */ }
+    full_expression
+    {
+        /* Per the spec the case labels are constant expressions. They
+           may reference named constants or enum values and involve
+           arithmetic, which requires the variable tables of the
+           semantic phase, so the parser keeps the label expressions
+           as-is and performs no numeric evaluation. */
+        $$ = $1;
+    }
     ;
 
 var_config_declaration:
     TOK_VAR_CONFIG
         instance_specific_init_list
     TOK_END_VAR
+    {
+        /* carry the init list; consumed by the semantic phase later */
+        $$ = $2;
+    }
     ;
 
 instance_specific_init_list:
     /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | instance_specific_init_list instance_specific_init
+    {
+        /* no carrier node for the init values yet; keep the head */
+        $$ = $1;
+    }
     ;
 
 instance_specific_init:
     instance_path TOK_AT direct_address TOK_COLON type_spec semicolons
+    {
+        /* no carrier node for the init values yet; keep the path */
+        $$ = $1;
+    }
     |instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value semicolons
+    {
+        /* no carrier node for the init values yet; keep the path */
+        $$ = $1;
+    }
     ;
 
 instance_path : TOK_ID
@@ -3533,12 +4031,47 @@ instance_path : TOK_ID
     ;
 
 using_directive_list : using_directive
-      {  }
+      {
+          /* Accumulate the namespace names, e.g. 'A.B' for
+             USING A.B; */
+          ObjPtr pNode;
+          pNode.NewObj( clsid( CStIdentifierListNode ) );
+          CStIdentifierListNode* pList = pNode;
+          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+          {
+              ObjPtr pUsing = ToObjPtrVal( $1 );
+              CStUsingDirective* pDirective = pUsing;
+              if( pDirective != nullptr )
+                  pList->m_vecIdentifiers.push_back(
+                      pDirective->m_strNamespace );
+          }
+          $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+      }
 
     | using_directive_list using_directive
       {
-          
-          $$ = $1;
+          /* rebuild-and-copy: the previous namespaces plus the new
+             one */
+          ObjPtr pNode;
+          pNode.NewObj( clsid( CStIdentifierListNode ) );
+          CStIdentifierListNode* pList = pNode;
+          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+          {
+              ObjPtr pPrev = ToObjPtrVal( $1 );
+              CStIdentifierListNode* pPrevList = pPrev;
+              if( pPrevList != nullptr )
+                  pList->m_vecIdentifiers =
+                      pPrevList->m_vecIdentifiers;
+          }
+          if( pList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+          {
+              ObjPtr pUsing = ToObjPtrVal( $2 );
+              CStUsingDirective* pDirective = pUsing;
+              if( pDirective != nullptr )
+                  pList->m_vecIdentifiers.push_back(
+                      pDirective->m_strNamespace );
+          }
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
       }
     ;
 using_directive : TOK_USING instance_path TOK_VSEMICOLON

@@ -142,6 +142,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStStructInitNode );
     INIT_MAP_ENTRY( CStIdentifierListNode );
     INIT_MAP_ENTRY( CStVarDeclListNode );
+    INIT_MAP_ENTRY( CStMethodDeclListNode );
+    INIT_MAP_ENTRY( CStCaseBranchListNode );
 
     // AST Root Node
     INIT_MAP_ENTRY( CStRootNode );

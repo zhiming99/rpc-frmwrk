@@ -215,6 +215,10 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "IfBranchListNode";
     if( eClsid == clsid( CStVarDeclListNode ) )
         return "VarDeclListNode";
+    if( eClsid == clsid( CStMethodDeclListNode ) )
+        return "MethodDeclListNode";
+    if( eClsid == clsid( CStCaseBranchListNode ) )
+        return "CaseBranchListNode";
     if( eClsid == clsid( CStVarDeclNode ) )
         return "VarDeclNode";
     if( eClsid == clsid( CStBasicTypeNode ) )
@@ -409,6 +413,20 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
             dynamic_cast< CStVarDeclListNode* >( pBase );
         if( p )
             oss << "varDecls=" << p->m_vecVarDecls.size();
+    }
+    else if( eClsid == clsid( CStMethodDeclListNode ) )
+    {
+        CStMethodDeclListNode* p =
+            dynamic_cast< CStMethodDeclListNode* >( pBase );
+        if( p )
+            oss << "methods=" << p->m_vecMethods.size();
+    }
+    else if( eClsid == clsid( CStCaseBranchListNode ) )
+    {
+        CStCaseBranchListNode* p =
+            dynamic_cast< CStCaseBranchListNode* >( pBase );
+        if( p )
+            oss << "branches=" << p->m_vecBranches.size();
     }
     else if( eClsid == clsid( CStIfBranchListNode ) )
     {
@@ -733,6 +751,16 @@ void DumpAstTree(
                 DumpAstTree( p->m_vecVarDecls[ i ], os, iDepth + 1, strIndent );
         }
     }
+    else if( eClsid == clsid( CStMethodDeclListNode ) )
+    {
+        CStMethodDeclListNode* p =
+            dynamic_cast< CStMethodDeclListNode* >( pBase );
+        if( p )
+        {
+            for( size_t i = 0; i < p->m_vecMethods.size(); i++ )
+                DumpAstTree( p->m_vecMethods[ i ], os, iDepth + 1, strIndent );
+        }
+    }
     else if( eClsid == clsid( CStIfBranchListNode ) )
     {
         CStIfBranchListNode* p =
@@ -747,6 +775,29 @@ void DumpAstTree(
                     p->m_vecBranches[ i ].m_vecStatements;
                 for( size_t j = 0; j < vecStmts.size(); j++ )
                     DumpAstTree( vecStmts[ j ], os, iDepth + 2, strIndent );
+            }
+        }
+    }
+    else if( eClsid == clsid( CStCaseBranchListNode ) )
+    {
+        CStCaseBranchListNode* p =
+            dynamic_cast< CStCaseBranchListNode* >( pBase );
+        if( p )
+        {
+            for( size_t i = 0; i < p->m_vecBranches.size(); i++ )
+            {
+                const CStCaseStmt::CCaseBranch& branch =
+                    p->m_vecBranches[ i ];
+                for( size_t j = 0; j < branch.m_vecSelectors.size(); j++ )
+                {
+                    DumpAstTree( branch.m_vecSelectors[ j ].m_pStartValue,
+                        os, iDepth + 1, strIndent );
+                    DumpAstTree( branch.m_vecSelectors[ j ].m_pEndValue,
+                        os, iDepth + 1, strIndent );
+                }
+                for( size_t j = 0; j < branch.m_vecStatements.size(); j++ )
+                    DumpAstTree( branch.m_vecStatements[ j ],
+                        os, iDepth + 1, strIndent );
             }
         }
     }

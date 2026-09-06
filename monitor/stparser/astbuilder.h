@@ -109,6 +109,34 @@ inline void SplitVarDeclList( ObjPtr pList,
 }
 
 /**
+ * @brief Convert a variable declaration into struct members
+ *
+ * Expands one CStructMember per declared name, so 'a, b : INT;'
+ * inside a STRUCT yields two named members sharing the same type
+ * node. Returns an empty vector for a null or nameless declaration.
+ */
+inline std::vector< CStStructTypeNode::CStructMember > MakeStructMembers(
+    const ObjPtr& pDecl )
+{
+    std::vector< CStStructTypeNode::CStructMember > vecMembers;
+    CStVarDeclNode* pVar = pDecl;
+    if( pVar == nullptr )
+        return vecMembers;
+    std::vector< std::string > vecNames = pVar->m_vecNames;
+    if( vecNames.empty() && !pVar->m_strName.empty() )
+        vecNames.push_back( pVar->m_strName );
+    for( size_t i = 0; i < vecNames.size(); ++i )
+    {
+        CStStructTypeNode::CStructMember member;
+        member.m_strName = vecNames[ i ];
+        member.m_pType = pVar->m_pType;
+        member.m_pInitialValue = pVar->m_pInitialValue;
+        vecMembers.push_back( member );
+    }
+    return vecMembers;
+}
+
+/**
  * @brief Extract string from token value
  */
 inline std::string GetString( const YYSTYPE& oVal )
