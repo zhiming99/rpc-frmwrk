@@ -94,6 +94,7 @@ typedef enum
     DECL_CLSID( CStInterfaceDecl ),
     DECL_CLSID( CStTypeDecl ),
     DECL_CLSID( CStVarConfigDecl ),
+    DECL_CLSID( CStTaskConfigNode ),
     DECL_CLSID( CStUsingDirective ),
     DECL_CLSID( CStInitialValueNode ),
     DECL_CLSID( CStArrayInitNode ),
@@ -103,6 +104,7 @@ typedef enum
     DECL_CLSID( CStVarDeclListNode ),
     DECL_CLSID( CStMethodDeclListNode ),
     DECL_CLSID( CStCaseBranchListNode ),
+    DECL_CLSID( CStVarConfigListNode ),
 
     // AST Root Node
     DECL_CLSID( CStRootNode ),

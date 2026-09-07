@@ -138,6 +138,7 @@ struct CStDirectAddressNode : public CStExprNode
     enumAddrType m_eAddrType;
     ObjPtr m_pParsed;
     ObjPtr m_pIndex;
+    bool m_bPartialAddr = false;
 
     CStDirectAddressNode() : super(),
         m_eAddrType( datRpcf )
@@ -1273,6 +1274,27 @@ struct CStVarConfigDecl : public CSTAstNodeBase
 };
 
 /**
+ * @brief Task configuration node
+ *
+ * Represents a task configuration in IEC 61131-3, e.g.:
+ * TASK MyTask (SINGLE := x, INTERVAL := t#100ms, PRIORITY := 3);
+ */
+struct CStTaskConfigNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::string m_strTaskName;
+    ObjPtr m_pSingle;    // optional SINGLE := data_source
+    ObjPtr m_pInterval;  // optional INTERVAL := data_source
+    ObjPtr m_pPriority;  // required PRIORITY := int_type
+
+    CStTaskConfigNode() : super()
+    { SetClassId( clsid( CStTaskConfigNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
  * @brief Using directive
  */
 struct CStUsingDirective : public CSTAstNodeBase
@@ -1408,6 +1430,26 @@ struct CStVarDeclListNode : public CSTAstNodeBase
 
     CStVarDeclListNode() : super()
     { SetClassId( clsid( CStVarDeclListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Transient accumulator for var_config_declaration
+ *
+ * Collects the instance-specific configurations inside
+ * 'VAR_CONFIG ... END_VAR'. Each entry is a CStVarConfigDecl.
+ * The var_config_declaration rule consumes this list and
+ * attaches it to the program/function block.
+ */
+struct CStVarConfigListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecConfigs;
+
+    CStVarConfigListNode() : super()
+    { SetClassId( clsid( CStVarConfigListNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };

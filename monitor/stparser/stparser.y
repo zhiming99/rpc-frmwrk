@@ -134,7 +134,7 @@ void yyerror (YYLTYPE* yyloc,
     const char* yymsgp);
 }
 
-%token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
+%token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT TOK_CONFIGURATION TOK_END_CONFIGURATION TOK_TASK TOK_SINGLE TOK_INTERVAL TOK_PRIORITY TOK_RESOURCE TOK_END_RESOURCE TOK_ON TOK_READ_ONLY TOK_READ_WRITE
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_LTIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
 %token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD TOK_LDWORD
 
@@ -145,7 +145,7 @@ void yyerror (YYLTYPE* yyloc,
 %token TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE TOK_INTERFACE TOK_END_INTERFACE
-%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT TOK_OVERLAP
+%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT TOK_OVERLAP TOK_NON_RETAIN TOK_WITH TOK_VAR_ACCESS
 
 %token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
 // virtual tokens
@@ -225,6 +225,7 @@ source_file:
         }
         $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
     }
+    | config_declaration
     ;
 
 namespace_name : TOK_ID 
@@ -276,8 +277,6 @@ namespace_element :
     { $$ = $1; }
     | type_definition_block
     { $$ = $1; }
-    | var_config_declaration
-    { $$ = $1; }
     | pragma_statement
     { $$ = $1; }
     | namespace_declaration
@@ -286,6 +285,221 @@ namespace_element :
     { $$ = $1; }
     | using_directive
     { $$ = $1; }
+    ;
+
+/* 1. Main Configuration Rule */
+config_declaration
+    : TOK_CONFIGURATION TOK_ID
+      global_var_decls_opt_list
+      resource_section
+      access_decls_opt
+      config_init_opt
+      TOK_END_CONFIGURATION
+      {
+          /* Semantic Action: Handle configuration AST creation */
+          printf("Parsed CONFIGURATION: %s\n", $2);
+      }
+    ;
+
+/* 2. Handles Global_Var_Decls* (Zero or More) */
+global_var_decls_opt_list
+    : /* empty */ 
+    | global_var_decls_opt_list global_var
+    ;
+
+single_resource_decl:
+    task_config_list prog_config_list
+    | prog_config_list
+
+task_config_list:
+    task_config TOK_SEMICOLON
+    {
+        /* First task - pass through */
+        $$ = $1;
+    }
+    | task_config_list task_config TOK_SEMICOLON
+    {
+        /* Accumulate tasks - currently just pass through; the semantic
+           phase can iterate over the list if needed */
+        $$ = $2;
+    }
+    ;
+
+task_config:
+    TOK_TASK TOK_ID task_init
+    {
+        /* Attach task name to the task config node */
+        if( $3 != nullptr && IsObjPtrVal( $3 ) )
+        {
+            ObjPtr pTask = ToObjPtrVal( $3 );
+            CStTaskConfigNode* pNode = pTask;
+            if( pNode != nullptr )
+                pNode->m_strTaskName = ID($2);
+        }
+        $$ = $3;
+    }
+
+task_init:
+    TOK_LPAREN opt_single_init opt_interval_init priority_init TOK_RPAREN
+    {
+        /* Build a task configuration node with single, interval, and priority */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStTaskConfigNode ) );
+        CStTaskConfigNode* pTask = pNode;
+        if( pTask != nullptr )
+        {
+            pTask->m_pSingle = ( $2 != nullptr && IsObjPtrVal( $2 ) ) ?
+                ToObjPtrVal( $2 ) : nullptr;
+            pTask->m_pInterval = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
+                ToObjPtrVal( $3 ) : nullptr;
+            pTask->m_pPriority = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
+                ToObjPtrVal( $4 ) : nullptr;
+            pTask->SetLocation( LOC_RANGE($1, $5) );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
+    }
+
+opt_single_init:
+    /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
+    | TOK_SINGLE TOK_ASSIGN data_source TOK_COMMA
+    {
+        $$ = $3;
+    }
+
+opt_interval_init:
+    /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
+    | TOK_INTERVAL TOK_ASSIGN data_source TOK_COMMA
+    {
+        $$ = $3;
+    }
+
+priority_init:
+    TOK_PRIORITY TOK_ASSIGN int_type
+    {
+        /* priority is an int_type (type node), not a value */
+        $$ = $3;
+    }
+
+data_source:
+    /* semantic checks needed */
+    full_expression
+
+prog_config_list:
+    prog_config TOK_SEMICOLON
+    | prog_config_list prog_config TOK_SEMICOLON
+
+prog_config:
+    /* semantic checks needed */
+    TOK_PROGRAM opt_retain TOK_ID opt_with_task TOK_COLON prog_type_access opt_prog_conf_elems
+
+opt_retain:
+    /* empty */
+    | TOK_RETAIN
+    | TOK_NON_RETAIN
+
+opt_with_task:
+    /* empty */
+    | TOK_WITH TOK_ID
+
+prog_type_access:
+    /* semantic checks needed */
+    instance_path
+
+opt_prog_conf_elems:
+    /* empty */
+    | prog_conf_elem
+    | opt_prog_conf_elems TOK_COMMA prog_conf_elem
+
+prog_conf_elem: fb_task
+    | prog_cnxn
+
+
+fb_task: instance_path 
+    /* semantic checks needed */
+    | instance_path caret_list
+
+caret_list: TOK_CARET
+    | caret_list TOK_CARET
+    ;
+
+prog_cnxn:
+    symbolic_var TOK_ASSIGN full_expression TOK_OUTPUT_ASSIGN data_sink
+
+data_sink:
+    /* semantic checks needed */
+    instance_path
+
+symbolic_var: 
+    /* semantic checks needed */
+    | instance_path
+    | instance_path subscript_list
+    this_notition instance_path 
+    | this_notition instance_path subscript_list
+
+subscript_list:
+    TOK_LBRACKET expr_list TOK_RBRACKET
+
+expr_list:
+    full_expression 
+    | expr_list TOK_COMMA full_expression 
+
+this_notition: /* empty */
+    TOK_THIS TOK_DOT
+    { $$ = $1; }
+
+/* 3. Handles (Single_Resource_Decl | Resource_Decl+) */
+resource_section
+    : single_resource_decl
+    | resource_decl_list
+    ;
+
+/* Helper for Resource_Decl+ (One or More Explicit Resources) */
+resource_decl_list :
+    resource_declaration
+    | resource_decl_list resource_declaration
+    ;
+
+resource_declaration:
+    /* semantic checks needed */
+    TOK_RESOURCE TOK_ID TOK_ON TOK_ID global_var_decls_opt_list single_resource_decl TOK_END_RESOURCE
+
+/* 4. Handles Access_Decls? (Optional) */
+access_decls_opt
+    : /* empty */
+    | access_declarations
+    ;
+
+access_declarations:
+    TOK_VAR_ACCESS TOK_END_VAR
+    | TOK_VAR_ACCESS access_decl_list TOK_END_VAR
+
+access_decl_list:
+    access_declaration TOK_SEMICOLON
+    | access_decl_list access_declaration TOK_SEMICOLON
+
+access_declaration:
+    /* semantic checks needed */
+    TOK_ID TOK_COLON access_path TOK_COLON type_spec opt_access_dir
+
+access_path:
+    /* semantic checks needed */
+    instance_path
+
+opt_access_dir:
+    TOK_READ_ONLY
+    | TOK_READ_WRITE
+
+/* 5. Handles Config_Init? (Optional) */
+config_init_opt
+    : /* empty */
+    | var_config_init
     ;
 
 namespace_declaration
@@ -846,6 +1060,11 @@ opt_qualifier:
           $$ = MAKE_VALUE(
               ( guint32 )CStVarDeclNode::vqRetain, LOC($1) );
       }
+    | TOK_NON_RETAIN
+      {
+          $$ = MAKE_VALUE(
+              ( guint32 )CStVarDeclNode::vqNonRetain, LOC($1) );
+      }
     | TOK_PERSISTENT
       {
           $$ = MAKE_VALUE(
@@ -1204,7 +1423,7 @@ var_declaration:
               LOC_RANGE($1, $5) );
           $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
       }
-    | TOK_ID TOK_AT direct_address type_spec
+    | TOK_ID TOK_AT direct_address TOK_COLON type_spec
       {
           /* Located declaration per the spec, e.g.
              'head AT %B0 INT;' in a STRUCT */
@@ -1222,15 +1441,15 @@ var_declaration:
               if( pDirect != nullptr )
                   strAddr = pDirect->m_strAddress;
           }
-          ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
-              ToObjPtrVal( $4 ) : nullptr;
+          ObjPtr pType = ( $5 != nullptr && IsObjPtrVal( $5 ) ) ?
+              ToObjPtrVal( $5 ) : nullptr;
           ObjPtr pNode = pFactory->CreateVarDeclNode(
               std::vector<std::string>{strName}, pType, CStVarDeclNode::vcLocal,
               CStVarDeclNode::vqNone, nullptr, strAddr, true,
-              pDirectAddr, LOC_RANGE($1, $4) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
+              pDirectAddr, LOC_RANGE($1, $5) );
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
       }
-    | TOK_ID TOK_AT direct_address type_spec TOK_ASSIGN initial_value
+    | TOK_ID TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value
       {
           /* Colon variant, e.g. 'head AT %B0 : INT;', consistent
              with the VAR_CONFIG binding form */
@@ -1248,15 +1467,15 @@ var_declaration:
               if( pDirect != nullptr )
                   strAddr = pDirect->m_strAddress;
           }
-          ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
-              ToObjPtrVal( $4 ) : nullptr;
-          ObjPtr pInit = ( $6 != nullptr && IsObjPtrVal( $6 ) ) ?
-              ToObjPtrVal( $6 ) : nullptr;
+          ObjPtr pType = ( $5 != nullptr && IsObjPtrVal( $5 ) ) ?
+              ToObjPtrVal( $5 ) : nullptr;
+          ObjPtr pInit = ( $7 != nullptr && IsObjPtrVal( $7 ) ) ?
+              ToObjPtrVal( $7 ) : nullptr;
           ObjPtr pNode = pFactory->CreateVarDeclNode(
               std::vector<std::string>{strName}, pType, CStVarDeclNode::vcLocal,
               CStVarDeclNode::vqNone, pInit, strAddr, true,
-              pDirectAddr, LOC_RANGE($1, $5) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
+              pDirectAddr, LOC_RANGE($1, $7) );
+          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $7) );
       }
     ;
 
@@ -1304,6 +1523,11 @@ direct_address:
           ObjPtr pAddr = pFactory->CreateDirectAddressNode(
               strAddr, CStDirectAddressNode::datPeripheralOffset,
               pParsed, pIndex, LOC_RANGE($1, $4) );
+          if( strAddr.size() && strAddr.back() == '*' )
+          {
+              CStDirectAddressNode* pdan = pAddr;
+              pdan->m_bPartialAddr = true;
+          }
           $$ = MAKE_VALUE( Variant( pAddr ), LOC_RANGE($1, $4) );
       }
     ;
@@ -1452,6 +1676,9 @@ time_type:
         $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
     }
 
+varied_length_dim_list:
+    TOK_MUL
+    | varied_length_dim_list TOK_COMMA TOK_MUL
 
 array_type:
     TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF type_spec
@@ -1496,6 +1723,7 @@ array_type:
             pElementType, vecDims, LOC_RANGE($1, $6) );
         $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
     }
+    TOK_ARRAY TOK_LBRACKET varied_length_dim_list TOK_RBRACKET TOK_OF type_spec
     ;
 
 range_list:
@@ -3949,12 +4177,13 @@ case_constant_expression:
     }
     ;
 
-var_config_declaration:
+var_config_init:
     TOK_VAR_CONFIG
         instance_specific_init_list
     TOK_END_VAR
     {
-        /* carry the init list; consumed by the semantic phase later */
+        /* Pass through the config list for the semantic phase;
+           each entry is a CStVarConfigDecl with one address config */
         $$ = $2;
     }
     ;
@@ -3962,25 +4191,99 @@ var_config_declaration:
 instance_specific_init_list:
     /* empty */
     {
-        $$ = MAKE_EMPTY();
+        ObjPtr pList;
+        pList.NewObj( clsid( CStVarConfigListNode ) );
+        $$ = MAKE_VALUE( Variant( pList ), YYLTYPE2() );
     }
     | instance_specific_init_list instance_specific_init
     {
-        /* no carrier node for the init values yet; keep the head */
-        $$ = $1;
+        /* Accumulate the config entries */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStVarConfigListNode ) );
+        CStVarConfigListNode* pCfgList = pList;
+        if( pCfgList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStVarConfigListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pCfgList->m_vecConfigs = pPrevList->m_vecConfigs;
+        }
+        if( pCfgList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+            pCfgList->m_vecConfigs.push_back( ToObjPtrVal( $2 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $2) );
     }
     ;
 
 instance_specific_init:
     instance_path TOK_AT direct_address TOK_COLON type_spec semicolons
     {
-        /* no carrier node for the init values yet; keep the path */
-        $$ = $1;
+        /* One instance-specific config: path AT address : type */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        std::string strPath;
+        if( $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            CStInstancePathNode* pPath = ToObjPtrVal( $1 );
+            if( pPath != nullptr )
+                strPath = pPath->GetDottedName();
+        }
+        std::string strAddr;
+        ObjPtr pDirectAddr = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
+            ToObjPtrVal( $3 ) : nullptr;
+        if( !pDirectAddr.IsEmpty() )
+        {
+            CStDirectAddressNode* pDirect = pDirectAddr;
+            if( pDirect != nullptr )
+                strAddr = pDirect->m_strAddress;
+        }
+        ObjPtr pType = ( $5 != nullptr && IsObjPtrVal( $5 ) ) ?
+            ToObjPtrVal( $5 ) : nullptr;
+        ObjPtr pNode = pFactory->CreateVarConfigDecl(
+            strPath, pType, LOC_RANGE($1, $5) );
+        CStVarConfigDecl* pCfg = pNode;
+        if( pCfg != nullptr )
+        {
+            CStVarConfigDecl::CInstanceConfig instCfg;
+            instCfg.m_strPath = strAddr;
+            instCfg.m_pValue = nullptr;
+            pCfg->m_vecConfigs.push_back( instCfg );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
     }
-    |instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value semicolons
+    | instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value semicolons
     {
-        /* no carrier node for the init values yet; keep the path */
-        $$ = $1;
+        /* One instance-specific config with initial value */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        std::string strPath;
+        if( $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            CStInstancePathNode* pPath = ToObjPtrVal( $1 );
+            if( pPath != nullptr )
+                strPath = pPath->GetDottedName();
+        }
+        std::string strAddr;
+        ObjPtr pDirectAddr = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
+            ToObjPtrVal( $3 ) : nullptr;
+        if( !pDirectAddr.IsEmpty() )
+        {
+            CStDirectAddressNode* pDirect = pDirectAddr;
+            if( pDirect != nullptr )
+                strAddr = pDirect->m_strAddress;
+        }
+        ObjPtr pType = ( $5 != nullptr && IsObjPtrVal( $5 ) ) ?
+            ToObjPtrVal( $5 ) : nullptr;
+        ObjPtr pInit = ( $7 != nullptr && IsObjPtrVal( $7 ) ) ?
+            ToObjPtrVal( $7 ) : nullptr;
+        ObjPtr pNode = pFactory->CreateVarConfigDecl(
+            strPath, pType, LOC_RANGE($1, $7) );
+        CStVarConfigDecl* pCfg = pNode;
+        if( pCfg != nullptr )
+        {
+            CStVarConfigDecl::CInstanceConfig instCfg;
+            instCfg.m_strPath = strAddr;
+            instCfg.m_pValue = pInit;
+            pCfg->m_vecConfigs.push_back( instCfg );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $7) );
     }
     ;
 

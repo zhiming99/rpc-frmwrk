@@ -342,6 +342,13 @@ std::string CStVarDeclListNode::GetNodeInfo() const
     return oss.str();
 }
 
+std::string CStVarConfigListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "VarConfigList{ configs: " << m_vecConfigs.size() << " }";
+    return oss.str();
+}
+
 std::string CStMethodDeclListNode::GetNodeInfo() const
 {
     std::ostringstream oss;
@@ -469,6 +476,7 @@ IMPL_GETNODEINFO( CStNamespaceDecl )
 IMPL_GETNODEINFO( CStInterfaceDecl )
 IMPL_GETNODEINFO( CStTypeDecl )
 IMPL_GETNODEINFO( CStVarConfigDecl )
+IMPL_GETNODEINFO( CStTaskConfigNode )
 IMPL_GETNODEINFO( CStUsingDirective )
 
 #undef IMPL_GETNODEINFO

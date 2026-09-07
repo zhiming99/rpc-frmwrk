@@ -219,6 +219,10 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "MethodDeclListNode";
     if( eClsid == clsid( CStCaseBranchListNode ) )
         return "CaseBranchListNode";
+    if( eClsid == clsid( CStVarConfigListNode ) )
+        return "VarConfigListNode";
+    if( eClsid == clsid( CStTaskConfigNode ) )
+        return "TaskConfigNode";
     if( eClsid == clsid( CStVarDeclNode ) )
         return "VarDeclNode";
     if( eClsid == clsid( CStBasicTypeNode ) )
@@ -427,6 +431,20 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
             dynamic_cast< CStCaseBranchListNode* >( pBase );
         if( p )
             oss << "branches=" << p->m_vecBranches.size();
+    }
+    else if( eClsid == clsid( CStVarConfigListNode ) )
+    {
+        CStVarConfigListNode* p =
+            dynamic_cast< CStVarConfigListNode* >( pBase );
+        if( p )
+            oss << "configs=" << p->m_vecConfigs.size();
+    }
+    else if( eClsid == clsid( CStTaskConfigNode ) )
+    {
+        CStTaskConfigNode* p =
+            dynamic_cast< CStTaskConfigNode* >( pBase );
+        if( p )
+            oss << "task=" << p->m_strTaskName;
     }
     else if( eClsid == clsid( CStIfBranchListNode ) )
     {
@@ -799,6 +817,30 @@ void DumpAstTree(
                     DumpAstTree( branch.m_vecStatements[ j ],
                         os, iDepth + 1, strIndent );
             }
+        }
+    }
+    else if( eClsid == clsid( CStVarConfigListNode ) )
+    {
+        CStVarConfigListNode* p =
+            dynamic_cast< CStVarConfigListNode* >( pBase );
+        if( p )
+        {
+            for( size_t i = 0; i < p->m_vecConfigs.size(); i++ )
+                DumpAstTree( p->m_vecConfigs[ i ], os, iDepth + 1, strIndent );
+        }
+    }
+    else if( eClsid == clsid( CStTaskConfigNode ) )
+    {
+        CStTaskConfigNode* p =
+            dynamic_cast< CStTaskConfigNode* >( pBase );
+        if( p )
+        {
+            if( !p->m_pSingle.IsEmpty() )
+                DumpAstTree( p->m_pSingle, os, iDepth + 1, strIndent );
+            if( !p->m_pInterval.IsEmpty() )
+                DumpAstTree( p->m_pInterval, os, iDepth + 1, strIndent );
+            if( !p->m_pPriority.IsEmpty() )
+                DumpAstTree( p->m_pPriority, os, iDepth + 1, strIndent );
         }
     }
     else if( eClsid == clsid( CStProgramDecl ) )

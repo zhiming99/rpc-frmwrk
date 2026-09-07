@@ -228,6 +228,8 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 (?i:AT)                     return TOK_AT;
 (?i:BY)                     return TOK_BY;
 (?i:RETAIN)                 return TOK_RETAIN;
+(?i:NON_RETAIN)             return TOK_NON_RETAIN;
+(?i:WITH)                   return TOK_WITH;
 (?i:PERSISTENT)             return TOK_PERSISTENT;
 (?i:ABSTRACT)               return TOK_ABSTRACT;
 (?i:FINAL)                  return TOK_FINAL;
@@ -248,6 +250,18 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 (?i:USING)                  return TOK_USING;
 (?i:VAR_STAT)               return TOK_VAR_STAT;
 (?i:OVERLAP)                return TOK_OVERLAP;
+(?i:CONFIGURATION)          return TOK_CONFIGURATION;
+(?i:END_CONFIGURATION)      return TOK_END_CONFIGURATION;
+(?i:TASK)                   return TOK_TASK;
+(?i:SINGLE)                 return TOK_SINGLE;
+(?i:INTERVAL)               return TOK_INTERVAL;
+(?i:PRIORITY)               return TOK_PRIORITY;
+(?i:RESOURCE)               return TOK_RESOURCE;
+(?i:END_RESOURCE)           return TOK_END_RESOURCE;
+(?i:ON)                     return TOK_ON;
+(?i:VAR_ACCESS)             return TOK_VAR_ACCESS;
+(?i:READ_ONLY)              return TOK_READ_ONLY;
+(?i:READ_WRITE)             return TOK_READ_WRITE;
 
 
  /* Matches D#2024-12-25 */

@@ -135,6 +135,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStInterfaceDecl );
     INIT_MAP_ENTRY( CStTypeDecl );
     INIT_MAP_ENTRY( CStVarConfigDecl );
+    INIT_MAP_ENTRY( CStTaskConfigNode );
     INIT_MAP_ENTRY( CStUsingDirective );
     INIT_MAP_ENTRY( CStInitialValueNode );
     INIT_MAP_ENTRY( CStArrayInitNode );
@@ -144,6 +145,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStVarDeclListNode );
     INIT_MAP_ENTRY( CStMethodDeclListNode );
     INIT_MAP_ENTRY( CStCaseBranchListNode );
+    INIT_MAP_ENTRY( CStVarConfigListNode );
 
     // AST Root Node
     INIT_MAP_ENTRY( CStRootNode );
