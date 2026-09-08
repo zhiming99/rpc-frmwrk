@@ -500,11 +500,11 @@ struct CStBasicTypeNode : public CStTypeNode
     typedef CStTypeNode super;
 
     enum enumBasicType {
-        btInt, btBool, btString, btWString,
+        btInt, btBool, btString, btWString, btUString,
         btByte, btWord, btDWord, btLWord,
         btInt8, btInt16, btInt32, btInt64,
         btUint8, btUint16, btUint32, btUint64,
-        btReal, btLReal,
+        btReal, btLReal, btChar, btWChar, btUChar,
         btTime, btDate, btDateTime, btTimeOfDay,
         // Additional types for compatibility
         btDInt, btSInt, btUInt, btUDInt, btUSInt,
