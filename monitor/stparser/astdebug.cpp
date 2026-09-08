@@ -221,6 +221,8 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "CaseBranchListNode";
     if( eClsid == clsid( CStVarConfigListNode ) )
         return "VarConfigListNode";
+    if( eClsid == clsid( CStProgConfigListNode ) )
+        return "ProgConfigListNode";
     if( eClsid == clsid( CStTaskConfigNode ) )
         return "TaskConfigNode";
     if( eClsid == clsid( CStVarDeclNode ) )
@@ -438,6 +440,13 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
             dynamic_cast< CStVarConfigListNode* >( pBase );
         if( p )
             oss << "configs=" << p->m_vecConfigs.size();
+    }
+    else if( eClsid == clsid( CStProgConfigListNode ) )
+    {
+        CStProgConfigListNode* p =
+            dynamic_cast< CStProgConfigListNode* >( pBase );
+        if( p )
+            oss << "progs=" << p->m_vecProgs.size();
     }
     else if( eClsid == clsid( CStTaskConfigNode ) )
     {
@@ -827,6 +836,16 @@ void DumpAstTree(
         {
             for( size_t i = 0; i < p->m_vecConfigs.size(); i++ )
                 DumpAstTree( p->m_vecConfigs[ i ], os, iDepth + 1, strIndent );
+        }
+    }
+    else if( eClsid == clsid( CStProgConfigListNode ) )
+    {
+        CStProgConfigListNode* p =
+            dynamic_cast< CStProgConfigListNode* >( pBase );
+        if( p )
+        {
+            for( size_t i = 0; i < p->m_vecProgs.size(); i++ )
+                DumpAstTree( p->m_vecProgs[ i ], os, iDepth + 1, strIndent );
         }
     }
     else if( eClsid == clsid( CStTaskConfigNode ) )

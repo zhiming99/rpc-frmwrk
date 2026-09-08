@@ -1455,11 +1455,24 @@ struct CStVarConfigListNode : public CSTAstNodeBase
 };
 
 /**
- * @brief Transient accumulator for method_declaration_list
+ * @brief Transient accumulator for prog_config_list
  *
- * Collects the METHOD declarations of a function block; the
- * function_block rule flattens it into
- * CStFunctionBlockDecl::m_vecMethods.
+ * Collects program configurations inside a resource declaration.
+ */
+struct CStProgConfigListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecProgs;
+
+    CStProgConfigListNode() : super()
+    { SetClassId( clsid( CStProgConfigListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Transient accumulator for method_declaration_list
  */
 struct CStMethodDeclListNode : public CSTAstNodeBase
 {

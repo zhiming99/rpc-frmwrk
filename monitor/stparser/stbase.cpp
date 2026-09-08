@@ -130,7 +130,11 @@ std::string TranslateSTString(const std::string& input) {
     for (size_t i = 0; i < st.size(); ++i) {
         if (st[i] == '$') {
             i++; // Move to character after $
-            if (i >= st.size()) break;
+            if( i >= st.size() )
+            {
+                result += '$'; // Safely preserve trailing $
+                break;
+            }
 
             char escape = st[i];
             switch (escape) {
@@ -166,61 +170,167 @@ std::string TranslateSTString(const std::string& input) {
     return result;
 }
 
-#include <cwctype>
+#include <cctype>
 
-std::wstring TranslateSTWString(const std::string& input) {
+std::wstring TranslateSTWString(const std::string& input) 
+{
     // 1. Remove surrounding double quotes
     if (input.size() < 2) return L"";
     std::string st = input.substr(1, input.size() - 2);
-
+                                                                                                                                                                                                                   
     std::wstring result;
     result.reserve(st.size());
 
     for (size_t i = 0; i < st.size(); ++i) {
         if (st[i] == '$') {
             i++;
-            if (i >= st.size()) break;
+            if (i >= st.size()) {
+                result += L'$'; // Hanging dollar sign safety handler
+                break;
+            }
 
             char escape = st[i];
             switch (escape) {
-                case 'L': case 'l': result += L'\n'; break;
-                case 'N': case 'n': result += L'\n'; break;
-                case 'P': case 'p': result += L'\f'; break;
-                case 'R': case 'r': result += L'\r'; break;
-                case 'T': case 't': result += L'\t'; break;
-                case '$': result += L'$';  break;
-                case '\"': result += L'\"'; break; // Double quote escape
-                default:
-                    // Check for 4-digit hex: $000A
-                    if (i + 3 < st.size() &&
-                        isxdigit(st[i]) && isxdigit(st[i+1]) &&
-                        isxdigit(st[i+2]) && isxdigit(st[i+3])) {
-
-                        std::string hexStr = st.substr(i, 4);
-                        wchar_t wc = (wchar_t)std::stoi(hexStr, nullptr, 16);
-                        result += wc;
-                        i += 3; // Skip the rest of the hex digits
-                    }
-                    // Fallback for 2-digit hex: $0A
-                    else if (i + 1 < st.size() && isxdigit(st[i]) && isxdigit(st[i+1])) {
-                        std::string hexStr = st.substr(i, 2);
-                        wchar_t wc = (wchar_t)std::stoi(hexStr, nullptr, 16);
-                        result += wc;
-                        i += 1;
-                    }
-                    else {
-                        result += (wchar_t)escape;
-                    }
-                    break;
+            case 'L': case 'l': result += L'\n'; break;
+            case 'N': case 'n': result += L'\n'; break; // Treat as \n or change to \r\n based on destination OS target
+            case 'P': case 'p': result += L'\f'; break;
+            case 'R': case 'r': result += L'\r'; break;
+            case 'T': case 't': result += L'\t'; break;
+            case '$': result += L'$';  break;
+            case '\"': result += L'\"'; break; // Double quote escape ($")
+            default:
+                // Check for 4-digit hex: $000A
+                if (i + 3 < st.size() &&
+                    std::isxdigit(st[i]) && std::isxdigit(st[i+1]) &&
+                    std::isxdigit(st[i+2]) && std::isxdigit(st[i+3])) {
+                                                                                                                                                                                                               
+                    std::string hexStr = st.substr(i, 4);
+                    wchar_t wc = static_cast<wchar_t>(std::stoi(hexStr, nullptr, 16));
+                    result += wc;
+                    i += 3; // Skip the remaining 3 hex digits (4th skipped by loop update)
+                }
+                // Fallback for 2-digit hex: $0A
+                else if (i + 1 < st.size() && std::isxdigit(st[i]) && std::isxdigit(st[i+1])) {
+                    std::string hexStr = st.substr(i, 2);
+                    wchar_t wc = static_cast<wchar_t>(std::stoi(hexStr, nullptr, 16));
+                    result += wc;
+                    i += 1; // FIXED: Skip the remaining 1 hex digit (2nd skipped by loop update)
+                }
+                else {
+                    result += L'$'; // Re-insert escape delimiter
+                    result += static_cast<wchar_t>(escape);
+                }
+                break;
             }
-        } else if (st[i] == '\"' && i + 1 < st.size() && st[i+1] == '\"') {
-            // Handle ST's "" (double double-quote)
-            result += L'\"';
-            i++;
         } else {
-            result += (wchar_t)st[i];
+            result += static_cast<wchar_t>(st[i]);
         }
     }
+    return result;
+}
+
+#include <sstream>
+#include <iomanip>
+#include <iostream>
+
+std::string TranslateSTUString(const std::string& yytext)
+{
+    std::string result;
+    if (yytext.empty()) return result;
+
+    // 1. Identify and skip the prefix (USTRING#' or U#')
+    size_t start_idx = 0;
+    if (yytext.rfind("USTRING#'", 0) == 0) {
+        start_idx = 9; // length of "USTRING#'"
+    } else if (yytext.rfind("U#'", 0) == 0) {
+        start_idx = 3; // length of "U#'"
+    } else {
+        // Fallback if the token doesn't match expected prefixes
+        return yytext;
+    }
+
+    // Ensure we don't read past the terminating single quote
+    size_t end_idx = yytext.length() - 1;
+    // C++11 Safe: check back element via index instead of using string::back()
+    if (yytext[yytext.length() - 1] != '\'') {
+        end_idx = yytext.length(); // Malformed string safety check
+    }
+
+    // 2. Parse the body of the string literal
+    for (size_t i = start_idx; i < end_idx; ++i) {
+        if (yytext[i] == '$') {
+            // Check if there is a character following the escape symbol
+            if (i + 1 >= end_idx) {
+                result += '$'; // Malformed hanging '$', treat literally
+                continue;
+            }
+
+            char next_char = yytext[i + 1];
+
+            // Handle standard IEC control code escapes
+            if (next_char == 'n' || next_char == 'N') { result += '\n'; i += 1; }
+            else if (next_char == 't' || next_char == 'T') { result += '\t'; i += 1; }
+            else if (next_char == 'r' || next_char == 'R') { result += '\r'; i += 1; }
+            else if (next_char == 'l' || next_char == 'L') { result += '\n'; i += 1; } // line feed
+            else if (next_char == 'p' || next_char == 'P') { result += '\f'; i += 1; } // page (form feed)
+            else if (next_char == '$') { result += '$';  i += 1; }
+            else if (next_char == '\'') { result += '\''; i += 1; }
+
+            // Handle standard 2-digit Hex Escapes ($FF)
+            else if (next_char != '{' && i + 2 < end_idx && std::isxdigit(yytext[i+1]) && std::isxdigit(yytext[i+2])) {
+                std::string hex_str = yytext.substr(i + 1, 2);
+                char decoded_byte = static_cast<char>(std::stoul(hex_str, nullptr, 16));
+                result += decoded_byte;
+                i += 2;
+            }
+
+            // Handle Edition 4 Unicode Bracket Escapes (${1F579})
+            else if (next_char == '{') {
+                size_t close_brace = yytext.find('}', i + 2);
+                if (close_brace != std::string::npos && close_brace < end_idx) {
+                    size_t hex_len = close_brace - (i + 2);
+                    std::string hex_str = yytext.substr(i + 2, hex_len);
+
+                    try {
+                        unsigned long cp = std::stoul(hex_str, nullptr, 16);
+
+                        // Convert the Unicode Code Point to UTF-8 Multi-byte Code Units
+                        if (cp <= 0x7F) {
+                            result += static_cast<char>(cp);
+                        } else if (cp <= 0x7FF) {
+                            result += static_cast<char>(0xC0 | ((cp >> 6) & 0x1F));
+                            result += static_cast<char>(0x80 | (cp & 0x3F));
+                        } else if (cp <= 0xFFFF) {
+                            result += static_cast<char>(0xE0 | ((cp >> 12) & 0x0F));
+                            result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                            result += static_cast<char>(0x80 | (cp & 0x3F));
+                        } else if (cp <= 0x10FFFF) {
+                            result += static_cast<char>(0xF0 | ((cp >> 18) & 0x07));
+                            result += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+                            result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                            result += static_cast<char>(0x80 | (cp & 0x3F));
+                        }
+                    } catch (...) {
+                        // If parsing hex fails, fallback to printing it raw
+                        result += yytext.substr(i, close_brace - i + 1);
+                    }
+                    i = close_brace; // Move loop index to the closing brace
+                } else {
+                    // No matching closing brace found
+                    result += "$}";
+                    i += 1;
+                }
+            }
+            else {
+                // Unknown character escape, treat '$' literally
+                result += '$';
+            }
+        } else {
+            // Pass standard and multi-byte raw characters straight through
+            result += yytext[i];
+        }
+    }
+
     return result;
 }
 

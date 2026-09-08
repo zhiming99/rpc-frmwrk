@@ -135,7 +135,7 @@ void yyerror (YYLTYPE* yyloc,
 }
 
 %token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT TOK_CONFIGURATION TOK_END_CONFIGURATION TOK_TASK TOK_SINGLE TOK_INTERVAL TOK_PRIORITY TOK_RESOURCE TOK_END_RESOURCE TOK_ON TOK_READ_ONLY TOK_READ_WRITE
-%token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_LTIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
+%token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_USTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_LTIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT TOK_CHAR TOK_WCHAR TOK_UCHAR
 %token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD TOK_LDWORD
 
 %token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT
@@ -147,7 +147,7 @@ void yyerror (YYLTYPE* yyloc,
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE TOK_INTERFACE TOK_END_INTERFACE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT TOK_OVERLAP TOK_NON_RETAIN TOK_WITH TOK_VAR_ACCESS
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_USTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
 // virtual tokens
 %token TOK_VSTART_MAIN TOK_VSTART_PRAGMA TOK_VCASE_SEP TOK_VPUNC TOK_VSEMICOLON TOK_VSUB TOK_VSTART_CASESEL
 
@@ -390,23 +390,68 @@ priority_init:
 data_source:
     /* semantic checks needed */
     full_expression
+    { $$ = $1; }
 
 prog_config_list:
     prog_config TOK_SEMICOLON
+    {
+        /* First program config - create accumulator */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStProgConfigListNode ) );
+        CStProgConfigListNode* pProgList = pList;
+        if( pProgList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pProgList->m_vecProgs.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
+    }
     | prog_config_list prog_config TOK_SEMICOLON
+    {
+        /* Accumulate program configs */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStProgConfigListNode ) );
+        CStProgConfigListNode* pProgList = pList;
+        if( pProgList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStProgConfigListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pProgList->m_vecProgs = pPrevList->m_vecProgs;
+        }
+        if( pProgList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+            pProgList->m_vecProgs.push_back( ToObjPtrVal( $2 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $2) );
+    }
+    ;
 
 prog_config:
-    /* semantic checks needed */
     TOK_PROGRAM opt_retain TOK_ID opt_with_task TOK_COLON prog_type_access opt_prog_conf_elems
+    {
+        /* Simplified pass-through for now - TODO: build proper node */
+        $$ = MAKE_EMPTY();
+    }
 
 opt_retain:
     /* empty */
+    {
+        $$ = MAKE_VALUE( ( guint32 )0, YYLTYPE2() );  // retainNone
+    }
     | TOK_RETAIN
+    {
+        $$ = MAKE_VALUE( ( guint32 )1, LOC($1) );  // retainRetain
+    }
     | TOK_NON_RETAIN
+    {
+        $$ = MAKE_VALUE( ( guint32 )2, LOC($1) );  // retainNonRetain
+    }
 
 opt_with_task:
     /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | TOK_WITH TOK_ID
+    {
+        $$ = $2;
+    }
 
 prog_type_access:
     /* semantic checks needed */
@@ -1652,6 +1697,28 @@ int_type:
             CStBasicTypeNode::btLWord, 0, LOC($1) );
         $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
     }
+    | TOK_CHAR
+    {
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode = pFactory->CreateBasicTypeNode(
+            CStBasicTypeNode::btChar, 0, LOC($1) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
+    | TOK_WCHAR
+    {
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode = pFactory->CreateBasicTypeNode(
+            CStBasicTypeNode::btWChar, 0, LOC($1) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
+    | TOK_UCHAR
+    {
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode = pFactory->CreateBasicTypeNode(
+            CStBasicTypeNode::btUChar, 0, LOC($1) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
+    ;
 
 time_type:
     TOK_TIME_TYPE
@@ -1772,14 +1839,34 @@ range:
     }
     ;
 
+string_type_name:
+    TOK_STRING_TYPE
+    {
+        Variant oVar( ( guint32 )CStBasicTypeNode::btString );
+        $$ = MAKE_VALUE( oVar, LOC($1) );
+    }
+    | TOK_WSTRING_TYPE
+    {
+        Variant oVar( ( guint32 )CStBasicTypeNode::btWString );
+        $$ = MAKE_VALUE( oVar, LOC($1) );
+    }
+    | TOK_USTRING_TYPE
+    {
+        Variant oVar( ( guint32 )CStBasicTypeNode::btUString );
+        $$ = MAKE_VALUE( oVar, LOC($1) );
+    }
+    ;
+
 string_type:
-    TOK_STRING_TYPE TOK_LPAREN full_expression TOK_RPAREN
+    string_type_name TOK_LPAREN full_expression TOK_RPAREN
     {  /* Specific length: the length is a constant expression, kept
           as parsed; the numeric length is evaluated by the semantic
           phase */
+        
         CStAstFactory* pFactory = GET_FACTORY(pCtx);
         ObjPtr pNode = pFactory->CreateBasicTypeNode(
-            CStBasicTypeNode::btString, 0, LOC_RANGE($1, $4) );
+           ( cpp::CStBasicTypeNode::enumBasicType) (int)NUM($1),
+           0, LOC_RANGE($1, $4) );
         CStBasicTypeNode* pType = pNode;
         if( pType != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
         {
@@ -1788,11 +1875,12 @@ string_type:
         }
         $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
     }
-    | TOK_STRING_TYPE TOK_LBRACKET full_expression TOK_RBRACKET
+    | string_type_name TOK_LBRACKET full_expression TOK_RBRACKET
     {  /* Specific length: constant expression, see above */
         CStAstFactory* pFactory = GET_FACTORY(pCtx);
         ObjPtr pNode = pFactory->CreateBasicTypeNode(
-            CStBasicTypeNode::btString, 0, LOC_RANGE($1, $4) );
+           ( cpp::CStBasicTypeNode::enumBasicType) (int)NUM($1),
+           0, LOC_RANGE($1, $4) );
         CStBasicTypeNode* pType = pNode;
         if( pType != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
         {
@@ -1801,46 +1889,12 @@ string_type:
         }
         $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
     }
-    | TOK_STRING_TYPE
+    | string_type_name
     {  /* Default length is 80 */
         CStAstFactory* pFactory = GET_FACTORY(pCtx);
         ObjPtr pNode = pFactory->CreateBasicTypeNode(
-            CStBasicTypeNode::btString, 80, LOC($1) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-    }
-    | TOK_WSTRING_TYPE TOK_LPAREN full_expression TOK_RPAREN
-    {  /* Wide string with specific length: constant expression,
-          see above */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pNode = pFactory->CreateBasicTypeNode(
-            CStBasicTypeNode::btWString, 0, LOC_RANGE($1, $4) );
-        CStBasicTypeNode* pType = pNode;
-        if( pType != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            pType->m_pStringLength = UnwrapFullExpression(
-                ToObjPtrVal( $3 ) );
-        }
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-    }
-    | TOK_WSTRING_TYPE TOK_LBRACKET full_expression TOK_RBRACKET
-    {  /* Wide string with specific length: constant expression,
-          see above */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pNode = pFactory->CreateBasicTypeNode(
-            CStBasicTypeNode::btWString, 0, LOC_RANGE($1, $4) );
-        CStBasicTypeNode* pType = pNode;
-        if( pType != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            pType->m_pStringLength = UnwrapFullExpression(
-                ToObjPtrVal( $3 ) );
-        }
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-    }
-    | TOK_WSTRING_TYPE
-    {  /* Wide string (UTF-16), default length 0 */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pNode = pFactory->CreateBasicTypeNode(
-            CStBasicTypeNode::btWString, 0, LOC($1) );
+           ( cpp::CStBasicTypeNode::enumBasicType) (int)NUM($1),
+           80, LOC($1) );
         $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
     }
     ;

@@ -105,6 +105,7 @@ typedef enum
     DECL_CLSID( CStMethodDeclListNode ),
     DECL_CLSID( CStCaseBranchListNode ),
     DECL_CLSID( CStVarConfigListNode ),
+    DECL_CLSID( CStProgConfigListNode ),
 
     // AST Root Node
     DECL_CLSID( CStRootNode ),

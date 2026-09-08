@@ -349,6 +349,13 @@ std::string CStVarConfigListNode::GetNodeInfo() const
     return oss.str();
 }
 
+std::string CStProgConfigListNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "ProgConfigList{ progs: " << m_vecProgs.size() << " }";
+    return oss.str();
+}
+
 std::string CStMethodDeclListNode::GetNodeInfo() const
 {
     std::ostringstream oss;

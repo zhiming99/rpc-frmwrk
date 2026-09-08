@@ -225,6 +225,7 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 (?i:TIME)                   return TOK_TIME_TYPE;
 (?i:STRING)                 return TOK_STRING_TYPE;
 (?i:WSTRING)                return TOK_WSTRING_TYPE;
+(?i:USTRING)                return TOK_USTRING_TYPE;
 (?i:AT)                     return TOK_AT;
 (?i:BY)                     return TOK_BY;
 (?i:RETAIN)                 return TOK_RETAIN;
@@ -283,15 +284,68 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 }
 
  /* Standard STRING literal */
-'(''|[^'\n]|(\$[0-9a-fA-F]{2})|\$[LlPpRrTtQ$])*' {
+(?:STRING|S|UTF8)#?'(?:[^$'\n]|\$[0-9a-fA-F]{2}|\$[LlNnPpRrTt$'])*' {
     // Action: process string (strip quotes, resolve escapes)
-    yylval->get()->first = TranslateSTString( yytext );
+    gint32 offset = 0;
+    if( strncmp( yytext, "STRING#", 7 ) == 0 )
+        offset = 7;
+    else if( strncmp(yytext, "UTF8#", 5) == 0 )
+        offset = 5;
+    else if( strncmp(yytext, "S#", 2) == 0 )
+        offset = 2;
+    yylval->get()->first = TranslateSTString( yytext + offset );
     return TOK_STRING;
 }
 
+(?:CHAR#)?'(?:[^$'\n]|\$[0-9a-fA-F]{2}|\$[LlNnPpRrTt$'])' {
+    // Action: process string (strip quotes, resolve escapes)
+    gint32 offset = 0;
+    if( strncmp( yytext, "CHAR#", 5 ) == 0 )
+        offset = 5;
+    yylval->get()->first = TranslateSTString( yytext + offset );
+    return TOK_CHAR;
+}
+
  /* WSTRING literal */
-\"(\"\"|[^\"\n]|(\$[0-9a-fA-F]{4})|\$[LlPpRrTtQ$])*\" {
-    lexerr( "wide character string are not supported, yet" );
+(?:WSTRING|W)?\"(?:[^$\"\n]|\$[0-9a-fA-F]{4}|\$[LlNnPpRrTt$\"])*\" {
+    gint32 offset = 0;
+    if( strncmp( yytext, "WSTRING#", 8 ) == 0 )
+        offset = 8;
+    else if( strncmp(yytext, "W#", 2) == 0 )
+        offset = 2;
+
+    yylval->get()->first = TranslateSTWString( yytext + offset );
+    return TOK_WSTRING;
+}
+
+(?:WCHAR|WC)#?\"(?:[^$\"\n]|\$[0-9a-fA-F]{4}|\$[LlNnPpRrTt$"])\" {
+    gint32 offset = 0;
+    if( strncmp( yytext, "WSTRING#", 8 ) == 0 )
+        offset = 8;
+    else if( strncmp(yytext, "WC#", 3) == 0 )
+        offset = 3;
+    yylval->get()->first = TranslateSTWString( yytext + offset );
+    return TOK_WCHAR;
+}
+
+(?:USTRING|U)#'(?:[^$'\n]|\$[ntrlp$']|\$[0-9a-fA-F]{2}|\$\{[0-9a-fA-F]{1,5}\})*' {
+    gint32 offset = 0;
+    if( strncmp( yytext, "USTRING#", 8 ) == 0 )
+        offset = 8;
+    else if( strncmp(yytext, "U#", 2) == 0 )
+        offset = 2;
+    yylval->get()->first = TranslateSTUString( yytext + offset );
+    return TOK_USTRING;
+ }
+
+(?:UCHAR|UC)#'(?:[^$'\n]|\$[ntrlp$']|\$[0-9a-fA-F]{2}|\$\{[0-9a-fA-F]{1,5}\})' {
+    gint32 offset = 0;
+    if( strncmp( yytext, "UCHAR#", 6 ) == 0 )
+        offset = 6;
+    else if( strncmp(yytext, "UC#", 3) == 0 )
+        offset = 3;
+    yylval->get()->first = TranslateSTUString( yytext + offset );
+    return TOK_UCHAR;
 }
 
  /* Error handling for unterminated strings */
