@@ -1295,6 +1295,23 @@ struct CStTaskConfigNode : public CSTAstNodeBase
 };
 
 /**
+ * @brief Task configuration list node (parser accumulator)
+ *
+ * Collects task configurations inside a resource declaration.
+ */
+struct CStTaskConfigListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecTasks;
+
+    CStTaskConfigListNode() : super()
+    { SetClassId( clsid( CStTaskConfigListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
  * @brief Using directive
  */
 struct CStUsingDirective : public CSTAstNodeBase
@@ -1306,6 +1323,207 @@ struct CStUsingDirective : public CSTAstNodeBase
 
     CStUsingDirective() : super()
     { SetClassId( clsid( CStUsingDirective ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Access declaration node
+ *
+ * Represents an access declaration in IEC 61131-3:
+ * id : access_path : type_spec [READ_ONLY | READ_WRITE]
+ */
+struct CStAccessDeclNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::string m_strId;        // The identifier being declared
+    ObjPtr m_pAccessPath;       // The access path (instance_path)
+    ObjPtr m_pTypeSpec;        // The type specification
+    bool m_bReadOnly;          // true if READ_ONLY, false if READ_WRITE
+
+    CStAccessDeclNode() : super(), m_bReadOnly( false )
+    { SetClassId( clsid( CStAccessDeclNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Access declaration list node (parser accumulator)
+ *
+ * Collects access declarations inside an access declaration block.
+ */
+struct CStAccessDeclListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecAccessDecls;
+
+    CStAccessDeclListNode() : super()
+    { SetClassId( clsid( CStAccessDeclListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Access declarations wrapper node
+ *
+ * Wraps the access declarations in VAR_ACCESS ... END_VAR block.
+ * Can be empty or contain a list of access declarations.
+ */
+struct CStAccessDeclsNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pAccessDeclList;  // CStAccessDeclListNode or empty
+
+    CStAccessDeclsNode() : super()
+    { SetClassId( clsid( CStAccessDeclsNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Global variable declaration list node (parser accumulator)
+ *
+ * Collects global variable declarations.
+ */
+struct CStGlobalVarDeclListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecGlobalVars;
+
+    CStGlobalVarDeclListNode() : super()
+    { SetClassId( clsid( CStGlobalVarDeclListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Configuration declaration node
+ *
+ * Represents a configuration declaration in IEC 61131-3:
+ * CONFIGURATION config_name
+ *     global_vars
+ *     resource_section
+ *     access_declarations
+ *     config_init
+ * END_CONFIGURATION
+ */
+struct CStConfigDeclNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::string m_strConfigName;
+    ObjPtr m_pGlobalVars;      // global_var_decls_opt_list
+    ObjPtr m_pResourceSection; // resource_section
+    ObjPtr m_pAccessDecls;    // access_decls_opt
+    ObjPtr m_pConfigInit;     // config_init_opt
+
+    CStConfigDeclNode() : super()
+    { SetClassId( clsid( CStConfigDeclNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Declarations list node (parser accumulator)
+ *
+ * Collects top-level declarations: namespace_elements, config_declaration,
+ * and access_declarations.
+ */
+struct CStDeclsNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecDecls;
+
+    CStDeclsNode() : super()
+    { SetClassId( clsid( CStDeclsNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Single resource declaration node
+ *
+ * Represents a single resource declaration in IEC 61131-3:
+ * Contains task configurations and program configurations.
+ */
+struct CStSingleResourceDeclNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pTaskList;   // task_config_list
+    ObjPtr m_pProgList;   // prog_config_list
+
+    CStSingleResourceDeclNode() : super()
+    { SetClassId( clsid( CStSingleResourceDeclNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Resource declaration node
+ *
+ * Represents a resource declaration in IEC 61131-3:
+ * RESOURCE resource_name ON resource_type
+ *     ... task_config_list, prog_config_list
+ * END_RESOURCE
+ */
+struct CStResourceDeclNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::string m_strResourceName;
+    std::string m_strResourceType;  // from TOK_ID after TOK_ON
+    ObjPtr m_pGlobalVars;  // global_var_decls_opt_list
+    ObjPtr m_pSingleResource;  // single_resource_decl
+
+    CStResourceDeclNode() : super()
+    { SetClassId( clsid( CStResourceDeclNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Resource declaration list node (parser accumulator)
+ *
+ * Collects multiple resource declarations.
+ */
+struct CStResourceDeclListNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::vector< ObjPtr > m_vecResources;
+
+    CStResourceDeclListNode() : super()
+    { SetClassId( clsid( CStResourceDeclListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Resource section node
+ *
+ * Represents a resource section in IEC 61131-3 configuration.
+ * Can contain either a single resource or a list of resources.
+ */
+struct CStResourceSectionNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    enum enumResourceType {
+        rtSingle,
+        rtList
+    };
+
+    enumResourceType m_eType;
+    ObjPtr m_pContent;  // Either single resource or list of resources
+
+    CStResourceSectionNode() : super(), m_eType( rtSingle )
+    { SetClassId( clsid( CStResourceSectionNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -1450,6 +1668,117 @@ struct CStVarConfigListNode : public CSTAstNodeBase
 
     CStVarConfigListNode() : super()
     { SetClassId( clsid( CStVarConfigListNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Program configuration node
+ *
+ * Represents a program configuration in IEC 61131-3, e.g.:
+ * PROGRAM MainProg WITH MyTask : PLC_PRG(x := y, a := b);
+ */
+struct CStProgConfigNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    std::string m_strProgName;
+    enum {
+        retainNone,
+        retainRetain,
+        retainNonRetain
+    } m_eRetain;
+    std::string m_strTaskName;  // optional WITH taskname
+    ObjPtr m_pProgType;  // instance_path for program type
+    std::vector< ObjPtr > m_vecParams;  // fb_task or prog_cnxn params
+
+    CStProgConfigNode() : super(), m_eRetain(retainNone)
+    { SetClassId( clsid( CStProgConfigNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Symbolic variable reference node
+ *
+ * Represents a symbolic variable reference in a prog_cnxn context,
+ * e.g., 'input1' in 'input1 := sensor1 OUTPUT_ASSIGN actuator1'.
+ * Can be a simple identifier, array access, or this.member access.
+ */
+struct CStSymbolicVarNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pVarPath;       // The instance_path (identifier or member access)
+    ObjPtr m_pSubscript;    // Optional array subscript
+    bool m_bIsThisNotation; // Whether using 'this' notation
+
+    CStSymbolicVarNode() : super(), m_bIsThisNotation( false )
+    { SetClassId( clsid( CStSymbolicVarNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief FB Task node
+ *
+ * Represents a function block task reference in a PROGRAM configuration,
+ * e.g., 'fbInstance' in 'PROGRAM Main : PLC_PRG(fbInstance)'.
+ * Can include pointer indicators (^, ^^).
+ */
+struct CStFbTaskNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pInstancePath;  // The instance path (identifier or member access)
+    guint32 m_iCaretCount;   // Number of pointer indicators (^)
+
+    CStFbTaskNode() : super(), m_iCaretCount( 0 )
+    { SetClassId( clsid( CStFbTaskNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Program Connection node
+ *
+ * Represents a program connection in a PROGRAM configuration,
+ * e.g., 'input1 := sensor1 OUTPUT_ASSIGN actuator1'.
+ */
+struct CStProgCnxnNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    ObjPtr m_pInputVar;    // symbolic_var (e.g., input1)
+    ObjPtr m_pExpression;  // full_expression (e.g., sensor1)
+    ObjPtr m_pOutputSink;  // data_sink (e.g., actuator1)
+
+    CStProgCnxnNode() : super()
+    { SetClassId( clsid( CStProgCnxnNode ) ); }
+
+    virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Program configuration element node
+ *
+ * Wraps either an fb_task (function block instance) or prog_cnxn
+ * (program connection) within a PROGRAM configuration.
+ */
+struct CStProgConfElemNode : public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+
+    enum enumElemType {
+        elemFbTask,   // fb_task: instance_path
+        elemProgCnxn  // prog_cnxn: symbolic_var := expr OUTPUT_ASSIGN data_sink
+    };
+
+    enumElemType m_eType;
+    ObjPtr m_pContent;  // Either fb_task (instance_path) or prog_cnxn (expr)
+
+    CStProgConfElemNode() : super(), m_eType( elemFbTask )
+    { SetClassId( clsid( CStProgConfElemNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };

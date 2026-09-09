@@ -136,7 +136,18 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStTypeDecl );
     INIT_MAP_ENTRY( CStVarConfigDecl );
     INIT_MAP_ENTRY( CStTaskConfigNode );
+    INIT_MAP_ENTRY( CStTaskConfigListNode );
     INIT_MAP_ENTRY( CStUsingDirective );
+    INIT_MAP_ENTRY( CStAccessDeclNode );
+    INIT_MAP_ENTRY( CStAccessDeclListNode );
+    INIT_MAP_ENTRY( CStAccessDeclsNode );
+    INIT_MAP_ENTRY( CStGlobalVarDeclListNode );
+    INIT_MAP_ENTRY( CStConfigDeclNode );
+    INIT_MAP_ENTRY( CStDeclsNode );
+    INIT_MAP_ENTRY( CStSingleResourceDeclNode );
+    INIT_MAP_ENTRY( CStResourceDeclNode );
+    INIT_MAP_ENTRY( CStResourceDeclListNode );
+    INIT_MAP_ENTRY( CStResourceSectionNode );
     INIT_MAP_ENTRY( CStInitialValueNode );
     INIT_MAP_ENTRY( CStArrayInitNode );
     INIT_MAP_ENTRY( CStArrayRepeatNode );
@@ -147,6 +158,11 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStCaseBranchListNode );
     INIT_MAP_ENTRY( CStVarConfigListNode );
     INIT_MAP_ENTRY( CStProgConfigListNode );
+    INIT_MAP_ENTRY( CStProgConfigNode );
+    INIT_MAP_ENTRY( CStSymbolicVarNode );
+    INIT_MAP_ENTRY( CStFbTaskNode );
+    INIT_MAP_ENTRY( CStProgCnxnNode );
+    INIT_MAP_ENTRY( CStProgConfElemNode );
 
     // AST Root Node
     INIT_MAP_ENTRY( CStRootNode );

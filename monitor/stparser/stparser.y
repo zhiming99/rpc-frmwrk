@@ -170,7 +170,7 @@ void yyerror (YYLTYPE* yyloc,
 %%
 
 start_point:
-    TOK_VSTART_MAIN source_file
+    TOK_VSTART_MAIN Decls
     {
         // Build the root AST node
         ObjPtr pSrcNode = ToObjPtrVal( $2 );
@@ -186,46 +186,137 @@ start_point:
         }
         $$ = $1;
     }
+    /* this rule applies to the second push-parser */
     | conditional_pragma
     { $$ = $1; }
     | TOK_EOF
     { $$ = $1; }
+    /* this rule applies to the second push-parser */
     | case_selector_check
     { $$ = $1; }
     ;
 
-source_file:
-    /* empty */
+
+Decls:
+    namespace_elements
     {
-        ObjPtr pNode = CreateAstNode< CStRootNode >();
-        $$ = MAKE_VALUE( Variant( pNode ), YYLTYPE2() );
-    }
-    | namespace_elements
-    {
-        ObjPtr pNode = CreateAstNode< CStRootNode >();
-        CStRootNode* pRoot = pNode;
-        if( $1 != nullptr && IsObjPtrVal( $1 ) )
+        /* Build declarations list from namespace_elements */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStDeclsNode ) );
+        CStDeclsNode* pDecls = pNode;
+        if( pDecls != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
         {
-            // Get declarations from namespace_elements
+            // Get children from namespace_elements (CStRootNode)
             ObjPtr pNamespaceContent = ToObjPtrVal( $1 );
             CStRootNode* pNsContent = pNamespaceContent;
             if( pNsContent != nullptr )
             {
-                // Create a virtual global scope node with empty name
-                // This node serves as the starting point for '::abc' resolution
-                ObjPtr pGlobalScope = GetAstFactory( pCtx )->CreateGlobalScope(
-                    pNsContent->m_vecChildren, LOC($1) );
-                
-                // Attach global scope to root
-                pRoot->m_vecDeclarations.push_back( pGlobalScope );
-                CSTAstNodeBase* pScope = pGlobalScope;
-                if( pScope != nullptr )
-                    pScope->SetParent( pRoot );
+                // Add all children as declarations
+                for( size_t i = 0; i < pNsContent->m_vecChildren.size(); ++i )
+                    pDecls->m_vecDecls.push_back( pNsContent->m_vecChildren[ i ] );
             }
         }
         $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
     }
     | config_declaration
+    {
+        /* Create declarations list with config_declaration */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStDeclsNode ) );
+        CStDeclsNode* pDecls = pNode;
+        if( pDecls != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pDecls->m_vecDecls.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
+    | access_declarations
+    {
+        /* Create declarations list with access_declarations */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStDeclsNode ) );
+        CStDeclsNode* pDecls = pNode;
+        if( pDecls != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pDecls->m_vecDecls.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
+    | Decls config_declaration
+    {
+        /* Accumulate config_declaration - modify $1 directly */
+        if( $1 != nullptr && IsObjPtrVal( $1 ) && $2 != nullptr && IsObjPtrVal( $2 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStDeclsNode* pPrevDecls = pPrev;
+            if( pPrevDecls != nullptr )
+                pPrevDecls->m_vecDecls.push_back( ToObjPtrVal( $2 ) );
+        }
+        $$ = $1;
+    }
+    | Decls access_declarations
+    {
+        /* Accumulate access_declarations - modify $1 directly */
+        if( $1 != nullptr && IsObjPtrVal( $1 ) && $2 != nullptr && IsObjPtrVal( $2 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStDeclsNode* pPrevDecls = pPrev;
+            if( pPrevDecls != nullptr )
+                pPrevDecls->m_vecDecls.push_back( ToObjPtrVal( $2 ) );
+        }
+        $$ = $1;
+    }
+    | Decls config_declaration namespace_elements
+    {
+        /* Accumulate config_declaration and namespace_elements - modify $1 directly */
+        if( $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStDeclsNode* pPrevDecls = pPrev;
+            if( pPrevDecls != nullptr )
+            {
+                if( $2 != nullptr && IsObjPtrVal( $2 ) )
+                    pPrevDecls->m_vecDecls.push_back( ToObjPtrVal( $2 ) );
+                if( $3 != nullptr && IsObjPtrVal( $3 ) )
+                {
+                    // Get children from namespace_elements
+                    ObjPtr pNamespaceContent = ToObjPtrVal( $3 );
+                    CStRootNode* pNsContent = pNamespaceContent;
+                    if( pNsContent != nullptr )
+                    {
+                        for( size_t i = 0; i < pNsContent->m_vecChildren.size(); ++i )
+                            pPrevDecls->m_vecDecls.push_back( pNsContent->m_vecChildren[ i ] );
+                    }
+                }
+            }
+        }
+        $$ = $1;
+    }
+    | Decls access_declarations namespace_elements
+    {
+        /* Accumulate access_declarations and namespace_elements - modify $1 directly */
+        if( $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStDeclsNode* pPrevDecls = pPrev;
+            if( pPrevDecls != nullptr )
+            {
+                if( $2 != nullptr && IsObjPtrVal( $2 ) )
+                    pPrevDecls->m_vecDecls.push_back( ToObjPtrVal( $2 ) );
+                if( $3 != nullptr && IsObjPtrVal( $3 ) )
+                {
+                    // Get children from namespace_elements
+                    ObjPtr pNamespaceContent = ToObjPtrVal( $3 );
+                    CStRootNode* pNsContent = pNamespaceContent;
+                    if( pNsContent != nullptr )
+                    {
+                        for( size_t i = 0; i < pNsContent->m_vecChildren.size(); ++i )
+                            pPrevDecls->m_vecDecls.push_back( pNsContent->m_vecChildren[ i ] );
+                    }
+                }
+            }
+        }
+        $$ = $1;
+    }
     ;
 
 namespace_name : TOK_ID 
@@ -288,40 +379,119 @@ namespace_element :
     ;
 
 /* 1. Main Configuration Rule */
-config_declaration
-    : TOK_CONFIGURATION TOK_ID
-      global_var_decls_opt_list
-      resource_section
-      access_decls_opt
-      config_init_opt
-      TOK_END_CONFIGURATION
-      {
-          /* Semantic Action: Handle configuration AST creation */
-          printf("Parsed CONFIGURATION: %s\n", $2);
-      }
+config_declaration :
+    TOK_CONFIGURATION TOK_ID
+    global_var_decls_opt_list
+    resource_section
+    access_decls_opt
+    config_init_opt
+    TOK_END_CONFIGURATION
+    {
+        /* Build configuration declaration node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConfigDeclNode ) );
+        CStConfigDeclNode* pConfig = pNode;
+        if( pConfig != nullptr )
+        {
+            pConfig->m_strConfigName = ID($2);
+            if( $3 != nullptr && IsObjPtrVal( $3 ) )
+                pConfig->m_pGlobalVars = ToObjPtrVal( $3 );
+            if( $4 != nullptr && IsObjPtrVal( $4 ) )
+                pConfig->m_pResourceSection = ToObjPtrVal( $4 );
+            if( $5 != nullptr && IsObjPtrVal( $5 ) )
+                pConfig->m_pAccessDecls = ToObjPtrVal( $5 );
+            if( $6 != nullptr && IsObjPtrVal( $6 ) )
+                pConfig->m_pConfigInit = ToObjPtrVal( $6 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $7) );
+    }
     ;
 
 /* 2. Handles Global_Var_Decls* (Zero or More) */
 global_var_decls_opt_list
-    : /* empty */ 
+    : /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | global_var_decls_opt_list global_var
+    {
+        /* Accumulate global variables */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStGlobalVarDeclListNode ) );
+        CStGlobalVarDeclListNode* pVarList = pList;
+        if( pVarList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStGlobalVarDeclListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pVarList->m_vecGlobalVars = pPrevList->m_vecGlobalVars;
+        }
+        if( pVarList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+            pVarList->m_vecGlobalVars.push_back( ToObjPtrVal( $2 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $2) );
+    }
     ;
 
 single_resource_decl:
     task_config_list prog_config_list
+    {
+        /* Build single resource node with task and prog lists */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStSingleResourceDeclNode ) );
+        CStSingleResourceDeclNode* pSingle = pNode;
+        if( pSingle != nullptr )
+        {
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pSingle->m_pTaskList = ToObjPtrVal( $1 );
+            if( $2 != nullptr && IsObjPtrVal( $2 ) )
+                pSingle->m_pProgList = ToObjPtrVal( $2 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+    }
     | prog_config_list
+    {
+        /* Build single resource node with only prog list */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStSingleResourceDeclNode ) );
+        CStSingleResourceDeclNode* pSingle = pNode;
+        if( pSingle != nullptr )
+        {
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pSingle->m_pProgList = ToObjPtrVal( $1 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
 
 task_config_list:
     task_config TOK_SEMICOLON
     {
-        /* First task - pass through */
-        $$ = $1;
+        /* First task - create accumulator */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStTaskConfigListNode ) );
+        CStTaskConfigListNode* pTaskList = pList;
+        if( pTaskList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pTaskList->m_vecTasks.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
     }
     | task_config_list task_config TOK_SEMICOLON
     {
-        /* Accumulate tasks - currently just pass through; the semantic
-           phase can iterate over the list if needed */
-        $$ = $2;
+        /* Accumulate tasks */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStTaskConfigListNode ) );
+        CStTaskConfigListNode* pTaskList = pList;
+        if( pTaskList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStTaskConfigListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pTaskList->m_vecTasks = pPrevList->m_vecTasks;
+        }
+        if( pTaskList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+            pTaskList->m_vecTasks.push_back( ToObjPtrVal( $2 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $2) );
     }
     ;
 
@@ -425,8 +595,43 @@ prog_config_list:
 prog_config:
     TOK_PROGRAM opt_retain TOK_ID opt_with_task TOK_COLON prog_type_access opt_prog_conf_elems
     {
-        /* Simplified pass-through for now - TODO: build proper node */
-        $$ = MAKE_EMPTY();
+        /* Build a program configuration node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStProgConfigNode ) );
+        CStProgConfigNode* pProg = pNode;
+        if( pProg != nullptr )
+        {
+            // Program name from TOK_ID
+            pProg->m_strProgName = ID($3);
+
+            // Retain type from opt_retain
+            pProg->m_eRetain = 
+                ( decltype( CStProgConfigNode::retainNone ) )NUM($2);
+
+            // Task name from opt_with_task
+            if( $4 != nullptr && IsObjPtrVal( $4 ) )
+            {
+                // opt_with_task returns the TOK_ID token when present
+                pProg->m_strTaskName = ID($4);
+            }
+
+            // Program type (instance_path) from prog_type_access
+            if( $6 != nullptr && IsObjPtrVal( $6 ) )
+                pProg->m_pProgType = ToObjPtrVal( $6 );
+
+            // Params from opt_prog_conf_elems
+            if( $7 != nullptr && IsObjPtrVal( $7 ) )
+            {
+                ObjPtr pParams = ToObjPtrVal( $7 );
+                CStProgConfigListNode* pParamList = pParams;
+                if( pParamList != nullptr )
+                    pProg->m_vecParams = pParamList->m_vecProgs;
+            }
+
+            pProg->SetLocation( LOC_RANGE($1, $7) );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $7) );
     }
 
 opt_retain:
@@ -456,44 +661,252 @@ opt_with_task:
 prog_type_access:
     /* semantic checks needed */
     instance_path
+    {
+        $$ = $1;
+    }
 
 opt_prog_conf_elems:
     /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | prog_conf_elem
+    {
+        /* First param - create accumulator */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStProgConfigListNode ) );
+        CStProgConfigListNode* pParamList = pList;
+        if( pParamList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pParamList->m_vecProgs.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
+    }
     | opt_prog_conf_elems TOK_COMMA prog_conf_elem
+    {
+        /* Accumulate more params */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStProgConfigListNode ) );
+        CStProgConfigListNode* pParamList = pList;
+        if( pParamList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStProgConfigListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pParamList->m_vecProgs = pPrevList->m_vecProgs;
+        }
+        if( pParamList != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
+            pParamList->m_vecProgs.push_back( ToObjPtrVal( $3 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $3) );
+    }
 
 prog_conf_elem: fb_task
+    {
+        /* Wrap fb_task in prog_conf_elem node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStProgConfElemNode ) );
+        CStProgConfElemNode* pElem = pNode;
+        if( pElem != nullptr )
+        {
+            pElem->m_eType = CStProgConfElemNode::elemFbTask;
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pElem->m_pContent = ToObjPtrVal( $1 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
     | prog_cnxn
+    {
+        /* Wrap prog_cnxn in prog_conf_elem node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStProgConfElemNode ) );
+        CStProgConfElemNode* pElem = pNode;
+        if( pElem != nullptr )
+        {
+            pElem->m_eType = CStProgConfElemNode::elemProgCnxn;
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pElem->m_pContent = ToObjPtrVal( $1 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
 
 
-fb_task: instance_path 
-    /* semantic checks needed */
+fb_task: instance_path
+    {
+        /* Build fb_task node with instance_path */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStFbTaskNode ) );
+        CStFbTaskNode* pFbTask = pNode;
+        if( pFbTask != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            pFbTask->m_pInstancePath = ToObjPtrVal( $1 );
+            pFbTask->m_iCaretCount = 0;
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
     | instance_path caret_list
+    {
+        /* Build fb_task node with instance_path and caret count */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStFbTaskNode ) );
+        CStFbTaskNode* pFbTask = pNode;
+        if( pFbTask != nullptr )
+        {
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pFbTask->m_pInstancePath = ToObjPtrVal( $1 );
+            if( $2 != nullptr )
+                pFbTask->m_iCaretCount = NUM($2);
+            else
+                pFbTask->m_iCaretCount = 0;
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+    }
 
 caret_list: TOK_CARET
+    {
+        /* Accumulate caret count */
+        $$ = MAKE_VALUE( ( guint32 )1, LOC($1) );
+    }
     | caret_list TOK_CARET
+    {
+        /* Increment caret count */
+        guint32 iCount = NUM($1);
+        $$ = MAKE_VALUE( ( guint32 )( iCount + 1 ), LOC_RANGE($1, $2) );
+    }
     ;
 
 prog_cnxn:
     symbolic_var TOK_ASSIGN full_expression TOK_OUTPUT_ASSIGN data_sink
+    {
+        /* Build prog_cnxn node with all components */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStProgCnxnNode ) );
+        CStProgCnxnNode* pCnxn = pNode;
+        if( pCnxn != nullptr )
+        {
+            // Store symbolic_var ($1)
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pCnxn->m_pInputVar = ToObjPtrVal( $1 );
+            // Store full_expression ($3)
+            if( $3 != nullptr && IsObjPtrVal( $3 ) )
+                pCnxn->m_pExpression = ToObjPtrVal( $3 );
+            // Store data_sink ($5)
+            if( $5 != nullptr && IsObjPtrVal( $5 ) )
+                pCnxn->m_pOutputSink = ToObjPtrVal( $5 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
+    }
 
 data_sink:
     /* semantic checks needed */
     instance_path
+    { $$ = $1; }
 
-symbolic_var: 
-    /* semantic checks needed */
+symbolic_var:
+    /* empty - placeholder for semantic checks */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | instance_path
+    {
+        /* Simple identifier - build symbolic var node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStSymbolicVarNode ) );
+        CStSymbolicVarNode* pSym = pNode;
+        if( pSym != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            pSym->m_pVarPath = ToObjPtrVal( $1 );
+            pSym->m_bIsThisNotation = false;
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
     | instance_path subscript_list
-    this_notition instance_path 
+    {
+        /* Array access - build symbolic var node with subscript */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStSymbolicVarNode ) );
+        CStSymbolicVarNode* pSym = pNode;
+        if( pSym != nullptr )
+        {
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pSym->m_pVarPath = ToObjPtrVal( $1 );
+            if( $2 != nullptr && IsObjPtrVal( $2 ) )
+                pSym->m_pSubscript = ToObjPtrVal( $2 );
+            pSym->m_bIsThisNotation = false;
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+    }
+    | this_notition instance_path
+    {
+        /* this.member - build symbolic var node with this notation */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStSymbolicVarNode ) );
+        CStSymbolicVarNode* pSym = pNode;
+        if( pSym != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+        {
+            pSym->m_pVarPath = ToObjPtrVal( $2 );
+            pSym->m_bIsThisNotation = true;
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+    }
     | this_notition instance_path subscript_list
+    {
+        /* this.member[index] - build symbolic var node with this and subscript */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStSymbolicVarNode ) );
+        CStSymbolicVarNode* pSym = pNode;
+        if( pSym != nullptr )
+        {
+            if( $2 != nullptr && IsObjPtrVal( $2 ) )
+                pSym->m_pVarPath = ToObjPtrVal( $2 );
+            if( $3 != nullptr && IsObjPtrVal( $3 ) )
+                pSym->m_pSubscript = ToObjPtrVal( $3 );
+            pSym->m_bIsThisNotation = true;
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
+    }
 
 subscript_list:
     TOK_LBRACKET expr_list TOK_RBRACKET
+    {
+        /* Pass through the expr_list */
+        $$ = $2;
+    }
 
 expr_list:
-    full_expression 
-    | expr_list TOK_COMMA full_expression 
+    full_expression
+    {
+        /* First expression - create list */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStArgListNode ) );
+        CStArgListNode* pArgs = pList;
+        if( pArgs != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pArgs->m_vecArgs.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
+    }
+    | expr_list TOK_COMMA full_expression
+    {
+        /* Accumulate more expressions */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStArgListNode ) );
+        CStArgListNode* pArgs = pList;
+        if( pArgs != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStArgListNode* pPrevArgs = pPrev;
+            if( pPrevArgs != nullptr )
+                pArgs->m_vecArgs = pPrevArgs->m_vecArgs;
+        }
+        if( pArgs != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
+            pArgs->m_vecArgs.push_back( ToObjPtrVal( $3 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $3) );
+    }
 
 this_notition: /* empty */
     TOK_THIS TOK_DOT
@@ -502,49 +915,209 @@ this_notition: /* empty */
 /* 3. Handles (Single_Resource_Decl | Resource_Decl+) */
 resource_section
     : single_resource_decl
+    {
+        /* Wrap single resource in resource section node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStResourceSectionNode ) );
+        CStResourceSectionNode* pSection = pNode;
+        if( pSection != nullptr )
+        {
+            pSection->m_eType = CStResourceSectionNode::rtSingle;
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pSection->m_pContent = ToObjPtrVal( $1 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
     | resource_decl_list
+    {
+        /* Wrap resource list in resource section node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStResourceSectionNode ) );
+        CStResourceSectionNode* pSection = pNode;
+        if( pSection != nullptr )
+        {
+            pSection->m_eType = CStResourceSectionNode::rtList;
+            if( $1 != nullptr && IsObjPtrVal( $1 ) )
+                pSection->m_pContent = ToObjPtrVal( $1 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
+    }
     ;
 
 /* Helper for Resource_Decl+ (One or More Explicit Resources) */
 resource_decl_list :
     resource_declaration
+    {
+        /* First resource - create accumulator */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStResourceDeclListNode ) );
+        CStResourceDeclListNode* pResList = pList;
+        if( pResList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pResList->m_vecResources.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
+    }
     | resource_decl_list resource_declaration
+    {
+        /* Accumulate resources */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStResourceDeclListNode ) );
+        CStResourceDeclListNode* pResList = pList;
+        if( pResList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStResourceDeclListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pResList->m_vecResources = pPrevList->m_vecResources;
+        }
+        if( pResList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+            pResList->m_vecResources.push_back( ToObjPtrVal( $2 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $2) );
+    }
     ;
 
 resource_declaration:
-    /* semantic checks needed */
     TOK_RESOURCE TOK_ID TOK_ON TOK_ID global_var_decls_opt_list single_resource_decl TOK_END_RESOURCE
+    {
+        /* Build resource declaration node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStResourceDeclNode ) );
+        CStResourceDeclNode* pRes = pNode;
+        if( pRes != nullptr )
+        {
+            pRes->m_strResourceName = ID($2);
+            pRes->m_strResourceType = ID($4);
+            if( $5 != nullptr && IsObjPtrVal( $5 ) )
+                pRes->m_pGlobalVars = ToObjPtrVal( $5 );
+            if( $6 != nullptr && IsObjPtrVal( $6 ) )
+                pRes->m_pSingleResource = ToObjPtrVal( $6 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $7) );
+    }
 
 /* 4. Handles Access_Decls? (Optional) */
 access_decls_opt
     : /* empty */
+    {
+        $$ = MAKE_EMPTY();
+    }
     | access_declarations
+    {
+        /* Pass through access_declarations result */
+        $$ = $1;
+    }
     ;
 
 access_declarations:
     TOK_VAR_ACCESS TOK_END_VAR
+    {
+        /* Empty access declarations - create wrapper with empty list */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStAccessDeclsNode ) );
+        CStAccessDeclsNode* pDecls = pNode;
+        if( pDecls != nullptr )
+        {
+            // Create empty list
+            ObjPtr pList;
+            pList.NewObj( clsid( CStAccessDeclListNode ) );
+            pDecls->m_pAccessDeclList = pList;
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
+    }
     | TOK_VAR_ACCESS access_decl_list TOK_END_VAR
+    {
+        /* Wrap access_decl_list in access_declarations node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStAccessDeclsNode ) );
+        CStAccessDeclsNode* pDecls = pNode;
+        if( pDecls != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+            pDecls->m_pAccessDeclList = ToObjPtrVal( $2 );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
+    }
 
 access_decl_list:
     access_declaration TOK_SEMICOLON
+    {
+        /* First access declaration - create accumulator */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStAccessDeclListNode ) );
+        CStAccessDeclListNode* pDeclList = pList;
+        if( pDeclList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+            pDeclList->m_vecAccessDecls.push_back( ToObjPtrVal( $1 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
+    }
     | access_decl_list access_declaration TOK_SEMICOLON
+    {
+        /* Accumulate access declarations */
+        ObjPtr pList;
+        pList.NewObj( clsid( CStAccessDeclListNode ) );
+        CStAccessDeclListNode* pDeclList = pList;
+        if( pDeclList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
+        {
+            ObjPtr pPrev = ToObjPtrVal( $1 );
+            CStAccessDeclListNode* pPrevList = pPrev;
+            if( pPrevList != nullptr )
+                pDeclList->m_vecAccessDecls = pPrevList->m_vecAccessDecls;
+        }
+        if( pDeclList != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
+            pDeclList->m_vecAccessDecls.push_back( ToObjPtrVal( $2 ) );
+        $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $2) );
+    }
 
 access_declaration:
-    /* semantic checks needed */
     TOK_ID TOK_COLON access_path TOK_COLON type_spec opt_access_dir
+    {
+        /* Build access declaration node */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStAccessDeclNode ) );
+        CStAccessDeclNode* pDecl = pNode;
+        if( pDecl != nullptr )
+        {
+            pDecl->m_strId = ID($1);
+            if( $3 != nullptr && IsObjPtrVal( $3 ) )
+                pDecl->m_pAccessPath = ToObjPtrVal( $3 );
+            if( $5 != nullptr && IsObjPtrVal( $5 ) )
+                pDecl->m_pTypeSpec = ToObjPtrVal( $5 );
+            // opt_access_dir: 0 = none, 1 = READ_ONLY, 2 = READ_WRITE
+            guint32 nDir = NUM($6);
+            pDecl->m_bReadOnly = ( nDir == 1 );
+        }
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
+    }
 
 access_path:
     /* semantic checks needed */
     instance_path
+    { $$ = $1; }
 
 opt_access_dir:
-    TOK_READ_ONLY
+    /* empty */
+    {
+        $$ = MAKE_VALUE( ( guint32 )0, YYLTYPE2() );  // none
+    }
+    | TOK_READ_ONLY
+    {
+        $$ = MAKE_VALUE( ( guint32 )1, LOC($1) );  // READ_ONLY
+    }
     | TOK_READ_WRITE
+    {
+        $$ = MAKE_VALUE( ( guint32 )2, LOC($1) );  // READ_WRITE
+    }
 
 /* 5. Handles Config_Init? (Optional) */
 config_init_opt
     : /* empty */
+    {
+        $$ = MAKE_VALUE( ( guint32 )0, YYLTYPE2() );  // none
+    }
+    /* semantic check with the EBNF rule config_inst_init in the IEC 61131-3(2025) spec. */
     | var_config_init
+    { $$ = $1; }
     ;
 
 namespace_declaration
@@ -1745,7 +2318,18 @@ time_type:
 
 varied_length_dim_list:
     TOK_MUL
+    {
+        /* Count of variable-length dimensions: 1 */
+        $$ = MAKE_VALUE( ( guint32 )1, LOC($1) );
+    }
     | varied_length_dim_list TOK_COMMA TOK_MUL
+    {
+        /* Accumulate dimension count */
+        guint32 iCount = 1;
+        if( $1 != nullptr )
+            iCount = ( guint32 )$1->first + 1;
+        $$ = MAKE_VALUE( iCount, LOC_RANGE($1, $3) );
+    }
 
 array_type:
     TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF type_spec
@@ -1790,7 +2374,31 @@ array_type:
             pElementType, vecDims, LOC_RANGE($1, $6) );
         $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
     }
-    TOK_ARRAY TOK_LBRACKET varied_length_dim_list TOK_RBRACKET TOK_OF type_spec
+    | TOK_ARRAY TOK_LBRACKET varied_length_dim_list TOK_RBRACKET TOK_OF type_spec
+    {
+        /* Variable-length array, e.g. ARRAY [*, *] OF INT */
+        CStAstFactory* pFactory = GET_FACTORY(pCtx);
+        ObjPtr pElementType = nullptr;
+        if( $6 != nullptr && IsObjPtrVal( $6 ) )
+        {
+            ObjPtr pTypeSpec = ToObjPtrVal( $6 );
+            CStDataTypeSpecNode* pSpecNode = pTypeSpec;
+            if( pSpecNode != nullptr )
+                pElementType = pSpecNode->m_pTypeSpec;
+        }
+        guint32 iDimCount = ( $3 != nullptr ) ? ( guint32 )$3->first : 0;
+        std::vector< CStArrayTypeNode::CArrayDim > vecDims;
+        for( guint32 i = 0; i < iDimCount; i++ )
+        {
+            CStArrayTypeNode::CArrayDim dim;
+            dim.m_pStart = nullptr;  // variable length marker
+            dim.m_pEnd = nullptr;
+            vecDims.push_back( dim );
+        }
+        ObjPtr pNode = pFactory->CreateArrayTypeNode(
+            pElementType, vecDims, LOC_RANGE($1, $5) );
+        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
+    }
     ;
 
 range_list:
@@ -2394,7 +3002,7 @@ l_value:
               $$ = MAKE_VALUE( Variant(), LOC_RANGE($1, $3) );
           }
       }
-    | TOK_THIS pointer l_value_var
+    | TOK_THIS TOK_DOT l_value_var
       {
           /* This member access via pointer */
           if( $3 != nullptr && IsObjPtrVal( $3 ) )

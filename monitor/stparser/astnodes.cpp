@@ -356,6 +356,41 @@ std::string CStProgConfigListNode::GetNodeInfo() const
     return oss.str();
 }
 
+std::string CStProgConfigNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "ProgConfig{ name: " << m_strProgName << ", params: " << m_vecParams.size() << " }";
+    return oss.str();
+}
+
+std::string CStSymbolicVarNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "SymbolicVar{ this: " << ( m_bIsThisNotation ? "yes" : "no" ) << " }";
+    return oss.str();
+}
+
+std::string CStFbTaskNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "FbTask{ carets: " << m_iCaretCount << " }";
+    return oss.str();
+}
+
+std::string CStProgCnxnNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "ProgCnxn{}";
+    return oss.str();
+}
+
+std::string CStProgConfElemNode::GetNodeInfo() const
+{
+    std::ostringstream oss;
+    oss << "ProgConfElem{ type: " << ( m_eType == elemFbTask ? "fb_task" : "prog_cnxn" ) << " }";
+    return oss.str();
+}
+
 std::string CStMethodDeclListNode::GetNodeInfo() const
 {
     std::ostringstream oss;
@@ -484,7 +519,18 @@ IMPL_GETNODEINFO( CStInterfaceDecl )
 IMPL_GETNODEINFO( CStTypeDecl )
 IMPL_GETNODEINFO( CStVarConfigDecl )
 IMPL_GETNODEINFO( CStTaskConfigNode )
+IMPL_GETNODEINFO( CStTaskConfigListNode )
 IMPL_GETNODEINFO( CStUsingDirective )
+IMPL_GETNODEINFO( CStAccessDeclNode )
+IMPL_GETNODEINFO( CStAccessDeclListNode )
+IMPL_GETNODEINFO( CStAccessDeclsNode )
+IMPL_GETNODEINFO( CStGlobalVarDeclListNode )
+IMPL_GETNODEINFO( CStConfigDeclNode )
+IMPL_GETNODEINFO( CStDeclsNode )
+IMPL_GETNODEINFO( CStSingleResourceDeclNode )
+IMPL_GETNODEINFO( CStResourceDeclNode )
+IMPL_GETNODEINFO( CStResourceDeclListNode )
+IMPL_GETNODEINFO( CStResourceSectionNode )
 
 #undef IMPL_GETNODEINFO
 

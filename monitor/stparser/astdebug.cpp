@@ -223,8 +223,40 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "VarConfigListNode";
     if( eClsid == clsid( CStProgConfigListNode ) )
         return "ProgConfigListNode";
+    if( eClsid == clsid( CStProgConfigNode ) )
+        return "ProgConfigNode";
+    if( eClsid == clsid( CStSymbolicVarNode ) )
+        return "SymbolicVarNode";
+    if( eClsid == clsid( CStFbTaskNode ) )
+        return "FbTaskNode";
+    if( eClsid == clsid( CStProgCnxnNode ) )
+        return "ProgCnxnNode";
+    if( eClsid == clsid( CStProgConfElemNode ) )
+        return "ProgConfElemNode";
     if( eClsid == clsid( CStTaskConfigNode ) )
         return "TaskConfigNode";
+    if( eClsid == clsid( CStTaskConfigListNode ) )
+        return "TaskConfigListNode";
+    if( eClsid == clsid( CStAccessDeclNode ) )
+        return "AccessDeclNode";
+    if( eClsid == clsid( CStAccessDeclListNode ) )
+        return "AccessDeclListNode";
+    if( eClsid == clsid( CStAccessDeclsNode ) )
+        return "AccessDeclsNode";
+    if( eClsid == clsid( CStGlobalVarDeclListNode ) )
+        return "GlobalVarDeclListNode";
+    if( eClsid == clsid( CStConfigDeclNode ) )
+        return "ConfigDeclNode";
+    if( eClsid == clsid( CStDeclsNode ) )
+        return "DeclsNode";
+    if( eClsid == clsid( CStSingleResourceDeclNode ) )
+        return "SingleResourceDeclNode";
+    if( eClsid == clsid( CStResourceDeclNode ) )
+        return "ResourceDeclNode";
+    if( eClsid == clsid( CStResourceDeclListNode ) )
+        return "ResourceDeclListNode";
+    if( eClsid == clsid( CStResourceSectionNode ) )
+        return "ResourceSectionNode";
     if( eClsid == clsid( CStVarDeclNode ) )
         return "VarDeclNode";
     if( eClsid == clsid( CStBasicTypeNode ) )
@@ -448,12 +480,124 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
         if( p )
             oss << "progs=" << p->m_vecProgs.size();
     }
+    else if( eClsid == clsid( CStProgConfigNode ) )
+    {
+        CStProgConfigNode* p =
+            dynamic_cast< CStProgConfigNode* >( pBase );
+        if( p )
+            oss << "prog=" << p->m_strProgName;
+    }
+    else if( eClsid == clsid( CStSymbolicVarNode ) )
+    {
+        CStSymbolicVarNode* p =
+            dynamic_cast< CStSymbolicVarNode* >( pBase );
+        if( p )
+            oss << "this=" << ( p->m_bIsThisNotation ? "yes" : "no" );
+    }
+    else if( eClsid == clsid( CStFbTaskNode ) )
+    {
+        CStFbTaskNode* p =
+            dynamic_cast< CStFbTaskNode* >( pBase );
+        if( p )
+            oss << "carets=" << p->m_iCaretCount;
+    }
+    else if( eClsid == clsid( CStProgCnxnNode ) )
+    {
+        CStProgCnxnNode* p =
+            dynamic_cast< CStProgCnxnNode* >( pBase );
+        if( p )
+            oss << "prog_cnxn";
+    }
+    else if( eClsid == clsid( CStProgConfElemNode ) )
+    {
+        CStProgConfElemNode* p =
+            dynamic_cast< CStProgConfElemNode* >( pBase );
+        if( p )
+            oss << "type=" << ( p->m_eType == CStProgConfElemNode::elemFbTask ? "fb_task" : "prog_cnxn" );
+    }
     else if( eClsid == clsid( CStTaskConfigNode ) )
     {
         CStTaskConfigNode* p =
             dynamic_cast< CStTaskConfigNode* >( pBase );
         if( p )
             oss << "task=" << p->m_strTaskName;
+    }
+    else if( eClsid == clsid( CStTaskConfigListNode ) )
+    {
+        CStTaskConfigListNode* p =
+            dynamic_cast< CStTaskConfigListNode* >( pBase );
+        if( p )
+            oss << "tasks=" << p->m_vecTasks.size();
+    }
+    else if( eClsid == clsid( CStAccessDeclNode ) )
+    {
+        CStAccessDeclNode* p =
+            dynamic_cast< CStAccessDeclNode* >( pBase );
+        if( p )
+            oss << "id=" << p->m_strId;
+    }
+    else if( eClsid == clsid( CStAccessDeclListNode ) )
+    {
+        CStAccessDeclListNode* p =
+            dynamic_cast< CStAccessDeclListNode* >( pBase );
+        if( p )
+            oss << "decls=" << p->m_vecAccessDecls.size();
+    }
+    else if( eClsid == clsid( CStAccessDeclsNode ) )
+    {
+        CStAccessDeclsNode* p =
+            dynamic_cast< CStAccessDeclsNode* >( pBase );
+        if( p )
+            oss << "access_decls";
+    }
+    else if( eClsid == clsid( CStGlobalVarDeclListNode ) )
+    {
+        CStGlobalVarDeclListNode* p =
+            dynamic_cast< CStGlobalVarDeclListNode* >( pBase );
+        if( p )
+            oss << "global_vars=" << p->m_vecGlobalVars.size();
+    }
+    else if( eClsid == clsid( CStConfigDeclNode ) )
+    {
+        CStConfigDeclNode* p =
+            dynamic_cast< CStConfigDeclNode* >( pBase );
+        if( p )
+            oss << "config=" << p->m_strConfigName;
+    }
+    else if( eClsid == clsid( CStDeclsNode ) )
+    {
+        CStDeclsNode* p =
+            dynamic_cast< CStDeclsNode* >( pBase );
+        if( p )
+            oss << "decls=" << p->m_vecDecls.size();
+    }
+    else if( eClsid == clsid( CStSingleResourceDeclNode ) )
+    {
+        CStSingleResourceDeclNode* p =
+            dynamic_cast< CStSingleResourceDeclNode* >( pBase );
+        if( p )
+            oss << "single_resource";
+    }
+    else if( eClsid == clsid( CStResourceDeclNode ) )
+    {
+        CStResourceDeclNode* p =
+            dynamic_cast< CStResourceDeclNode* >( pBase );
+        if( p )
+            oss << "resource=" << p->m_strResourceName;
+    }
+    else if( eClsid == clsid( CStResourceDeclListNode ) )
+    {
+        CStResourceDeclListNode* p =
+            dynamic_cast< CStResourceDeclListNode* >( pBase );
+        if( p )
+            oss << "resources=" << p->m_vecResources.size();
+    }
+    else if( eClsid == clsid( CStResourceSectionNode ) )
+    {
+        CStResourceSectionNode* p =
+            dynamic_cast< CStResourceSectionNode* >( pBase );
+        if( p )
+            oss << "type=" << ( p->m_eType == CStResourceSectionNode::rtSingle ? "single" : "list" );
     }
     else if( eClsid == clsid( CStIfBranchListNode ) )
     {
