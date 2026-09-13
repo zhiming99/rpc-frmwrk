@@ -29,6 +29,7 @@
 #include <memory>
 #include "rpc.h"
 #include "stast.h"
+#include "stclsids.h"
 
 namespace rpcf
 {
@@ -1877,5 +1878,91 @@ struct CStRootNode : public CSTAstNodeBase
      */
     std::string GetNodeInfo() const;
 };
+
+template <typename T> struct AstTraits;
+#define REGISTER_AST_NODE( __classname__ ) \
+    template <> struct AstTraits<__classname__> { \
+        static const EnumSTParserClsid id = Clsid_ ## __classname__; \
+    };
+
+// Register all AST node classes
+REGISTER_AST_NODE( CStLiteralExpr );
+REGISTER_AST_NODE( CStIdentifierExpr );
+REGISTER_AST_NODE( CStDirectAddressNode );
+REGISTER_AST_NODE( CStBinaryExpr );
+REGISTER_AST_NODE( CStUnaryExpr );
+REGISTER_AST_NODE( CStCallExpr );
+REGISTER_AST_NODE( CStArgListNode );
+REGISTER_AST_NODE( CStArrayAccessExpr );
+REGISTER_AST_NODE( CStMemberAccessExpr );
+REGISTER_AST_NODE( CStDereferenceExpr );
+REGISTER_AST_NODE( CStPointerMemberExpr );
+REGISTER_AST_NODE( CStLValueNode );
+REGISTER_AST_NODE( CStLValueExtNode );
+REGISTER_AST_NODE( CStInstancePathNode );
+REGISTER_AST_NODE( CStFullExpressionNode );
+REGISTER_AST_NODE( CStSubrangeNode );
+REGISTER_AST_NODE( CStSubrangeListNode );
+REGISTER_AST_NODE( CStStmtListNode );
+REGISTER_AST_NODE( CStIfBranchListNode );
+REGISTER_AST_NODE( CStBasicTypeNode );
+REGISTER_AST_NODE( CStArrayTypeNode );
+REGISTER_AST_NODE( CStStructTypeNode );
+REGISTER_AST_NODE( CStEnumTypeNode );
+REGISTER_AST_NODE( CStEnumValueNode );
+REGISTER_AST_NODE( CStEnumValueListNode );
+REGISTER_AST_NODE( CStDataTypeSpecNode );
+REGISTER_AST_NODE( CStTypeSpecNode );
+REGISTER_AST_NODE( CStTypeDefinitionBlockNode );
+REGISTER_AST_NODE( CStPointerTypeNode );
+REGISTER_AST_NODE( CStReferenceTypeNode );
+REGISTER_AST_NODE( CStDerivedTypeNode );
+REGISTER_AST_NODE( CStVarDeclNode );
+REGISTER_AST_NODE( CStAssignStmt );
+REGISTER_AST_NODE( CStCallStmt );
+REGISTER_AST_NODE( CStIfStmt );
+REGISTER_AST_NODE( CStForStmt );
+REGISTER_AST_NODE( CStWhileStmt );
+REGISTER_AST_NODE( CStRepeatStmt );
+REGISTER_AST_NODE( CStCaseStmt );
+REGISTER_AST_NODE( CStPragmaStmt );
+REGISTER_AST_NODE( CStProgramDecl );
+REGISTER_AST_NODE( CStFunctionBlockDecl );
+REGISTER_AST_NODE( CStFunctionBlockHeaderNode );
+REGISTER_AST_NODE( CStFunctionDecl );
+REGISTER_AST_NODE( CStMethodDecl );
+REGISTER_AST_NODE( CStNamespaceDecl );
+REGISTER_AST_NODE( CStInterfaceDecl );
+REGISTER_AST_NODE( CStTypeDecl );
+REGISTER_AST_NODE( CStVarConfigDecl );
+REGISTER_AST_NODE( CStTaskConfigNode );
+REGISTER_AST_NODE( CStTaskConfigListNode );
+REGISTER_AST_NODE( CStUsingDirective );
+REGISTER_AST_NODE( CStAccessDeclNode );
+REGISTER_AST_NODE( CStAccessDeclListNode );
+REGISTER_AST_NODE( CStAccessDeclsNode );
+REGISTER_AST_NODE( CStGlobalVarDeclListNode );
+REGISTER_AST_NODE( CStConfigDeclNode );
+REGISTER_AST_NODE( CStDeclsNode );
+REGISTER_AST_NODE( CStSingleResourceDeclNode );
+REGISTER_AST_NODE( CStResourceDeclNode );
+REGISTER_AST_NODE( CStResourceDeclListNode );
+REGISTER_AST_NODE( CStResourceSectionNode );
+REGISTER_AST_NODE( CStInitialValueNode );
+REGISTER_AST_NODE( CStArrayInitNode );
+REGISTER_AST_NODE( CStArrayRepeatNode );
+REGISTER_AST_NODE( CStStructInitNode );
+REGISTER_AST_NODE( CStIdentifierListNode );
+REGISTER_AST_NODE( CStVarDeclListNode );
+REGISTER_AST_NODE( CStMethodDeclListNode );
+REGISTER_AST_NODE( CStCaseBranchListNode );
+REGISTER_AST_NODE( CStVarConfigListNode );
+REGISTER_AST_NODE( CStProgConfigListNode );
+REGISTER_AST_NODE( CStProgConfigNode );
+REGISTER_AST_NODE( CStSymbolicVarNode );
+REGISTER_AST_NODE( CStFbTaskNode );
+REGISTER_AST_NODE( CStProgCnxnNode );
+REGISTER_AST_NODE( CStProgConfElemNode );
+REGISTER_AST_NODE( CStRootNode );
 
 } // namespace rpcf
