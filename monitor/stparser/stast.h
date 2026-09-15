@@ -51,7 +51,7 @@ struct CSTAstNodeBase :
     guint32 m_dwFlags = 0;
     CSTAstNodeBase():super()
     {} 
-    CSTAstNodeBase* m_pParent;
+    CSTAstNodeBase* m_pParent = nullptr;
     gint32 m_iToken = YYUNDEF;
     YYLTYPE2  m_oLocation;
 
@@ -78,7 +78,7 @@ struct CSTAstNodeBase :
     virtual std::string GetSignature() const
     { return std::string( "" ); }
 
-    inline void SetLocation( YYLTYPE2& oLoc )
+    inline void SetLocation( const YYLTYPE2& oLoc )
     { m_oLocation = oLoc; }
 
     const YYLTYPE2& GetLocation() const
@@ -87,6 +87,8 @@ struct CSTAstNodeBase :
     YYLTYPE2& GetLocation()
     { return m_oLocation; }
 
+    virtual std::string GetNodeInfo() const 
+    { return ""; }
 };
 
 
