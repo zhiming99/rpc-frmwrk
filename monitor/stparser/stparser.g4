@@ -8,6 +8,33 @@ parser grammar stparser;
 options { tokenVocab=stlexer; }
 
 // ============================================================
+// Parser member functions - semantic predicates
+// ============================================================
+
+@parser::members {
+  // Semantic predicates for var_decl_init_set disambiguation
+  virtual bool isSimpleType() { return true; }
+  virtual bool isArrayType() { return true; }
+  virtual bool isStructType() { return true; }
+  virtual bool isFBType() { return true; }
+  virtual bool isInterfaceType() { return true; }
+  virtual bool isAmbiguousType() { return true; }
+
+  // Semantic predicates for var_decl_init_simple_set disambiguation
+  virtual bool isSimpleSpec() { return true; }
+  virtual bool isSubrangeSpec() { return true; }
+  virtual bool isRefSpec() { return true; }
+  virtual bool isStringSpec() { return true; }
+  virtual bool isAmbiguousSpec() { return true; }
+
+  virtual bool isElemTypeName() {
+      printf( "haha\n" );
+      return true;
+  }
+  virtual bool isSimpleTypeAccess() { return false; }
+}
+
+// ============================================================
 // Start Point
 // ============================================================
 
@@ -65,7 +92,8 @@ namespace_global_name
     ;
 
 namespace_hierarchy
-    : ( namespace_global_name | namespace_name ) ( TOK_DOT namespace_name )*
+    : namespace_global_name  ( TOK_DOT namespace_name )*
+    | namespace_name ( TOK_DOT namespace_name )*
     ;
 
 // ============================================================
@@ -873,8 +901,8 @@ simple_spec_init
     ;
 
 simple_spec
-    : elem_type_name
-    | simple_type_access
+    : {isElemTypeName()}? elem_type_name
+    | {isSimpleTypeAccess()}? simple_type_access
     ;
 
 elem_type_name
@@ -1296,11 +1324,11 @@ pragma_statement
     ;
 
 conditional_pragma
-    : TOK_VSTART_PRAGMA TOK_IF expression TOK_RBRACE
+    : TOK_IF expression TOK_RBRACE
     ;
 
 case_selector_check
-    : TOK_VSTART_CASESEL expression
+    : expression
     ;
 
 // ============================================================
@@ -1642,7 +1670,7 @@ opt_overlap
 
 // Prog var decls set list
 prog_var_decls_set_list
-    : (prog_var_decls_set TOK_SEMICOLON)+ 
+    : prog_var_decls_set TOK_SEMICOLON (prog_var_decls_set TOK_SEMICOLON)*
     ;
 
 // More missing
@@ -1819,20 +1847,27 @@ unsigned_int_name
     ;
 
 // Var decl init set
+// Uses semantic predicates to disambiguate based on symbol table lookup
 var_decl_init_set
-    : var_decl_init_simple_set
-    | array_var_decl_init
-    | struct_var_decl_init
-    | fb_decl_init
-    | interface_spec_init
+    : {isSimpleType()}? var_decl_init_simple_set
+    | {isArrayType()}? array_var_decl_init
+    | {isStructType()}? struct_var_decl_init
+    | {isFBType()}? fb_decl_init
+    | {isInterfaceType()}? interface_spec_init
+    ;
+
+// Ambiguous type reference - unresolved until symbol table is complete
+ambiguous_type_ref
+    : variable_list TOK_COLON instance_path
     ;
 
 // Var decl init simple set
+// Uses semantic predicates to further disambiguate simple type declarations
 var_decl_init_simple_set
-    : simple_spec_init
-    | subrange_spec_init
-    | ref_spec_init
-    | string_spec_init
+    : {isSimpleSpec()}? simple_spec_init
+    | {isSubrangeSpec()}? subrange_spec_init
+    | {isRefSpec()}? ref_spec_init
+    | {isStringSpec()}? string_spec_init
     | ambiguous_type_decl
     ;
 

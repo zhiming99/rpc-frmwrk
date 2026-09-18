@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  stparser.yy
+ *       Filename:  stparser.y
  *
  *    Description:  The grammar parser for Structured Text Language
  *
@@ -138,7 +138,7 @@ void yyerror (YYLTYPE* yyloc,
 %token TOK_ADD TOK_MINUS TOK_MUL TOK_DIV TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
-%token TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
+%token TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING TOK_CLASS TOK_END_CLASS
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE TOK_INTERFACE TOK_END_INTERFACE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT TOK_OVERLAP TOK_NON_RETAIN TOK_WITH TOK_VAR_ACCESS
@@ -363,7 +363,7 @@ namespace_elements : namespace_element
       }
     ;
 
-namespace_element :
+namespace_element:
     global_var_decls
     { $$ = $1; }
     | data_type_decl
@@ -388,7 +388,7 @@ namespace_element :
 config_declaration :
     TOK_CONFIGURATION TOK_ID
     opt_global_var_decls
-    resource_section
+    resource_decl
     access_decls_opt
     opt_config_init
     TOK_END_CONFIGURATION
@@ -456,7 +456,7 @@ single_resource_decl:
     }
 
 task_config_list:
-    task_config TOK_SEMICOLON
+    task_config semicolons
     {
         /* First task - create accumulator */
         ObjPtr pList;
@@ -466,7 +466,7 @@ task_config_list:
             pTaskList->m_vecTasks.push_back( ToObjPtrVal( $1 ) );
         $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
     }
-    | task_config_list task_config TOK_SEMICOLON
+    | task_config_list task_config semicolons
     {
         /* Accumulate tasks */
         ObjPtr pList;
@@ -578,7 +578,7 @@ prog_output_access:
     tokid_dot symbolic_var
 
 prog_config_list:
-    prog_config TOK_SEMICOLON
+    prog_config semicolons
     {
         /* First program config - create accumulator */
         ObjPtr pList;
@@ -588,7 +588,7 @@ prog_config_list:
             pProgList->m_vecProgs.push_back( ToObjPtrVal( $1 ) );
         $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
     }
-    | prog_config_list prog_config TOK_SEMICOLON
+    | prog_config_list prog_config semicolons
     {
         /* Accumulate program configs */
         ObjPtr pList;
@@ -866,7 +866,7 @@ global_var_access:
     opt_tokid_dot TOK_ID opt_dot_tokid
     ;
 
-symbolic_variable:
+symbolic_var:
     var_access_or_multi_elem
     | this_notation var_access_or_multi_elem
     | instance_path TOK_DOT var_access_or_multi_elem
@@ -944,26 +944,8 @@ this_notation:
     TOK_THIS TOK_DOT
     { $$ = $1; }
 
-symbolic_var:
-    symbolic_term_list
-
-symbolic_term_list:
-    symbolic_term
-    | symbolic_term_list TOK_DOT symbolic_term
-    ;
-    
-symbolic_term_postfix:
-    subscript_list
-    | caret_list
-    ;
-
-symbolic_term:
-    identifier_dot_list
-    | identifier_dot_list symbolic_term_postfix
-    ;
-
 /* 3. Handles (Single_Resource_Decl | Resource_Decl+) */
-resource_section
+resource_decl
     : single_resource_decl
     {
         /* Wrap single resource in resource section node */
@@ -1090,7 +1072,7 @@ access_decls:
     }
 
 access_decl_list:
-    access_decl TOK_SEMICOLON
+    access_decl semicolons
     {
         /* First access declaration - create accumulator */
         ObjPtr pList;
@@ -1100,7 +1082,7 @@ access_decl_list:
             pDeclList->m_vecAccessDecls.push_back( ToObjPtrVal( $1 ) );
         $$ = MAKE_VALUE( Variant( pList ), LOC($1) );
     }
-    | access_decl_list access_decl TOK_SEMICOLON
+    | access_decl_list access_decl semicolons
     {
         /* Accumulate access declarations */
         ObjPtr pList;
@@ -1119,7 +1101,7 @@ access_decl_list:
     }
 
 access_decl:
-    TOK_ID TOK_COLON access_path TOK_COLON type_spec opt_access_dir
+    TOK_ID TOK_COLON access_path TOK_COLON data_type_access opt_access_dir
     {
         /* Build access declaration node */
         CStAstFactory* pFactory = GET_FACTORY(pCtx);
@@ -1205,8 +1187,8 @@ opt_global_var_decl_list:
     ;
 
 global_var_decl_list:
-    global_var_decl TOK_SEMICOLON
-    | global_var_decl_list global_var_decl
+    global_var_decl semicolons
+    | global_var_decl_list global_var_decl semicolons 
     ;
 
 global_var_decl:
@@ -1220,54 +1202,6 @@ global_var_spec:
 global_var_type_set:
     loc_var_spec_init
     | fb_type_access
-    ;
-
-
-program:
-    TOK_PROGRAM TOK_ID opt_using_directive_list var_declarations body
-        TOK_END_PROGRAM
-      {
-          CStAstFactory* pFactory = GET_FACTORY(pCtx);
-          std::string strName = ID($2);
-
-          /* The using directives, the var declarations and the
-             body are all visible directly; no carrier needed */
-          std::vector< ObjPtr > vecStatements;
-          std::vector< ObjPtr > vecInput, vecOutput, vecInOut;
-          std::vector< ObjPtr > vecLocal, vecTemp;
-          std::vector< ObjPtr > vecOther;
-          std::vector< std::string > vecUsing;
-
-          if( $3 != nullptr && IsObjPtrVal( $3 ) )
-          {
-              /* the accumulated namespace names, e.g. 'A.B' */
-              ObjPtr pList = ToObjPtrVal( $3 );
-              CStIdentifierListNode* pIdList = pList;
-              if( pIdList != nullptr )
-                  vecUsing = pIdList->m_vecIdentifiers;
-          }
-          if( $4 != nullptr && IsObjPtrVal( $4 ) )
-          {
-              /* Split the accumulated declarations by category */
-              SplitVarDeclList( ToObjPtrVal( $4 ),
-                  vecInput, vecOutput, vecInOut,
-                  vecLocal, vecTemp, vecOther );
-          }
-          if( $5 != nullptr && IsObjPtrVal( $5 ) )
-          {
-              ObjPtr pList = ToObjPtrVal( $5 );
-              CStStmtListNode* pStmtList = pList;
-              if( pStmtList != nullptr )
-                  vecStatements = pStmtList->m_vecStatements;
-          }
-
-          ObjPtr pProgram = pFactory->CreateProgramDecl(
-              strName, vecInput, vecOutput, vecInOut,
-              vecLocal, vecTemp, vecStatements, vecUsing,
-              LOC_RANGE($1, $6) );
-
-          $$ = MAKE_VALUE( Variant( pProgram ), LOC_RANGE($1, $6) );
-      }
     ;
 
 /* Handles the optional USING directives of a program */
@@ -1340,7 +1274,7 @@ simple_spec_init:
     ;
 simple_spec:
     elem_type_name
-//    | simple_type_access
+    | simple_type_access
     ;
 simple_type_access:
     instance_path
@@ -1348,11 +1282,11 @@ simple_type_access:
 
 subrange_spec:
     int_type_name TOK_LPAREN range TOK_RPAREN 
-//    | subrange_type_access
+    | subrange_type_access
     ;
 
-// subrange_type_access:
-//     instance_path
+subrange_type_access:
+     instance_path
     ;
 subrange_spec_init:
     subrange_spec
@@ -1390,10 +1324,10 @@ array_spec_init:
     ;
 array_spec:
     TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF data_type_access
-    // | array_type_access
+    | array_type_access
     ;
-// array_type_access:
-//     instance_path
+array_type_access:
+    instance_path
 
 array_init:
     TOK_LBRACKET array_elem_init_list TOK_RBRACKET
@@ -1424,7 +1358,7 @@ struct_type_decl_init:
 
 struct_spec:
     struct_decl
-//    | struct_spec_init
+    | struct_spec_init
     ;
 
 struct_spec_init:
@@ -1455,12 +1389,11 @@ ref_name : TOK_ID
 ref_deref:
     ref_name caret_list
 
-/*ref_assign:
+ref_assign:
     ref_name TOK_ASSIGN ref_name 
     | ref_name TOK_ASSIGN ref_value
     | ref_name TOK_ASSIGN ref_deref
     ;
-    */
 
 ref_var_decl:
     identifier_list TOK_COLON ref_spec
@@ -1478,10 +1411,10 @@ other_var_decls:
     ;
 
 retain_var_decls:
-    TOK_VAR TOK_RETAIN opt_access_spec opt_var_decls_init_set TOK_END_VAR
+    TOK_VAR TOK_RETAIN opt_access_spec opt_var_decls_init_set_list TOK_END_VAR
 
 no_retain_var_decls:
-    TOK_VAR TOK_NON_RETAIN opt_access_spec opt_var_decls_init_set TOK_END_VAR
+    TOK_VAR TOK_NON_RETAIN opt_access_spec opt_var_decls_init_set_list TOK_END_VAR
 
 fb_io_var_decls:
     fb_input_decls
@@ -1591,7 +1524,12 @@ opt_internal:
     | TOK_INTERNAL
     ;
 
-func_var_decl_set:
+opt_func_var_decls_set:
+    /* empty */
+    | func_var_decls_set
+    ;
+
+func_var_decls_set:
     io_var_decls
     | func_var_decls
     | temp_var_decls
@@ -1627,7 +1565,7 @@ opt_output_decl_list :
     ;
 
 prog_decl:
-    TOK_PROGRAM opt_internal TOK_ID opt_prog_var_decls_set body TOK_END_PROGRAM
+    TOK_PROGRAM opt_internal TOK_ID opt_prog_var_decls_set opt_body TOK_END_PROGRAM
 
 
 opt_prog_var_decls_set:
@@ -1666,6 +1604,7 @@ prog_access_decl:
 
 func_decl:
     TOK_FUNCTION opt_internal derived_func_name opt_data_type_access opt_using_directive_list 
+    opt_func_var_decls_set opt_body TOK_END_FUNCTION
     ;
 
 func_var_decls:
@@ -1680,7 +1619,7 @@ temp_var_member:
 
 temp_var_member_list:
     temp_var_member TOK_SEMICOLON
-    | temp_var_member_list temp_var_member
+    | temp_var_member_list temp_var_member TOK_SEMICOLON
 
 opt_temp_var_member_list:
     /* empty */
@@ -1694,6 +1633,72 @@ opt_constant:
     | TOK_CONSTANT
     ;
 
+class_var_decls_list:
+    class_var_decls
+    | class_var_decls_list class_var_decls
+    ;
+
+class_var_decls:
+    func_var_decls
+    | other_var_decls
+    ;
+
+opt_class_var_decls_list:
+    /* empty */
+    | class_var_decls_list
+    ;
+
+class_method_or_property_decl_list:
+    class_method_or_property_decl
+    | class_method_or_property_decl_list class_method_or_property_decl
+    ;
+
+class_method_or_property_decl:
+    method_decl
+    | property_decl
+    ;
+
+class_decl:
+    TOK_CLASS opt_internal opt_fb_modifier TOK_ID opt_using_directive_list
+    opt_extends_clause opt_implements_clause
+    opt_class_var_decls_list class_method_or_property_decl_list TOK_END_CLASS
+
+opt_interface_extends_clause:
+    /* empty */ 
+    | TOK_EXTENDS interface_name_list
+    ;
+
+interface_decl:
+    TOK_INTERFACE opt_internal TOK_ID opt_using_directive_list
+    opt_interface_extends_clause opt_method_or_property_prototypes
+    TOK_END_INTERFACE
+
+opt_method_or_property_prototypes:
+    /* empty */
+    | method_or_property_prototypes
+    ;
+
+method_or_property_prototypes:
+    method_or_property_prototype
+    | method_or_property_prototypes method_or_property_prototype
+    ;
+
+method_or_property_prototype:
+    method_prototype
+    | property_prototype
+    ;
+
+method_prototype:
+    TOK_METHOD TOK_ID opt_data_type_access opt_io_var_decls TOK_END_METHOD
+
+opt_io_var_decls:
+    /* empty */
+    | io_var_decls
+    ;
+
+property_prototype:
+    setter_or_getter TOK_ID TOK_COLON data_type_access TOK_END_PROPERTY
+
 var_decl:
     identifier_list TOK_COLON var_member_init
 
@@ -1703,10 +1708,16 @@ var_member_init:
     | array_var_decl
     | struct_var_decl
     | struct_type_decl
+    ;
 
-opt_var_decls_init_set:
+opt_var_decls_init_set_list:
     /* empty */
-    | var_decls_init_set
+    | var_decls_init_set_list
+    ;
+
+var_decls_init_set_list:
+    var_decls_init_set TOK_SEMICOLON
+    | var_decls_init_set_list var_decls_init_set TOK_SEMICOLON
     ;
 
 var_decls_init_set:
@@ -1730,7 +1741,7 @@ loc_partly_var:
     TOK_ID TOK_AT TOK_PART_ADDR
 
 var_decls:
-    TOK_VAR opt_constant opt_access_spec opt_var_decls_init_set TOK_END_VAR
+    TOK_VAR opt_constant opt_access_spec opt_var_decls_init_set_list TOK_END_VAR
 
 var_decl_init:
     variable_list TOK_COLON var_decl_init_set
@@ -1759,9 +1770,13 @@ interface_spec_init:
 interface_value:
     symbolic_var 
     | TOK_NULL
-//    | fb_instance_name
-//    | class_instance_name
+    | fb_instance_name
+    | class_instance_name
     ;
+
+class_instance_name:
+    instance_path
+    | instance_path caret_list
 
 array_var_decl_init:
     variable_list TOK_COLON array_spec_init
@@ -1788,8 +1803,8 @@ opt_external_decls:
     ;
 
 external_decls:
-    external_decl TOK_SEMICOLON
-    | external_decls external_decl
+    external_decl semicolons
+    | external_decls external_decl semicolons
 
 external_decl:
    instance_path TOK_COLON external_member_init 
@@ -1803,169 +1818,6 @@ opt_body:
     /* empty */
     | body
 
-type_assignments:
-      type_assignment
-      {
-          /* First type assignment - create block container */
-          ObjPtr pBlock;
-          pBlock.NewObj( clsid( CStTypeDefinitionBlockNode ) );
-          CStTypeDefinitionBlockNode* pBlockNode = pBlock;
-          if( pBlockNode != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-              pBlockNode->m_vecTypeDecls.push_back( ToObjPtrVal( $1 ) );
-          $$ = MAKE_VALUE( Variant( pBlock ), LOC($1) );
-      }
-    | type_assignments type_assignment
-      {
-          /* Accumulate type assignments */
-          ObjPtr pBlock;
-          pBlock.NewObj( clsid( CStTypeDefinitionBlockNode ) );
-          CStTypeDefinitionBlockNode* pBlockNode = pBlock;
-          if( pBlockNode != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-          {
-              ObjPtr pPrev = ToObjPtrVal( $1 );
-              CStTypeDefinitionBlockNode* pPrevBlock = pPrev;
-              if( pPrevBlock != nullptr )
-                  pBlockNode->m_vecTypeDecls = pPrevBlock->m_vecTypeDecls;
-          }
-          if( pBlockNode != nullptr && $2 != nullptr && IsObjPtrVal( $2 ) )
-              pBlockNode->m_vecTypeDecls.push_back( ToObjPtrVal( $2 ) );
-          $$ = MAKE_VALUE( Variant( pBlock ), LOC_RANGE($1, $2) );
-      }
-    /* error recovery for type definitions */
-    | type_assignments error
-      {
-          pCtx->IncError();
-          stdstr strCurFile = basename(
-              pCtx->GetCurFileName().c_str() );
-          ParserPrint( strCurFile.c_str(),
-              @2.last_line,
-              "invalid type definition, skipping", true );
-          yyerrok;
-          /* Return the previous block unchanged */
-          $$ = $1;
-      }
-    ;
-
-enum_value_list:
-      enum_value1
-      {
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStEnumValueListNode ) );
-          CStEnumValueListNode* pList = pNode;
-          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-              pList->m_vecValues.push_back( ToObjPtrVal( $1 ) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-      }
-    | enum_value_list TOK_COMMA enum_value1
-      {
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStEnumValueListNode ) );
-          CStEnumValueListNode* pList = pNode;
-          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-          {
-              ObjPtr pPrev = ToObjPtrVal( $1 );
-              CStEnumValueListNode* pPrevList = pPrev;
-              if( pPrevList != nullptr )
-                  pList->m_vecValues = pPrevList->m_vecValues;
-          }
-          if( pList != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
-              pList->m_vecValues.push_back( ToObjPtrVal( $3 ) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-      }
-    /* error recovery for enum values */
-    | enum_value_list error enum_value1
-      {
-          pCtx->IncError();
-          ParserPrint( basename(pCtx->GetCurFileName().c_str()),
-              @2.last_line,
-              "invalid enum value, skipping", true );
-          yyerrok;
-      }
-    | enum_value_list TOK_COMMA error
-      {
-          pCtx->IncError();
-          ParserPrint( basename(pCtx->GetCurFileName().c_str()),
-              @3.last_line,
-              "invalid enum value, skipping", true );
-          yyerrok;
-      }
-    ;
-
-enum_value1:
-      TOK_ID
-      {
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStEnumValueNode ) );
-          CStEnumValueNode* pVal = pNode;
-          if( pVal != nullptr )
-          {
-              pVal->m_strName = ID($1);
-              // m_pExplicitValue remains empty = auto-assign
-          }
-          $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-      }
-    | TOK_ID TOK_ASSIGN full_expression
-      {
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStEnumValueNode ) );
-          CStEnumValueNode* pVal = pNode;
-          if( pVal != nullptr )
-          {
-              pVal->m_strName = ID($1);
-              if( $3 != nullptr && IsObjPtrVal( $3 ) )
-              {
-                  pVal->m_pExplicitValue = ToObjPtrVal( $3 );
-                  CSTAstNodeBase* pChild = pVal->m_pExplicitValue;
-                  if( pChild != nullptr )
-                      pChild->SetParent( pVal );
-              }
-          }
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-      }
-    ;
-
-opt_base_type:
-    /* empty */
-    {
-        /* no explicit base type */
-        $$ = MAKE_EMPTY();
-    }
-    | int_type_name
-    {
-        $$ = $1;
-    }
-    ;
-
- /* the default initialization for variables of this enum */
-opt_assign_enum_val:
-    /* empty */
-    {
-        $$ = MAKE_EMPTY();
-    }
-    | TOK_ID /* one of the enum value */
-    {
-        $$ = $1;
-    }
-    | TOK_ID TOK_PUNC TOK_ID /* enum_type_name#member */
-    {
-        /* keep the qualified name; enum_type_definition reads it with STR() */
-        $$ = MAKE_VALUE( Variant( ID($1) + "#" + ID($3) ),
-            LOC_RANGE($1, $3) );
-    }
-    ;
-
-enum_type_head:
-    TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
-    {
-        // Store the enum type name in the enum_value_list node
-        ObjPtr pList = ToObjPtrVal( $4 );
-        CStEnumValueListNode* pValList = pList;
-        if( pValList != nullptr )
-        {
-            pValList->m_strTypeName = ID($1);
-        }
-        $$ = $4;
-    }
 
 enum_type_decl:
     TOK_ID TOK_COLON enum_spec_init
@@ -1980,30 +1832,6 @@ enum_type_access:
 enum_value:
     TOK_ID
     | enum_type_access TOK_PUNC TOK_ID
-
-type_assignment:
-      TOK_ID TOK_COLON type_spec semicolons {
-        /* Alias: TYPE MyInt : INT; */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strName = ID($1);
-        ObjPtr pTypeDef = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
-            ToObjPtrVal( $3 ) : nullptr;
-        ObjPtr pTypeDecl = pFactory->CreateTypeDecl(
-            strName, pTypeDef, LOC_RANGE($1, $4) );
-        $$ = MAKE_VALUE( Variant( pTypeDecl ), LOC_RANGE($1, $4) );
-      }
-
-    | TOK_ID TOK_COLON struct_decl semicolons   {
-        /* Struct: TYPE Motor : STRUCT... */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strName = ID($1);
-        ObjPtr pStructType = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
-            ToObjPtrVal( $3 ) : nullptr;
-        ObjPtr pTypeDecl = pFactory->CreateTypeDecl(
-            strName, pStructType, LOC_RANGE($1, $4) );
-        $$ = MAKE_VALUE( Variant( pTypeDecl ), LOC_RANGE($1, $4) );
-    }
-    ;
 
 opt_overlap:
     /* empty */
@@ -2074,213 +1902,24 @@ struct_elem_decl_list:
       }
     ;
 
+opt_locate_at:
+    /* empty */
+    | locate_at
+    ;
+
 struct_elem_decl:
-      var_declaration
-      {
-          /* var_declaration already builds the CStVarDeclNode; the
-             member_list accumulator converts it to CStructMember
-             entries, one per declared name */
-          $$ = $1;
-      }
+    var_decl_init
+    | TOK_ID opt_locate_at TOK_COLON struct_elem_spec_set
     ;
 
-var_decl_type:
-    TOK_VAR
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vcLocal, LOC($1) );
-      }
-    | TOK_VAR_TEMP
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vcTemp, LOC($1) );
-      }
-    | TOK_VAR_INPUT
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vcInput, LOC($1) );
-      }
-    | TOK_VAR_OUTPUT
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vcOutput, LOC($1) );
-      }
-    | TOK_VAR_IN_OUT
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vcInOut, LOC($1) );
-      }
-    | TOK_VAR_STAT
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vcStat, LOC($1) );
-      }
-    | TOK_VAR_EXTERNAL
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vcExternal, LOC($1) );
-      }
-    ;
-
-var_declarations:
-    /* empty */
-      {
-          /* no VAR block: an empty accumulator, split by the POU
-             rules into the var vectors */
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStVarDeclListNode ) );
-          $$ = MAKE_VALUE( Variant( pNode ), YYLTYPE2() );
-      }
-    | var_declarations var_decl_type declaration TOK_END_VAR
-      {
-          /* Rebuild-and-copy: the declarations of the previous
-             blocks plus this one; the block keyword decides the
-             category of every declaration it contains, e.g.
-             VAR_INPUT ... END_VAR marks them as inputs */
-          CStVarDeclNode::enumVarCategory eCategory =
-              ( CStVarDeclNode::enumVarCategory )NUM( $2 );
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStVarDeclListNode ) );
-          CStVarDeclListNode* pList = pNode;
-          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-          {
-              ObjPtr pPrev = ToObjPtrVal( $1 );
-              CStVarDeclListNode* pPrevList = pPrev;
-              if( pPrevList != nullptr )
-                  pList->m_vecVarDecls = pPrevList->m_vecVarDecls;
-          }
-          if( pList != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
-          {
-              ObjPtr pBlock = ToObjPtrVal( $3 );
-              CStVarDeclListNode* pBlockList = pBlock;
-              if( pBlockList != nullptr )
-              {
-                  for( guint32 i = 0;
-                      i < pBlockList->m_vecVarDecls.size(); ++i )
-                  {
-                      CStVarDeclNode* pVar =
-                          pBlockList->m_vecVarDecls[ i ];
-                      if( pVar != nullptr )
-                          pVar->m_eCategory = eCategory;
-                      pList->m_vecVarDecls.push_back(
-                          pBlockList->m_vecVarDecls[ i ] );
-                  }
-              }
-          }
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-      }
-    ;
-
-opt_qualifier:
-    /* empty */
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vqNone, YYLTYPE2() );
-      }
-    | TOK_RETAIN
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vqRetain, LOC($1) );
-      }
-    | TOK_NON_RETAIN
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vqNonRetain, LOC($1) );
-      }
-    | TOK_PERSISTENT
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vqPersistent, LOC($1) );
-      }
-    | TOK_RETAIN TOK_PERSISTENT
-      {
-          /* PERSISTENT implies RETAIN */
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vqPersistent,
-              LOC_RANGE($1, $2) );
-      }
-    | TOK_PERSISTENT TOK_RETAIN
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vqPersistent,
-              LOC_RANGE($1, $2) );
-      }
-    | TOK_CONSTANT
-      {
-          $$ = MAKE_VALUE(
-              ( guint32 )CStVarDeclNode::vqConst, LOC($1) );
-      }
-    ;
-
-declaration:
-    opt_qualifier var_list semicolons
-      {
-          /* Apply the block-level qualifier, e.g. the RETAIN of
-             'VAR RETAIN ... END_VAR', to every declaration of the
-             block */
-          ObjPtr pList = ( $2 != nullptr && IsObjPtrVal( $2 ) ) ?
-              ToObjPtrVal( $2 ) : nullptr;
-          CStVarDeclListNode* pNode = pList;
-          if( pNode != nullptr )
-          {
-              CStVarDeclNode::enumVarQualifier eQualifier =
-                  ( CStVarDeclNode::enumVarQualifier )NUM( $1 );
-              for( guint32 i = 0;
-                  i < pNode->m_vecVarDecls.size(); ++i )
-              {
-                  CStVarDeclNode* pVar = pNode->m_vecVarDecls[ i ];
-                  if( pVar == nullptr )
-                      continue;
-                  pVar->m_eQualifier = eQualifier;
-                  if( eQualifier == CStVarDeclNode::vqConst )
-                      pVar->m_bConstant = true;
-              }
-          }
-          $$ = MAKE_VALUE( Variant( pList ), LOC_RANGE($1, $3) );
-      }
-    ;
-
-var_list:
-    var_declaration
-      {
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStVarDeclListNode ) );
-          CStVarDeclListNode* pList = pNode;
-          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-              pList->m_vecVarDecls.push_back( ToObjPtrVal( $1 ) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-      }
-    | var_list semicolons var_declaration
-      {
-          /* rebuild-and-copy: the previous declarations plus the
-             new one */
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStVarDeclListNode ) );
-          CStVarDeclListNode* pList = pNode;
-          if( pList != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-          {
-              ObjPtr pPrev = ToObjPtrVal( $1 );
-              CStVarDeclListNode* pPrevList = pPrev;
-              if( pPrevList != nullptr )
-                  pList->m_vecVarDecls = pPrevList->m_vecVarDecls;
-          }
-          if( pList != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
-              pList->m_vecVarDecls.push_back( ToObjPtrVal( $3 ) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-      }
-    /* error recovery for variable declarations */
-    | var_list semicolons error
-      {
-          pCtx->IncError();
-          stdstr strCurFile = basename(
-              pCtx->GetCurFileName().c_str() );
-          ParserPrint( strCurFile.c_str(),
-              @3.last_line,
-              "invalid variable declaration, skipping", true );
-          yyerrok;
-          /* Keep the declarations accumulated so far */
-          $$ = $1;
-      }
+ struct_elem_spec_set:
+    simple_spec_init
+    | subrange_spec_init
+    | ref_spec_init
+    | string_spec_init
+    | array_spec_init
+    | struct_spec_init
+    | ambiguous_type_decl
     ;
 
 initial_value:
@@ -2302,7 +1941,7 @@ initial_value:
           }
           $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
       }
-    | TOK_LBRACKET array_init_list TOK_RBRACKET             /* Array:int := [1, 2, 3]; */
+    | TOK_LBRACKET array_elem_init_list  TOK_RBRACKET             /* Array:int := [1, 2, 3]; */
       {
           ObjPtr pNode;
           pNode.NewObj( clsid( CStInitialValueNode ) );
@@ -2322,121 +1961,6 @@ initial_value:
       }
     | struct_init     /* Struct: := (Speed := 10, Run := TRUE); */
     | ref_value
-    ;
-
-array_elem_init1:
-      TOK_NUMBER TOK_LPAREN initial_value TOK_RPAREN
-      {
-          /* Keep the repetition unexpanded, e.g. 3(5): expanding
-             '10000(5)' at parse time would create 10000 AST
-             entries; the semantic phase expands the node when
-             materializing the initial values */
-          gint32 iCount = NUM($1);
-          ObjPtr pElement = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
-              ToObjPtrVal( $3 ) : nullptr;
-          CStAstFactory* pFactory = GET_FACTORY(pCtx);
-          ObjPtr pNode = pFactory->CreateArrayRepeatNode(
-              iCount, pElement, LOC_RANGE($1, $4) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-      }
-    | TOK_NUMBER TOK_LPAREN array_elem_init1 TOK_RPAREN
-      {
-          /* Flatten nested repetitions at parse time, e.g.
-             3(5("h")) becomes 15("h"): the repetition count is
-             multiplicative and neither the C++ nor the wasm
-             translator cares about the nesting, so the parser
-             multiplies the counts instead of growing the node
-             tree. Expanding to individual entries is still
-             postponed to the semantic phase, e.g. '10000(5)'
-             remains a single node */
-          gint32 iCount = NUM($1);
-          ObjPtr pInnerNode = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
-              ToObjPtrVal( $3 ) : nullptr;
-          CStArrayRepeatNode* pInner = pInnerNode;
-          gint32 iTotal = iCount;
-          ObjPtr pElement = pInnerNode;
-          if( pInner != nullptr )
-          {
-              gint64 llCount = ( gint64 )iCount * pInner->m_iCount;
-              if( llCount <= INT32_MAX )
-              {
-                  iTotal = ( gint32 )llCount;
-                  pElement = pInner->m_pElement;
-              }
-              else
-              {
-                  pCtx->IncError();
-                  ParserPrint(
-                      basename( pCtx->GetCurFileName().c_str() ),
-                      @1.last_line,
-                      "repeated element count exceeds the limit",
-                      true );
-                  /* keep the nested node so the count is not
-                     silently wrapped around */
-              }
-          }
-          CStAstFactory* pFactory = GET_FACTORY(pCtx);
-          ObjPtr pNode = pFactory->CreateArrayRepeatNode(
-              iTotal, pElement, LOC_RANGE($1, $4) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-      }
-    ;
-
-array_init_list:
-      initial_value
-      {
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStArrayInitNode ) );
-          CStArrayInitNode* pInit = pNode;
-          if( $1 != nullptr && IsObjPtrVal( $1 ) )
-              pInit->m_vecValues.push_back( ToObjPtrVal( $1 ) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-      }
-    | array_init_list TOK_COMMA initial_value
-      {
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStArrayInitNode ) );
-          CStArrayInitNode* pInit = pNode;
-          if( $1 != nullptr && IsObjPtrVal( $1 ) )
-          {
-              ObjPtr pPrev = ToObjPtrVal( $1 );
-              CStArrayInitNode* pPrevInit = pPrev;
-              if( pPrevInit != nullptr )
-                  pInit->m_vecValues = pPrevInit->m_vecValues;
-          }
-          if( $3 != nullptr && IsObjPtrVal( $3 ) )
-              pInit->m_vecValues.push_back( ToObjPtrVal( $3 ) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-      }
-    /* ST also supports 'n(value)' for repeating array elements */
-    | array_init_list TOK_COMMA array_elem_init1
-      {
-          /* Keep the repetition unexpanded: expanding '10000(5)'
-             here would create 10000 AST entries; the semantic
-             phase expands it when materializing the values */
-          ObjPtr pNode;
-          pNode.NewObj( clsid( CStArrayInitNode ) );
-          CStArrayInitNode* pInit = pNode;
-          if( pInit != nullptr && $1 != nullptr && IsObjPtrVal( $1 ) )
-          {
-              ObjPtr pPrev = ToObjPtrVal( $1 );
-              CStArrayInitNode* pPrevInit = pPrev;
-              if( pPrevInit != nullptr )
-                  pInit->m_vecValues = pPrevInit->m_vecValues;
-          }
-          if( pInit != nullptr && $3 != nullptr && IsObjPtrVal( $3 ) )
-              pInit->m_vecValues.push_back( ToObjPtrVal( $3 ) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-      }
-    /* error recovery for array initialization */
-    | array_init_list TOK_COMMA error
-    {
-        pCtx->IncError();
-        ParserPrint( basename(pCtx->GetCurFileName().c_str()),
-            @3.last_line,
-            "invalid array element, skipping", true );
-        yyerrok;
-    }
     ;
 
 struct_elem_init_list:
@@ -2460,104 +1984,6 @@ struct_elem_init:
           pInit->m_vecValues.push_back( pValue );
           $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
       }
-
-var_declaration:
-    identifier_list TOK_COLON type_spec
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::vector< std::string > vecNames;
-        if( $1 != nullptr && IsObjPtrVal( $1 ) )
-        {
-            ObjPtr pIdList = ToObjPtrVal( $1 );
-            CStIdentifierListNode* pIds = pIdList;
-            if( pIds != nullptr )
-                vecNames = pIds->m_vecIdentifiers;
-        }
-        ObjPtr pType = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
-            ToObjPtrVal( $3 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateVarDeclNode(
-            vecNames, pType, CStVarDeclNode::vcLocal,
-            CStVarDeclNode::vqNone, nullptr, "", false, nullptr,
-            LOC_RANGE($1, $3) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-    }
-    | identifier_list TOK_COLON type_spec TOK_ASSIGN initial_value
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::vector< std::string > vecNames;
-        if( $1 != nullptr && IsObjPtrVal( $1 ) )
-        {
-            ObjPtr pIdList = ToObjPtrVal( $1 );
-            CStIdentifierListNode* pIds = pIdList;
-            if( pIds != nullptr )
-                vecNames = pIds->m_vecIdentifiers;
-        }
-        ObjPtr pType = ( $3 != nullptr && IsObjPtrVal( $3 ) ) ?
-            ToObjPtrVal( $3 ) : nullptr;
-        ObjPtr pInit = ( $5 != nullptr && IsObjPtrVal( $5 ) ) ?
-            ToObjPtrVal( $5 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateVarDeclNode(
-            vecNames, pType, CStVarDeclNode::vcLocal,
-            CStVarDeclNode::vqNone, pInit, "", false, nullptr,
-            LOC_RANGE($1, $5) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
-    }
-    | TOK_ID locate_at TOK_COLON type_spec
-    {
-        /* Located declaration per the spec, e.g.
-           'head AT %B0 INT;' in a STRUCT */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strName = ID($1);
-        std::string strAddr = "";
-        ObjPtr pDirectAddr = ( $2 != nullptr && IsObjPtrVal( $2 ) ) ?
-            ToObjPtrVal( $2 ) : nullptr;
-        if( !pDirectAddr.IsEmpty() )
-        {
-            /* Keep the wrapper node as a marker for the
-               translator, which emits different code for direct
-               addresses; the text stays for display */
-            CStDirectAddressNode* pDirect = pDirectAddr;
-            if( pDirect != nullptr )
-                strAddr = pDirect->m_strAddress;
-        }
-        ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
-            ToObjPtrVal( $4 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateVarDeclNode(
-            std::vector<std::string>{strName}, pType, CStVarDeclNode::vcLocal,
-            CStVarDeclNode::vqNone, nullptr, strAddr, true,
-            pDirectAddr, LOC_RANGE($1, $4) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-    }
-    | TOK_ID locate_at TOK_COLON type_spec TOK_ASSIGN initial_value
-    {
-        /* Colon variant, e.g. 'head AT %B0 : INT;', consistent
-           with the VAR_CONFIG binding form */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strName = ID($1);
-        std::string strAddr = "";
-        ObjPtr pDirectAddr = ( $2 != nullptr && IsObjPtrVal( $2 ) ) ?
-            ToObjPtrVal( $2 ) : nullptr;
-        if( !pDirectAddr.IsEmpty() )
-        {
-            /* Keep the wrapper node as a marker for the
-               translator, which emits different code for direct
-               addresses; the text stays for display */
-            CStDirectAddressNode* pDirect = pDirectAddr;
-            if( pDirect != nullptr )
-                strAddr = pDirect->m_strAddress;
-        }
-        ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
-            ToObjPtrVal( $4 ) : nullptr;
-        ObjPtr pInit = ( $6 != nullptr && IsObjPtrVal( $6 ) ) ?
-            ToObjPtrVal( $6 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateVarDeclNode(
-            std::vector<std::string>{strName}, pType, CStVarDeclNode::vcLocal,
-            CStVarDeclNode::vqNone, pInit, strAddr, true,
-            pDirectAddr, LOC_RANGE($1, $6) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
-    }
-    ;
-
 
 direct_variable:
     TOK_RPCF_ADDR
@@ -2810,76 +2236,6 @@ varied_length_dim_list:
         $$ = MAKE_VALUE( iCount, LOC_RANGE($1, $3) );
     }
 
-array_type:
-    TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF type_spec
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pElementType = nullptr;
-
-        // Extract element type from type_spec
-        if( $6 != nullptr && IsObjPtrVal( $6 ) )
-        {
-            ObjPtr pTypeSpec = ToObjPtrVal( $6 );
-            CStDataTypeSpecNode* pSpecNode = pTypeSpec;
-            if( pSpecNode != nullptr )
-                pElementType = pSpecNode->m_pTypeSpec;
-        }
-
-        /* Flatten the subrange list into array dimensions */
-        std::vector< CStArrayTypeNode::CArrayDim > vecDims;
-        if( $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            ObjPtr pList = ToObjPtrVal( $3 );
-            CStSubrangeListNode* pRangeList = pList;
-            if( pRangeList != nullptr )
-            {
-                for( size_t i = 0;
-                    i < pRangeList->m_vecRanges.size(); i++ )
-                {
-                    CStSubrangeNode* pRange = pRangeList->m_vecRanges[ i ];
-                    if( pRange == nullptr )
-                        continue;
-                    /* Keep the bound expressions; the numeric bounds
-                       are evaluated later by the semantic phase */
-                    CStArrayTypeNode::CArrayDim dim;
-                    dim.m_pStart = pRange->m_pStart;
-                    dim.m_pEnd = pRange->m_pEnd;
-                    vecDims.push_back( dim );
-                }
-            }
-        }
-
-        ObjPtr pNode = pFactory->CreateArrayTypeNode(
-            pElementType, vecDims, LOC_RANGE($1, $6) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
-    }
-    | TOK_ARRAY TOK_LBRACKET varied_length_dim_list TOK_RBRACKET TOK_OF type_spec
-    {
-        /* Variable-length array, e.g. ARRAY [*, *] OF INT */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pElementType = nullptr;
-        if( $6 != nullptr && IsObjPtrVal( $6 ) )
-        {
-            ObjPtr pTypeSpec = ToObjPtrVal( $6 );
-            CStDataTypeSpecNode* pSpecNode = pTypeSpec;
-            if( pSpecNode != nullptr )
-                pElementType = pSpecNode->m_pTypeSpec;
-        }
-        guint32 iDimCount = ( $3 != nullptr ) ? ( guint32 )$3->first : 0;
-        std::vector< CStArrayTypeNode::CArrayDim > vecDims;
-        for( guint32 i = 0; i < iDimCount; i++ )
-        {
-            CStArrayTypeNode::CArrayDim dim;
-            dim.m_pStart = nullptr;  // variable length marker
-            dim.m_pEnd = nullptr;
-            vecDims.push_back( dim );
-        }
-        ObjPtr pNode = pFactory->CreateArrayTypeNode(
-            pElementType, vecDims, LOC_RANGE($1, $5) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
-    }
-    ;
-
 range_list:
       range
       {
@@ -3014,79 +2370,6 @@ string_spec:
     }
     ;
 
-pointer_type:
-    TOK_CARET type_spec
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pTargetType = nullptr;
-
-        if( $2 != nullptr && IsObjPtrVal( $2 ) )
-        {
-            ObjPtr pTypeSpec = ToObjPtrVal( $2 );
-            CStDataTypeSpecNode* pSpecNode = pTypeSpec;
-            if( pSpecNode != nullptr )
-                pTargetType = pSpecNode->m_pTypeSpec;
-        }
-
-        ObjPtr pNode = pFactory->CreatePointerTypeNode(
-            pTargetType, LOC_RANGE($1, $2) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
-    }
-    | TOK_POINTER TOK_TO type_spec
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pTargetType = nullptr;
-
-        if( $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            ObjPtr pTypeSpec = ToObjPtrVal( $3 );
-            CStDataTypeSpecNode* pSpecNode = pTypeSpec;
-            if( pSpecNode != nullptr )
-                pTargetType = pSpecNode->m_pTypeSpec;
-        }
-
-        ObjPtr pNode = pFactory->CreatePointerTypeNode(
-            pTargetType, LOC_RANGE($1, $3) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-    }
-
-reference_type:
-    TOK_REFERENCE TOK_TO type_spec
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pTargetType = nullptr;
-
-        if( $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            ObjPtr pTypeSpec = ToObjPtrVal( $3 );
-            CStDataTypeSpecNode* pSpecNode = pTypeSpec;
-            if( pSpecNode != nullptr )
-                pTargetType = pSpecNode->m_pTypeSpec;
-        }
-
-        ObjPtr pNode = pFactory->CreateReferenceTypeNode(
-            pTargetType, LOC_RANGE($1, $3) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-    }
-    | TOK_REF_TO type_spec
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pTargetType = nullptr;
-
-        if( $2 != nullptr && IsObjPtrVal( $2 ) )
-        {
-            ObjPtr pTypeSpec = ToObjPtrVal( $2 );
-            CStDataTypeSpecNode* pSpecNode = pTypeSpec;
-            if( pSpecNode != nullptr )
-                pTargetType = pSpecNode->m_pTypeSpec;
-        }
-
-        ObjPtr pNode = pFactory->CreateReferenceTypeNode(
-            pTargetType, LOC_RANGE($1, $2) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
-    }
-    ;
-
 elem_type_name:
     numeric_type_name
     | bit_str_type_name
@@ -3114,90 +2397,6 @@ data_type_access:
     }
     ;
 
-
-array_var_decl:
-
-data_type_to_use:
-    /* implicit enum - anonymous enum type */
-     TOK_LPAREN enum_value_list TOK_RPAREN
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::vector< ObjPtr > vecValues;
-        if( $2 != nullptr && IsObjPtrVal( $2 ) )
-        {
-            ObjPtr pList = ToObjPtrVal( $2 );
-            CStEnumValueListNode* pValList = pList;
-            if( pValList != nullptr )
-                vecValues = pValList->m_vecValues;
-        }
-        // Create anonymous enum type with empty name
-        ObjPtr pEnumType = pFactory->CreateEnumTypeNode(
-            "", vecValues, nullptr, "", LOC_RANGE($1, $3) );
-        // Wrap in CStDataTypeSpecNode
-        ObjPtr pNode = pFactory->CreateDataTypeSpecNode(
-            pEnumType, LOC_RANGE($1, $3) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-    }
-    | int_type_name TOK_LPAREN range TOK_RPAREN
-    {
-        // TODO: Handle ranged integer types
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pTypeSpec = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
-            ToObjPtrVal( $1 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateDataTypeSpecNode(
-            pTypeSpec, LOC_RANGE($1, $4) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-    }
-    | string_spec
-    {
-        // Wrap string_type result in CStDataTypeSpecNode
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pTypeSpec = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
-            ToObjPtrVal( $1 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateDataTypeSpecNode(
-            pTypeSpec, LOC($1) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-    }
-    ;
-
-type_spec:
-    data_type_access
-    {
-        // Wrap data_type_spec in CStTypeSpecNode
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pType = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
-            ToObjPtrVal( $1 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateTypeSpecNode( pType, LOC($1) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-    }
-    | array_type
-    {
-        // Wrap array_type in CStTypeSpecNode
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pType = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
-            ToObjPtrVal( $1 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateTypeSpecNode( pType, LOC($1) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-    }
-    | reference_type
-    {
-        // Wrap reference_type in CStTypeSpecNode
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pType = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
-            ToObjPtrVal( $1 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateTypeSpecNode( pType, LOC($1) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-    }
-    | pointer_type
-    {
-        // Wrap pointer_type in CStTypeSpecNode
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        ObjPtr pType = ( $1 != nullptr && IsObjPtrVal( $1 ) ) ?
-            ToObjPtrVal( $1 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateTypeSpecNode( pType, LOC($1) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
-    }
-    ;
 
 derived_type_access: instance_path
     {
@@ -4080,7 +3279,7 @@ primary_expr:
 variable_access:
     symbolic_var
     // | symbolic_var TOK_DOT multi_part_access
-    | symbolic_var TOK_VSEP_MULTI_PART TOK_DOT multi_part_access
+    | symbolic_var TOK_DOT multi_part_access
 
 multi_part_access:
     TOK_NUMBER
@@ -4569,7 +3768,7 @@ param_assignment:
     ;
 
 method_declaration_list:
-    method_declaration
+    method_decl
       {
           ObjPtr pNode;
           pNode.NewObj( clsid( CStMethodDeclListNode ) );
@@ -4578,7 +3777,7 @@ method_declaration_list:
               pList->m_vecMethods.push_back( ToObjPtrVal( $1 ) );
           $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
       }
-    | method_declaration_list method_declaration
+    | method_declaration_list method_decl
       {
           /* rebuild-and-copy: the previous methods plus the new
              one */
@@ -4613,43 +3812,23 @@ opt_override:
     | TOK_OVERRIDE
     ;
 
-method_declaration:
-    TOK_METHOD opt_access_spec opt_fb_modifier opt_override TOK_ID TOK_COLON data_type_access TOK_VSEMICOLON
-        var_declarations
-        block_statements
+opt_method_var_decls:
+    /* empty */
+    | method_var_decls
+    ;
+
+method_var_decls:
+    io_var_decls
+    | func_var_decls
+    | temp_var_decls
+    ;
+
+
+method_decl:
+    TOK_METHOD opt_access_spec opt_fb_modifier opt_override TOK_ID opt_data_type_access
+        opt_method_var_decls
+        opt_body
     TOK_END_METHOD
-      {
-          CStAstFactory* pFactory = GET_FACTORY(pCtx);
-          std::string strName = ID($5);
-          CStMethodDecl::enumAccessModifier eAccess =
-              ( CStMethodDecl::enumAccessModifier )NUM( $2 );
-          ObjPtr pReturnType = ( $7 != nullptr && IsObjPtrVal( $7 ) ) ?
-              ToObjPtrVal( $7 ) : nullptr;
-
-          /* Split the accumulated declarations by category */
-          std::vector< ObjPtr > vecInput, vecOutput, vecInOut;
-          std::vector< ObjPtr > vecLocal, vecTemp, vecOther;
-          if( $9 != nullptr && IsObjPtrVal( $9 ) )
-              SplitVarDeclList( ToObjPtrVal( $9 ),
-                  vecInput, vecOutput, vecInOut,
-                  vecLocal, vecTemp, vecOther );
-
-          std::vector< ObjPtr > vecStatements;
-          if( $10 != nullptr && IsObjPtrVal( $10 ) )
-          {
-              /* Extract the body statements from the accumulator */
-              ObjPtr pList = ToObjPtrVal( $10 );
-              CStStmtListNode* pStmtList = pList;
-              if( pStmtList != nullptr )
-                  vecStatements = pStmtList->m_vecStatements;
-          }
-
-          ObjPtr pNode = pFactory->CreateMethodDecl(
-              strName, eAccess, pReturnType,
-              vecInput, vecOutput, vecInOut, vecLocal, vecTemp,
-              vecStatements, LOC_RANGE($1, $11) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $11) );
-      }
     ;
 
 opt_access_spec:
@@ -4679,148 +3858,6 @@ access_spec:
       }
     ;
 
-
-function_block:
-    function_block_header using_directive_list var_declarations method_declaration_list block_statements TOK_END_FUNCTION_BLOCK
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strName = "";
-        CStFunctionBlockDecl::enumFbModifier eModifier =
-            CStFunctionBlockDecl::fbmNone;
-        std::string strExtends = "";
-        std::vector< std::string > vecImplements;
-        if( $1 != nullptr && IsObjPtrVal( $1 ) )
-        {
-            /* Extract the header information from the accumulator */
-            ObjPtr pHeader = ToObjPtrVal( $1 );
-            CStFunctionBlockHeaderNode* pFbHeader = pHeader;
-            if( pFbHeader != nullptr )
-            {
-                strName = pFbHeader->m_strName;
-                eModifier = pFbHeader->m_eModifier;
-                strExtends = pFbHeader->m_strExtends;
-                vecImplements = pFbHeader->m_vecImplements;
-            }
-        }
-        /* method extraction is pending its accumulator */
-        std::vector< ObjPtr > vecInput, vecOutput, vecInOut, vecLocal, vecTemp;
-        std::vector< ObjPtr > vecMethods, vecStatements;
-        std::vector< ObjPtr > vecOther;
-        if( $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            /* Split the accumulated declarations by category */
-            SplitVarDeclList( ToObjPtrVal( $3 ),
-                vecInput, vecOutput, vecInOut,
-                vecLocal, vecTemp, vecOther );
-        }
-        if( $4 != nullptr && IsObjPtrVal( $4 ) )
-        {
-            /* Extract the accumulated methods */
-            ObjPtr pList = ToObjPtrVal( $4 );
-            CStMethodDeclListNode* pMethodList = pList;
-            if( pMethodList != nullptr )
-                vecMethods = pMethodList->m_vecMethods;
-        }
-        if( $5 != nullptr && IsObjPtrVal( $5 ) )
-        {
-            /* Extract the body statements from the accumulator */
-            ObjPtr pList = ToObjPtrVal( $5 );
-            CStStmtListNode* pStmtList = pList;
-            if( pStmtList != nullptr )
-                vecStatements = pStmtList->m_vecStatements;
-        }
-        
-        ObjPtr pNode = pFactory->CreateFunctionBlockDecl(
-            strName, eModifier, strExtends, vecImplements,
-            vecInput, vecOutput, vecInOut, vecLocal, vecTemp,
-            vecMethods, vecStatements, LOC_RANGE($1, $6) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
-    }
-    | function_block_header var_declarations method_declaration_list block_statements TOK_END_FUNCTION_BLOCK
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strName = "";
-        CStFunctionBlockDecl::enumFbModifier eModifier =
-            CStFunctionBlockDecl::fbmNone;
-        std::string strExtends = "";
-        std::vector< std::string > vecImplements;
-        if( $1 != nullptr && IsObjPtrVal( $1 ) )
-        {
-            /* Extract the header information from the accumulator */
-            ObjPtr pHeader = ToObjPtrVal( $1 );
-            CStFunctionBlockHeaderNode* pFbHeader = pHeader;
-            if( pFbHeader != nullptr )
-            {
-                strName = pFbHeader->m_strName;
-                eModifier = pFbHeader->m_eModifier;
-                strExtends = pFbHeader->m_strExtends;
-                vecImplements = pFbHeader->m_vecImplements;
-            }
-        }
-        /* method extraction is pending its accumulator */
-        std::vector< ObjPtr > vecInput, vecOutput, vecInOut, vecLocal, vecTemp;
-        std::vector< ObjPtr > vecMethods, vecStatements;
-        std::vector< ObjPtr > vecOther;
-        if( $2 != nullptr && IsObjPtrVal( $2 ) )
-        {
-            /* Split the accumulated declarations by category */
-            SplitVarDeclList( ToObjPtrVal( $2 ),
-                vecInput, vecOutput, vecInOut,
-                vecLocal, vecTemp, vecOther );
-        }
-        if( $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            /* Extract the accumulated methods */
-            ObjPtr pList = ToObjPtrVal( $3 );
-            CStMethodDeclListNode* pMethodList = pList;
-            if( pMethodList != nullptr )
-                vecMethods = pMethodList->m_vecMethods;
-        }
-        if( $4 != nullptr && IsObjPtrVal( $4 ) )
-        {
-            /* Extract the body statements from the accumulator */
-            ObjPtr pList = ToObjPtrVal( $4 );
-            CStStmtListNode* pStmtList = pList;
-            if( pStmtList != nullptr )
-                vecStatements = pStmtList->m_vecStatements;
-        }
-
-        ObjPtr pNode = pFactory->CreateFunctionBlockDecl(
-            strName, eModifier, strExtends, vecImplements,
-            vecInput, vecOutput, vecInOut, vecLocal, vecTemp,
-            vecMethods, vecStatements, LOC_RANGE($1, $5) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
-    }
-
-function_block_header:
-    TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
-      {
-          /* Accumulate the header information; consumed by the
-             function_block rule to build the final declaration */
-          CStAstFactory* pFactory = GET_FACTORY(pCtx);
-          std::string strName = ID($3);
-          CStFunctionBlockDecl::enumFbModifier eModifier =
-              ( CStFunctionBlockDecl::enumFbModifier )NUM($2);
-          std::string strExtends; 
-          if( $4 != nullptr && IsObjPtrVal( $4 ) )
-          {
-              CStInstancePathNode* pInstPath = ( ObjPtr& )$4->first;
-              strExtends = pInstPath->GetDottedName();
-          }
-          std::vector< std::string > vecImplements;
-          if( $5 != nullptr && IsObjPtrVal( $5 ) )
-          {
-              ObjPtr pList = ToObjPtrVal( $5 );
-              CStIdentifierListNode* pIdList = pList;
-              if( pIdList != nullptr )
-                  vecImplements = pIdList->m_vecIdentifiers;
-          }
-          ObjPtr pNode = pFactory->CreateFunctionBlockHeaderNode(
-              strName, eModifier, strExtends, vecImplements,
-              LOC_RANGE($1, $5) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
-      }
-    ;
 
 /* Handles ABSTRACT or FINAL keywords */
 fb_modifier:
@@ -4880,13 +3917,13 @@ opt_implements_clause:
           pNode.NewObj( clsid( CStIdentifierListNode ) );
           $$ = MAKE_VALUE( Variant( pNode ), YYLTYPE2() );
       }
-    | TOK_IMPLEMENTS interface_list
+    | TOK_IMPLEMENTS interface_name_list
       {
           $$ = $2;
       }
     ;
 
-interface_list:
+interface_name_list:
     instance_path
       {
           /* Accumulate the interface names as dotted paths, e.g.
@@ -4905,7 +3942,7 @@ interface_list:
           }
           $$ = MAKE_VALUE( Variant( pNode ), LOC($1) );
       }
-    | interface_list TOK_COMMA instance_path
+    | interface_name_list TOK_COMMA instance_path
       {
           /* rebuild-and-copy: the previous entries plus the new
              interface path */
@@ -4930,38 +3967,6 @@ interface_list:
           }
           $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
       }
-    ;
-
-function:
-    TOK_FUNCTION TOK_ID var_declarations block_statements TOK_END_FUNCTION
-    {
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strName = ID($2);
-        
-        std::vector< ObjPtr > vecInput, vecOutput, vecInOut;
-        std::vector< ObjPtr > vecLocal, vecTemp, vecStatements;
-        std::vector< ObjPtr > vecOther;
-        if( $3 != nullptr && IsObjPtrVal( $3 ) )
-        {
-            /* Split the accumulated declarations by category */
-            SplitVarDeclList( ToObjPtrVal( $3 ),
-                vecInput, vecOutput, vecInOut,
-                vecLocal, vecTemp, vecOther );
-        }
-        if( $4 != nullptr && IsObjPtrVal( $4 ) )
-        {
-            /* Extract the body statements from the accumulator */
-            ObjPtr pList = ToObjPtrVal( $4 );
-            CStStmtListNode* pStmtList = pList;
-            if( pStmtList != nullptr )
-                vecStatements = pStmtList->m_vecStatements;
-        }
-        
-        ObjPtr pNode = pFactory->CreateFunctionDecl(
-            strName, nullptr, vecInput, vecOutput, vecInOut,
-            vecLocal, vecTemp, vecStatements, LOC_RANGE($1, $5) );
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $5) );
-    }
     ;
 
 case_statement:
@@ -5334,82 +4339,48 @@ locate_at:
     TOK_AT direct_variable
     { $$ = $2; }
 
+opt_fb_inst_or_class_inst_list:
+    /* empty */
+    | fb_inst_or_class_inst_list
+    ;
+
+fb_inst_or_class_inst_list:
+    fb_inst_or_class_inst
+    | fb_inst_or_class_inst_list fb_inst_or_class_inst
+    ;
+
+fb_inst_or_class_inst:
+    fb_instance_name TOK_DOT
+    | class_instance_name TOK_DOT
+    ;
+
+resource_name: TOK_ID
+prog_name: TOK_ID
+
+instance_tail:
+    opt_fb_inst_or_class_inst_list instance_tail1 TOK_ASSIGN struct_init
+    ;
+
+instance_tail1:
+    TOK_ID opt_locate_at TOK_COLON loc_var_spec_init
+    | instance_tail2 
+    ;
+
+instance_tail2:
+    fb_instance_name TOK_COLON fb_type_access
+    | class_instance_name TOK_COLON class_type_access
+
+class_type_access:
+    instance_path
+
 instance_specific_init:
-    instance_path locate_at TOK_COLON type_spec semicolons
-    {
-        /* One instance-specific config: path AT address : type */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strPath;
-        if( $1 != nullptr && IsObjPtrVal( $1 ) )
-        {
-            CStInstancePathNode* pPath = ToObjPtrVal( $1 );
-            if( pPath != nullptr )
-                strPath = pPath->GetDottedName();
-        }
-        std::string strAddr;
-        ObjPtr pDirectAddr = ( $2 != nullptr && IsObjPtrVal( $2 ) ) ?
-            ToObjPtrVal( $2 ) : nullptr;
-        if( !pDirectAddr.IsEmpty() )
-        {
-            CStDirectAddressNode* pDirect = pDirectAddr;
-            if( pDirect != nullptr )
-                strAddr = pDirect->m_strAddress;
-        }
-        ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
-            ToObjPtrVal( $4 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateVarConfigDecl(
-            strPath, pType, LOC_RANGE($1, $4) );
-        CStVarConfigDecl* pCfg = pNode;
-        if( pCfg != nullptr )
-        {
-            CStVarConfigDecl::CInstanceConfig instCfg;
-            instCfg.m_strPath = strAddr;
-            instCfg.m_pValue = nullptr;
-            pCfg->m_vecConfigs.push_back( instCfg );
-        }
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $4) );
-    }
-    | instance_path locate_at TOK_COLON type_spec TOK_ASSIGN initial_value semicolons
-    {
-        /* One instance-specific config with initial value */
-        CStAstFactory* pFactory = GET_FACTORY(pCtx);
-        std::string strPath;
-        if( $1 != nullptr && IsObjPtrVal( $1 ) )
-        {
-            CStInstancePathNode* pPath = ToObjPtrVal( $1 );
-            if( pPath != nullptr )
-                strPath = pPath->GetDottedName();
-        }
-        std::string strAddr;
-        ObjPtr pDirectAddr = ( $2 != nullptr && IsObjPtrVal( $2 ) ) ?
-            ToObjPtrVal( $2 ) : nullptr;
-        if( !pDirectAddr.IsEmpty() )
-        {
-            CStDirectAddressNode* pDirect = pDirectAddr;
-            if( pDirect != nullptr )
-                strAddr = pDirect->m_strAddress;
-        }
-        ObjPtr pType = ( $4 != nullptr && IsObjPtrVal( $4 ) ) ?
-            ToObjPtrVal( $4 ) : nullptr;
-        ObjPtr pInit = ( $6 != nullptr && IsObjPtrVal( $6 ) ) ?
-            ToObjPtrVal( $6 ) : nullptr;
-        ObjPtr pNode = pFactory->CreateVarConfigDecl(
-            strPath, pType, LOC_RANGE($1, $6) );
-        CStVarConfigDecl* pCfg = pNode;
-        if( pCfg != nullptr )
-        {
-            CStVarConfigDecl::CInstanceConfig instCfg;
-            instCfg.m_strPath = strAddr;
-            instCfg.m_pValue = pInit;
-            pCfg->m_vecConfigs.push_back( instCfg );
-        }
-        $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $6) );
-    }
+    resource_name TOK_DOT prog_name TOK_DOT instance_tail
     ;
 
 global_name_space:
     TOK_DOT 
     | TOK_UNDERSCORE TOK_DOT
+    ;
 
 identifier_dot_list:
     TOK_ID
@@ -5508,22 +4479,13 @@ using_directive_list : using_directive
           $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $2) );
       }
     ;
-using_directive : TOK_USING instance_path TOK_VSEMICOLON
-      {
-          CStAstFactory* pFactory = GET_FACTORY(pCtx);
-          std::vector< std::string > vecNamespace;
-          // Namespace components come from the path wrapper
-          if( $2 != nullptr && IsObjPtrVal( $2 ) )
-          {
-              CStInstancePathNode* pPath = ToObjPtrVal( $2 );
-              if( pPath != nullptr )
-                  vecNamespace = pPath->m_vecNameComponents;
-          }
 
-          ObjPtr pNode = pFactory->CreateUsingDirective(
-              vecNamespace, LOC_RANGE($1, $3) );
-          $$ = MAKE_VALUE( Variant( pNode ), LOC_RANGE($1, $3) );
-      }
+instance_path_list:
+    instance_path
+    | instance_path_list TOK_COMMA instance_path
+    ;
+
+using_directive : TOK_USING instance_path_list TOK_VSEMICOLON
     ;
 
 %%
