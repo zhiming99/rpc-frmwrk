@@ -406,9 +406,12 @@ gint32 AdjustTokens(
                 if( current_tok == TOK_DOT &&
                     next_tok == TOK_ID )
                 {
-                    // assuming instance_path not span lines.
+                    // assuming instance_path not span lines
+                    // and have not spaces in the middle.
                     if( current_lloc.first_line ==
-                        prev_lloc.first_line )
+                        prev_lloc.first_line &&
+                        current_lloc.first_column ==
+                            prev_lloc.last_column + 1 )
                         bInsert = false;
                 }
                 if( !bInsert )
@@ -548,7 +551,7 @@ gint32 StartParse(
                     ParserPrint( pCtx->GetCurFileName().c_str(),
                         current_lloc.first_line,
                         "error, "
-                        "unexpected elsif or endif." );
+                        "unexpected elsif or endif.", true );
                     break;
                 }
                 current_tok = TOK_VSTART_PRAGMA;
@@ -721,14 +724,14 @@ gint32 StartParse(
         ParserPrint( basename(
             pCtx->GetCurFileName().c_str() ),
             current_lloc.first_line, 
-            "Parsing successfully" );
+            "Parsing successfully", false );
     }
     else
     {
         ParserPrint( basename(
             pCtx->GetCurFileName().c_str() ),
             current_lloc.first_line, 
-            "Parsing failed with errors" );
+            "Parsing failed with errors", true );
     }
     yylex_destroy( yyscanner );
     pCtx->SetScanner( nullptr );

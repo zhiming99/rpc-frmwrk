@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: checkout gmssl
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
           repository: zhiming99/GmSSL
           path: ./gmssl
@@ -46,6 +46,9 @@ jobs:
       run: cat /proc/cpuinfo && make -j 4
     - name: install
       run: sudo make install
+
+    - name: initsvr
+      run: LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/local/lib/rpcf /usr/local/bin/rpcfctl initsvr
 
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
@@ -83,7 +86,7 @@ jobs:
 
     - name: Upload Test Results on Canceled
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
           name: logfiles
           path: |

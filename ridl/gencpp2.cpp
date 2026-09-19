@@ -3895,7 +3895,26 @@ gint32 CExportObjDesc2::OutputROS()
         ret = FindInstCfg( "synccfg.py", strSrcPy );
         if( ERROR( ret ) )
         {
-            ret = 0;
+            // this is the case when the ridlc is
+            // not installed
+            strSrcPy = "./synccfg.py";
+            ret = access( strSrcPy.c_str(),
+                R_OK | W_OK );
+            if( ret < 0 )
+            {
+                ret = 0;
+                break;
+            }
+        }
+
+        if( !IsSameFile( strSrcPy, strDstPy ) 
+            && !CopyFile( strSrcPy, strDstPy ) )
+        {
+            ret = ERROR_FAIL;
+            OutputMsg( ret,
+                "Failed to copy file %s to %s",
+                strSrcPy.c_str(),
+                strDstPy.c_str() );
             break;
         }
 
@@ -3937,14 +3956,14 @@ gint32 CExportObjDesc2::OutputROS()
         const char* args[5];
 
         args[ 0 ] = "/bin/sed";
-        args[ 1 ] = strCmdLine.c_str();
-        args[ 2 ] = strSrcPy.c_str();
-        args[ 3 ] = nullptr;
+        args[ 1 ] = "-i";
+        args[ 2 ] = strCmdLine.c_str();
+        args[ 3 ] = strDstPy.c_str();
+        args[ 4 ] = nullptr;
         char* env[ 1 ] = { nullptr };
 
         Execve( "/bin/sed",
-            const_cast< char* const*>( args ),
-            env, strDstPy.c_str() );
+            const_cast< char* const*>( args ), env );
 
     }while( 0 );
 

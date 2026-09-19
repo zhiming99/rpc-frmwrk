@@ -94,8 +94,8 @@ function check_user_mount()
     fi
     base=$HOME/.rpcf
     if [ ! -f $base/usereg.dat ]; then
-        echo "Error, did not find the user registry file."
-        echo "you may want to use 'inituser.sh' to initialize one first"
+        echo "Error, did not find the user registry file." >& 2
+        echo "you may want to use 'inituser.sh' to initialize one first" >& 2
         return 1
     fi
     export rootdir=
@@ -103,14 +103,12 @@ function check_user_mount()
         rootdir=`echo $appmp | awk '{print $3}'`
         if [ -d "$rootdir/usereg/users" ]; then
             rootdir="$rootdir/usereg"
-            #echo find mount at $rootdir...
             return 0
         fi
     elif (( $mt == 0 ));then
         mp+=" invalidpath"
         for rootdir in $mp; do
             if [ -d "$rootdir/users" ]; then
-                #echo find mount at $rootdir...
                 return 0
             fi
         done
@@ -121,7 +119,7 @@ function check_user_mount()
         mkdir -p $rootdir
     fi
     if ! regfsmnt -d $base/usereg.dat $rootdir; then
-        echo "Error, failed to mount usereg.dat"
+        echo "Error, failed to mount usereg.dat" >& 2
         return 1
     fi
 

@@ -8,8 +8,10 @@ libauth_la_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/ipc -I../ \
 if ENABLE_KRB5
 libauth_la_CPPFLAGS += -DKRB5
 krb5_sources=kdcfdo.cpp secfido.cpp k5proxy.cpp k5server.cpp 
+common_link=$(COMMON_LINK_KRB5)
 else
 krb5_sources=
+common_link=$(COMMON_LINK_SSL)
 endif
 
 SUBDIRS =
@@ -36,7 +38,7 @@ EXTRA_DIST=README.md README_cn.md CMakeLists.txt
 libauth_la_LDFLAGS = -version-info @VERSION2@
 libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc \
  -L$(top_srcdir)/3rd_party -lutils $(OA2Lib) $(OA2Login)\
-../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK_KRB5) \
+../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(common_link) \
  $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la ../../monitor/registry/libregfs.la \
  $(top_srcdir)/monitor/sinit/librpcfenc.la
 

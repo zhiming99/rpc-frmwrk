@@ -418,7 +418,7 @@ void Usage( char* szName )
         "\t [ -o Enable monitoring when the rpcrouter run as a bridge, that is '-r 2' ]\n"
         "\t [ --monitor=<app instname> similiar to '-o' option but specifying an app instance name, as different from the default 'rpcrouter1' ]\n"
         "\t [ -l Use the driver.json in current directory instead of the default one ]\n"
-        "\t [ -L <log level>  Set the vobose degree, 0-6, 6 to be the most vbose.\n"
+        "\t [ -L <log level>  Set the verbose degree from 0 to 6. 0 to be quiet, and 6 the most verbose.\n"
         "\t [ -v Version information ]\n"
         "\t [ -h This help ]\n",
         szName );

@@ -46,7 +46,7 @@
 #include "sys/user.h"
 
 #include <arpa/inet.h>
-#include <dbus/dbus.h>
+//#include <dbus/dbus.h>
 #include <json/json.h>
 
 #define NSEC_PER_SEC 1000000000

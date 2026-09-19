@@ -3,7 +3,7 @@ rpcf-dev.install.in rpcf-static.install.in README.md CMakeLists.txt \
 collect_files.sh postinst.cmake.in postrm.cmake.in \
 postinst-dev.cmake.in postrm-dev.cmake.in cmakepak.sh
 
-rev=0
+rev=1
 DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)-$(rev)
 if ENABLE_PYTHON
     ena_python="yes"
