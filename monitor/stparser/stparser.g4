@@ -13,19 +13,19 @@ options { tokenVocab=stlexer; }
 
 @parser::members {
   // Semantic predicates for var_decl_init_set disambiguation
-  virtual bool isSimpleType() { return true; }
-  virtual bool isArrayType() { return true; }
-  virtual bool isStructType() { return true; }
-  virtual bool isFBType() { return true; }
-  virtual bool isInterfaceType() { return true; }
-  virtual bool isAmbiguousType() { return true; }
+  virtual bool IsSimpleType() { return true; }
+  virtual bool IsArrayType() { return true; }
+  virtual bool IsStructType() { return true; }
+  virtual bool IsFBType() { return true; }
+  virtual bool IsInterfaceType() { return true; }
+  virtual bool IsAmbiguousType() { return true; }
 
   // Semantic predicates for var_decl_init_simple_set disambiguation
-  virtual bool isSimpleSpec() { return true; }
-  virtual bool isSubrangeSpec() { return true; }
-  virtual bool isRefSpec() { return true; }
-  virtual bool isStringSpec() { return true; }
-  virtual bool isAmbiguousSpec() { return true; }
+  virtual bool IsSimpleSpec() { return true; }
+  virtual bool IsSubrangeSpec() { return true; }
+  virtual bool IsRefSpec() { return true; }
+  virtual bool IsStringSpec() { return true; }
+  virtual bool IsAmbiguousSpec() { return true; }
 
   virtual bool isElemTypeName() {
       printf( "haha\n" );
@@ -703,7 +703,12 @@ var_decl
     ;
 
 var_decl_init
-    : variable_list TOK_COLON var_decl_init_set
+    : {IsSimpleType()}? variable_list TOK_COLON var_decl_init_set
+    | {IsArrayType()}? array_var_decl_init
+    | {IsStructType()}? struct_var_decl_init
+    | {IsFBType()}? fb_decl_init
+    | {IsInterfaceType()}? interface_spec_init
+    | {IsAmbiguousType()}? ambiguous_type_decl
     ;
 
 identifier_list
@@ -1135,7 +1140,7 @@ caret_list
     ;
 
 ambiguous_type_decl
-    : identifier TOK_COLON instance_path (TOK_ASSIGN spec_type_accesses)?
+    : variable_list TOK_COLON instance_path (TOK_ASSIGN spec_type_accesses)?
     ;
 
 spec_type_accesses
@@ -1558,12 +1563,14 @@ interface_spec_init
 interface_value
     : instance_path
     | TOK_NULL
+//  | fb_instance_name
+//  | class_instance_name
+//  | symbolic_variable
     ;
 
 // Multibits type name
 multibits_type_name
-    : TOK_BOOL
-    | TOK_BYTE
+    : TOK_BYTE
     | TOK_WORD
     | TOK_DWORD
     | TOK_LWORD
@@ -1849,11 +1856,7 @@ unsigned_int_name
 // Var decl init set
 // Uses semantic predicates to disambiguate based on symbol table lookup
 var_decl_init_set
-    : {isSimpleType()}? var_decl_init_simple_set
-    | {isArrayType()}? array_var_decl_init
-    | {isStructType()}? struct_var_decl_init
-    | {isFBType()}? fb_decl_init
-    | {isInterfaceType()}? interface_spec_init
+    : var_decl_init_simple_set
     ;
 
 // Ambiguous type reference - unresolved until symbol table is complete
@@ -1864,16 +1867,16 @@ ambiguous_type_ref
 // Var decl init simple set
 // Uses semantic predicates to further disambiguate simple type declarations
 var_decl_init_simple_set
-    : {isSimpleSpec()}? simple_spec_init
-    | {isSubrangeSpec()}? subrange_spec_init
-    | {isRefSpec()}? ref_spec_init
-    | {isStringSpec()}? string_spec_init
+    : {IsSimpleSpec()}? simple_spec_init
+    | {IsSubrangeSpec()}? subrange_spec_init
+    | {IsRefSpec()}? ref_spec_init
+    | {IsStringSpec()}? string_spec_init
     | ambiguous_type_decl
     ;
 
 // Var decls init set
 var_decls_init_set
-    : var_decl_init_set 
+    : var_decl_init
     | loc_var_decl
     | loc_partly_var
     ;

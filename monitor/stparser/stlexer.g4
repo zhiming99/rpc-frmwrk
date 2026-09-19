@@ -180,17 +180,14 @@ TOK_LTIME : ([lL] [tT] | 'LTIME') '#'
            '-'? UNSIGNED_INT ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns')+
            ([0-9]+ ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns'))*;
 
-// Date literal D#2024-12-25
-TOK_DATE : [dD] '#' DIGIT{4} '-' DIGIT{2} '-' DIGIT{2};
+// Date literal D#2024-12-25                                                                                                                                                                                         
+TOK_DATE : [dD] '#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT;
 
-// Time of day TOD#14:30:05.123
-TOK_TIME_OF_DAY : ([tT] [oO] [dD] | 'TIME_OF_DAY') '#'
-                  DIGIT{1,2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)?;
+// Time of day TOD#14:30:05.123                                                                                                                                                                                      
+TOK_TIME_OF_DAY : ([tT] [oO] [dD] | 'TIME_OF_DAY') '#' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
 
-// Date and time DT#2024-12-25-14:30:05
-TOK_DATE_TIME : ([dD] [tT] | 'DATE_AND_TIME') '#'
-               DIGIT{4} '-' DIGIT{2} '-' DIGIT{2} '-'
-               DIGIT{1,2} ':' DIGIT{2} ':' DIGIT{2} ('.' DIGIT+)?;
+// Date and time DT#2024-12-25-14:30:05                                                                                                                                                                              
+TOK_DATE_TIME : ([dD] [tT] | 'DATE_AND_TIME') '#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT '-' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
 
 // String literals
 // Standard string: STRING#'...' or S#'...' or '...'
