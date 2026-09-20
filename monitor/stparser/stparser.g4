@@ -27,11 +27,8 @@ options { tokenVocab=stlexer; }
   virtual bool IsStringSpec() { return true; }
   virtual bool IsAmbiguousSpec() { return true; }
 
-  virtual bool isElemTypeName() {
-      printf( "haha\n" );
-      return true;
-  }
-  virtual bool isSimpleTypeAccess() { return false; }
+  virtual bool IsElemTypeName() { return true; }
+  virtual bool IsSimpleTypeAccess() { return false; }
 }
 
 // ============================================================
@@ -170,7 +167,7 @@ opt_interval_init
     ;
 
 priority_init
-    : TOK_PRIORITY TOK_ASSIGN TOK_NUMBER
+    : TOK_PRIORITY TOK_ASSIGN TOK_INT
     ;
 
 // ============================================================
@@ -380,7 +377,7 @@ primary_expr
     ;
 
 variable_access
-    : symbolic_variable (TOK_DOT multi_part_access)?
+    : symbolic_variable multibit_part_access?
     ;
 
 func_call
@@ -397,14 +394,15 @@ derived_func_name
 
 constant
     : numeric_literal
-    | time_literal
     | string_literal
-    | bool_literal
+    | time_literal
     | bit_str_literal
+    | bool_literal
     ;
 
 numeric_literal
-    : TOK_NUMBER
+    : TOK_INT
+    | TOK_REAL
     ;
 
 time_literal
@@ -422,7 +420,7 @@ string_literal
     ;
 
 bool_value
-    : TOK_NUMBER
+    : TOK_INT
     | TOK_TRUE
     | TOK_FALSE
     ;
@@ -433,8 +431,8 @@ bool_literal
     ;
 
 bit_str_literal
-    : TOK_NUMBER
-    | bit_str_type_name TOK_PUNC TOK_NUMBER
+    : TOK_INT
+    | bit_str_type_name TOK_PUNC TOK_INT
     ;
 
 bool_type_name
@@ -702,13 +700,23 @@ var_decl
     : identifier_list TOK_COLON var_member_init
     ;
 
-var_decl_init
+/*var_decl_init
     : {IsSimpleType()}? variable_list TOK_COLON var_decl_init_set
     | {IsArrayType()}? array_var_decl_init
     | {IsStructType()}? struct_var_decl_init
     | {IsFBType()}? fb_decl_init
     | {IsInterfaceType()}? interface_spec_init
-    | {IsAmbiguousType()}? ambiguous_type_decl
+    | ambiguous_type_decl
+    ;
+*/
+
+var_decl_init
+    : variable_list TOK_COLON var_decl_init_set
+    | array_var_decl_init
+    | struct_var_decl_init
+    | fb_decl_init
+    | interface_spec_init
+    | ambiguous_type_decl
     ;
 
 identifier_list
@@ -906,13 +914,35 @@ simple_spec_init
     ;
 
 simple_spec
-    : {isElemTypeName()}? elem_type_name
-    | {isSimpleTypeAccess()}? simple_type_access
+    : elem_type_name
+    | simple_type_access
+    ;
+
+date_type_name
+    : TOK_TIME_TYPE
+    | TOK_LTIME_TYPE
+    ;
+
+time_type_name
+    : TOK_DATE_TYPE
+    | TOK_LDATE_TYPE
     ;
 
 elem_type_name
     : numeric_type_name
     | bit_str_type_name
+    | string_simple_type
+    | date_type_name
+    | time_type_name
+    ;
+
+string_simple_type
+    : TOK_STRING_TYPE
+    | TOK_WSTRING_TYPE 
+    | TOK_USTRING_TYPE
+    | TOK_CHAR_TYPE
+    | TOK_WCHAR_TYPE
+    | TOK_UCHAR_TYPE
     ;
 
 simple_type_name
@@ -937,7 +967,7 @@ subrange_type_access
     ;
 
 subrange_spec_init
-    : subrange_spec (TOK_ASSIGN TOK_NUMBER)?
+    : subrange_spec (TOK_ASSIGN TOK_INT)?
     ;
 
 subrange_type_name
@@ -1042,7 +1072,7 @@ array_elem_init_list
 
 array_elem_init
     : array_elem_init_value
-    | TOK_NUMBER TOK_LPAREN array_elem_init_list TOK_RPAREN
+    | TOK_INT TOK_LPAREN array_elem_init_list TOK_RPAREN
     ;
 
 array_elem_init_value
@@ -1577,9 +1607,9 @@ multibits_type_name
     ;
 
 // Multi-part access
-multi_part_access
-    : TOK_NUMBER
-    | TOK_MULTPART_ACCESS
+multibit_part_access 
+    : TOK_DOT TOK_INT
+    | TOK_DOT TOK_MULTPART_ACCESS
     ;
 
 // Instance specific init
@@ -1677,7 +1707,7 @@ opt_overlap
 
 // Prog var decls set list
 prog_var_decls_set_list
-    : prog_var_decls_set TOK_SEMICOLON (prog_var_decls_set TOK_SEMICOLON)*
+    : (prog_var_decls_set opt_semicolons )+
     ;
 
 // More missing
@@ -1719,7 +1749,7 @@ pointer
 
 // Prog access decl
 prog_access_decl
-    : identifier TOK_COLON symbolic_variable (TOK_DOT multi_part_access)? TOK_COLON
+    : identifier TOK_COLON symbolic_variable multibit_part_access? TOK_COLON
     data_type_access access_direction?
     ;
 
@@ -1752,8 +1782,8 @@ property_decl
 
 // Real type name
 real_type_name
-    : TOK_REAL
-    | TOK_LREAL
+    : TOK_REAL_TYPE
+    | TOK_LREAL_TYPE
     ;
 
 // Final batch of missing rules
@@ -1766,7 +1796,7 @@ semicolons
 
 // Signed int name
 signed_int_name
-    : TOK_INT | TOK_DINT | TOK_LINT | TOK_SINT
+    : TOK_INT_TYPE | TOK_DINT | TOK_LINT | TOK_SINT
     ;
 
 // String list
@@ -1778,7 +1808,7 @@ string_list
 // String spec
 string_spec
     : ( TOK_STRING_TYPE | TOK_WSTRING_TYPE | TOK_USTRING_TYPE )
-        ( TOK_LBRACKET TOK_NUMBER TOK_RBRACKET )?
+        ( TOK_LBRACKET TOK_INT TOK_RBRACKET )?
     | TOK_CHAR_TYPE
     | TOK_WCHAR_TYPE
     | TOK_UCHAR_TYPE
@@ -1791,7 +1821,7 @@ struct_decl
 
 // Struct elem decl
 struct_elem_decl
-    : struct_elem_name ( locate_at TOK_DOT multi_part_access )? TOK_COLON struct_elem_init_set
+    : struct_elem_name ( locate_at multibit_part_access )? TOK_COLON struct_elem_init_set
     | var_decl_init
     ;
 
@@ -1842,12 +1872,6 @@ temp_var_member_list
     | temp_var_member_list temp_var_member semicolons
     ;
 
-// Time type name
-time_type_name
-    : TOK_TIME
-    | TOK_LTIME
-    ;
-
 // Unsigned int name
 unsigned_int_name
     : TOK_UINT | TOK_UDINT | TOK_ULINT | TOK_USINT
@@ -1866,11 +1890,20 @@ ambiguous_type_ref
 
 // Var decl init simple set
 // Uses semantic predicates to further disambiguate simple type declarations
-var_decl_init_simple_set
+/*var_decl_init_simple_set
     : {IsSimpleSpec()}? simple_spec_init
     | {IsSubrangeSpec()}? subrange_spec_init
     | {IsRefSpec()}? ref_spec_init
     | {IsStringSpec()}? string_spec_init
+    | ambiguous_type_decl
+    ;
+*/
+
+var_decl_init_simple_set
+    : simple_spec_init
+    | subrange_spec_init
+    | ref_spec_init
+    | string_spec_init
     | ambiguous_type_decl
     ;
 

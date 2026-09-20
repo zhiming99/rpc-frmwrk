@@ -5,10 +5,13 @@
 
 //Lexer grammar
 lexer grammar stlexer;
+options {
+    //caseInsensitive = false;
+}
 
 // Keywords - case insensitive
 // Type keywords
-TOK_INT       : 'INT';
+TOK_INT_TYPE  : 'INT';
 TOK_UINT      : 'UINT';
 TOK_DINT      : 'DINT';
 TOK_UDINT     : 'UDINT';
@@ -21,8 +24,8 @@ TOK_BYTE      : 'BYTE';
 TOK_WORD      : 'WORD';
 TOK_DWORD     : 'DWORD';
 TOK_LDWORD    : 'LDWORD';
-TOK_REAL      : 'REAL';
-TOK_LREAL     : 'LREAL';
+TOK_REAL_TYPE : 'REAL';
+TOK_LREAL_TYPE : 'LREAL';
 
 // Program organization
 TOK_PROGRAM         : 'PROGRAM';
@@ -85,6 +88,9 @@ TOK_CHAR_TYPE       : 'CHAR';
 TOK_WCHAR_TYPE      : 'WCHAR';
 TOK_UCHAR_TYPE      : 'UCHAR';
 TOK_TIME_TYPE       : 'TIME';
+TOK_LTIME_TYPE      : 'LTIME';
+TOK_DATE_TYPE       : 'DATE';
+TOK_LDATE_TYPE      : 'LDATE';
 
 // OOP keywords
 TOK_EXTENDS         : 'EXTENDS';
@@ -168,6 +174,7 @@ fragment LETTER     : [a-zA-Z];
 // Integer literals with underscores
 fragment UNSIGNED_INT : DIGIT+ ('_'? DIGIT+)*;
 fragment SIGNED_INT  : ('+' | '-')? UNSIGNED_INT;
+fragment BIT : '0' | '1';
 
 // Time literals
 // T#... or TIME#...
@@ -203,18 +210,23 @@ TOK_USTRING : ([uU] | 'USTRING') '#'? '\'' ('\\$' | ~[$'\r\n])* '\'';
 TOK_CHAR : ([cC] [hH] [aA] [rR] | 'CHAR') '#'? '\'' ('\\$' | ~[$'\r\n]) '\'';
 
 // Unicode char: UCHAR#'x' or UC#'x'
-TOK_UCHAR : ([uU] [cC] [hH] [aA] [rR] | 'UCHAR') '#'? '\'' ('\\$' | ~[$'\r\n]) '\'';
+TOK_UCHAR : ([uU] [cC] | 'UCHAR') '#'? '\'' ('\\$' | ~[$'\r\n]) '\'';
 
 // Wide char: WCHAR#'x' or WC#'x'
-TOK_WCHAR : ([wW] [cC] [hH] [aA] [rR] | 'WCHAR') '#'? '"' ('\\$' | ~[$"\r\n]) '"';
+TOK_WCHAR : ([wW] [cC] | 'WCHAR') '#'? '"' ('\\$' | ~[$"\r\n]) '"';
 
 // Typed numeric literals: REAL#10, LREAL#-1.5, INT#10
 // Real literals with type
-TOK_NUMBER : (REAL | LREAL) '#' SIGNED_INT ('.' UNSIGNED_INT)? ('E' SIGNED_INT)?
-           | UNSIGNED_INT '#' HEX_DIGIT+  // Based literal 16#FF
-           | SIGNED_INT                    // Simple integer
+TOK_REAL : (REAL | LREAL) '#' SIGNED_INT ( '.' UNSIGNED_INT ('E' SIGNED_INT)?)
            | UNSIGNED_INT '.' UNSIGNED_INT ('E' SIGNED_INT)?  // Real literal
-           | UNSIGNED_INT;  // Simple integer fallback
+           ;
+
+TOK_INT:   '16#' HEX_DIGIT+  // Based literal 16#FF
+           | SIGNED_INT        // Simple integer
+           | UNSIGNED_INT 
+           | '2#' BIT ('_'? BIT)*   // binary literal
+           ;
+
 fragment REAL  : [rR] [eE] [aA] [lL];
 fragment LREAL : [lL] [rR] [eE] [aA] [lL];
 
