@@ -125,8 +125,8 @@ EOF
 fi
 
 if [ -f ./postinst1 -o -f ./postinst2 -o -f ./postinst3 ];then
-    echo '#!/bin/bash -e' >> ./postinst
-    echo '#!/bin/bash -e' >> ./postrm
+    echo '#!/bin/bash' >> ./postinst
+    echo '#!/bin/bash' >> ./postrm
     if [ -f ./postinst1 ]; then
         cat ./postinst1 >> ./postinst
         cat ./postrm1 >> ./postrm
