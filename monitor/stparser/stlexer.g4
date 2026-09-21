@@ -281,7 +281,7 @@ TOK_BLOCK_COMMENT_C  : '/*' .*? '*/' -> channel(HIDDEN);
 TOK_LINE_COMMENT     : '//' ~[\r\n]* -> channel(HIDDEN);
 
 // Whitespace - ignored
-WS : [ \t\r\n]+ -> channel(HIDDEN);
+TOK_WHITESPACE : [ \t\r\n]+ -> channel(HIDDEN);
 
 // Error handling for unknown characters
-UNKNOWN_CHAR : . -> channel(HIDDEN);
+TOK_UNKNOWN_CHAR : . -> channel(HIDDEN);

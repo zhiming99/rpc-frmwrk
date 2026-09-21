@@ -29,6 +29,14 @@ options { tokenVocab=stlexer; }
 
   virtual bool IsElemTypeName() { return true; }
   virtual bool IsSimpleTypeAccess() { return false; }
+
+  bool m_bPass2 = false;
+
+  inline bool IsPass2() const
+  { return m_bPass2; }
+
+  void SetPass2( bool bPass2 = true )
+  { m_bPass2 = bPass2; }
 }
 
 // ============================================================
@@ -272,8 +280,8 @@ symbolic_variable
     ;
 
 var_access_or_multi_elem
-    : multi_elem_var
-    | var_access
+    : var_access
+    | multi_elem_var
     ;
 
 var_access
@@ -282,7 +290,7 @@ var_access
     ;
 
 variable_name
-    : TOK_ID
+    : identifier
     ;
 
 multi_elem_var
@@ -368,9 +376,9 @@ unary_expr
 
 primary_expr
     : constant
+    | variable_access
     | enum_value
     | namedval_value
-    | variable_access
     | func_call
     | ref_value
     | TOK_LPAREN full_expression TOK_RPAREN
@@ -452,7 +460,7 @@ statement
     ;
 
 stmt_list
-    : (statement? semicolons)*
+    : statement (semicolons statement)*
     ;
 
 assignment_statement
@@ -498,12 +506,12 @@ selection_statement
 
 if_statement
     : TOK_IF expression TOK_THEN stmt_list
-      elsif_statement*
+      elseif_statement*
       else_branch?
       TOK_END_IF
     ;
 
-elsif_statement
+elseif_statement
     : TOK_ELSIF expression TOK_THEN stmt_list
     ;
 
@@ -700,23 +708,21 @@ var_decl
     : identifier_list TOK_COLON var_member_init
     ;
 
-/*var_decl_init
+var_decl_init
     : {IsSimpleType()}? variable_list TOK_COLON var_decl_init_set
     | {IsArrayType()}? array_var_decl_init
     | {IsStructType()}? struct_var_decl_init
     | {IsFBType()}? fb_decl_init
     | {IsInterfaceType()}? interface_spec_init
-    | ambiguous_type_decl
+    | variable_list TOK_COLON ambiguous_var_decl_init
     ;
-*/
 
-var_decl_init
-    : variable_list TOK_COLON var_decl_init_set
-    | array_var_decl_init
-    | struct_var_decl_init
-    | fb_decl_init
-    | interface_spec_init
-    | ambiguous_type_decl
+ambiguous_var_decl_init
+    : array_type_access (TOK_ASSIGN array_init)?
+    | struct_type_access ( TOK_ASSIGN struct_init )?
+    | fb_type_access ( TOK_ASSIGN struct_init )?
+    | interface_type_access ( TOK_ASSIGN interface_value )?
+    | ambiguous_spec_decl
     ;
 
 identifier_list
@@ -1452,11 +1458,6 @@ class_instance_name
     : instance_path (caret_list)*
     ;
 
-// Elseif branch
-elseif_branch
-    : TOK_ELSIF expression TOK_THEN stmt_list
-    ;
-
 // External member init
 external_member_init
     : simple_spec
@@ -1591,11 +1592,10 @@ interface_spec_init
 
 // Interface value
 interface_value
-    : instance_path
+    : symbolic_variable
+    | fb_instance_name
+    | class_instance_name
     | TOK_NULL
-//  | fb_instance_name
-//  | class_instance_name
-//  | symbolic_variable
     ;
 
 // Multibits type name
@@ -1890,21 +1890,17 @@ ambiguous_type_ref
 
 // Var decl init simple set
 // Uses semantic predicates to further disambiguate simple type declarations
-/*var_decl_init_simple_set
+var_decl_init_simple_set
     : {IsSimpleSpec()}? simple_spec_init
     | {IsSubrangeSpec()}? subrange_spec_init
     | {IsRefSpec()}? ref_spec_init
     | {IsStringSpec()}? string_spec_init
-    | ambiguous_type_decl
+    | ambiguous_spec_decl
     ;
-*/
 
-var_decl_init_simple_set
-    : simple_spec_init
-    | subrange_spec_init
-    | ref_spec_init
-    | string_spec_init
-    | ambiguous_type_decl
+ambiguous_spec_decl
+    : simple_type_access ( TOK_ASSIGN expression )?
+    | subrange_type_access ( TOK_ASSIGN int_type_name )?
     ;
 
 // Var decls init set
@@ -1922,3 +1918,4 @@ var_member_init
     | struct_var_decl
     | struct_decl
     ;
+
