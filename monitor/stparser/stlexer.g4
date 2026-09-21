@@ -6,7 +6,7 @@
 //Lexer grammar
 lexer grammar stlexer;
 options {
-    //caseInsensitive = false;
+    caseInsensitive = true;
 }
 
 // Keywords - case insensitive
@@ -168,8 +168,8 @@ TOK_COS             : 'COS';
 
 // Fragment rules (helper definitions)
 fragment DIGIT      : [0-9];
-fragment HEX_DIGIT  : [0-9a-fA-F];
-fragment LETTER     : [a-zA-Z];
+fragment HEX_DIGIT  : [0-9A-F];
+fragment LETTER     : [A-Z];
 
 // Integer literals with underscores
 fragment UNSIGNED_INT : DIGIT+ ('_'? DIGIT+)*;
@@ -178,46 +178,46 @@ fragment BIT : '0' | '1';
 
 // Time literals
 // T#... or TIME#...
-TOK_TIME : ([tT] | 'TIME') '#'
+TOK_TIME : ('T'|'TIME') '#'
           '-'? UNSIGNED_INT ('d' | 'h' | 'm' | 's' | 'ms')+
           ([0-9]+ ('d' | 'h' | 'm' | 's' | 'ms'))*;
 
 // LT#... or LTIME#...
-TOK_LTIME : ([lL] [tT] | 'LTIME') '#'
+TOK_LTIME : ('LT' | 'LTIME') '#'
            '-'? UNSIGNED_INT ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns')+
            ([0-9]+ ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns'))*;
 
 // Date literal D#2024-12-25                                                                                                                                                                                         
-TOK_DATE : [dD] '#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT;
+TOK_DATE :  '[L]?D#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT;
 
 // Time of day TOD#14:30:05.123                                                                                                                                                                                      
-TOK_TIME_OF_DAY : ([tT] [oO] [dD] | 'TIME_OF_DAY') '#' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
+TOK_TIME_OF_DAY : ('TOD' | 'TIME_OF_DAY') '#' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
 
 // Date and time DT#2024-12-25-14:30:05                                                                                                                                                                              
-TOK_DATE_TIME : ([dD] [tT] | 'DATE_AND_TIME') '#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT '-' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
+TOK_DATE_TIME : ('DT' | 'DATE_AND_TIME') '#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT '-' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
 
 // String literals
 // Standard string: STRING#'...' or S#'...' or '...'
-TOK_STRING : ([sS] | 'STRING') '#'? '\'' ('\\$' | ~[$'\r\n])* '\'';
+TOK_STRING : (('S' | 'STRING')'#')? '\'' ('\\$' | ~[$'\r\n])* '\'';
 
 // Wide string: WSTRING#"..." or W#"..."
-TOK_WSTRING : ([wW] | 'WSTRING') '#'? '"' ('\\$' | ~[$"\r\n])* '"';
+TOK_WSTRING : (('W' | 'WSTRING') '#')? '"' ('\\$' | ~[$"\r\n])* '"';
 
 // Unicode string: USTRING#'...' or U#'...'
-TOK_USTRING : ([uU] | 'USTRING') '#'? '\'' ('\\$' | ~[$'\r\n])* '\'';
+TOK_USTRING : (('U' | 'USTRING') '#')? '\'' ('\\$' | ~[$'\r\n])* '\'';
 
 // Character literals: CHAR#'x' or 'x'
-TOK_CHAR : ([cC] [hH] [aA] [rR] | 'CHAR') '#'? '\'' ('\\$' | ~[$'\r\n]) '\'';
+TOK_CHAR : (('C' | 'CHAR') '#')? '\'' ('\\$' | ~[$'\r\n]) '\'';
 
 // Unicode char: UCHAR#'x' or UC#'x'
-TOK_UCHAR : ([uU] [cC] | 'UCHAR') '#'? '\'' ('\\$' | ~[$'\r\n]) '\'';
+TOK_UCHAR : (('UC' | 'UCHAR') '#')? '\'' ('\\$' | ~[$'\r\n]) '\'';
 
 // Wide char: WCHAR#'x' or WC#'x'
-TOK_WCHAR : ([wW] [cC] | 'WCHAR') '#'? '"' ('\\$' | ~[$"\r\n]) '"';
+TOK_WCHAR : ('WC' | 'WCHAR') '#'? '"' ('\\$' | ~[$"\r\n]) '"';
 
 // Typed numeric literals: REAL#10, LREAL#-1.5, INT#10
 // Real literals with type
-TOK_REAL : (REAL | LREAL) '#' SIGNED_INT ( '.' UNSIGNED_INT ('E' SIGNED_INT)?)
+TOK_REAL : ('REAL' | 'LREAL') '#' SIGNED_INT ( '.' UNSIGNED_INT ('E' SIGNED_INT)?)
            | UNSIGNED_INT '.' UNSIGNED_INT ('E' SIGNED_INT)?  // Real literal
            ;
 
@@ -227,23 +227,21 @@ TOK_INT:   '16#' HEX_DIGIT+  // Based literal 16#FF
            | '2#' BIT ('_'? BIT)*   // binary literal
            ;
 
-fragment REAL  : [rR] [eE] [aA] [lL];
-fragment LREAL : [lL] [rR] [eE] [aA] [lL];
 
 // Peripheral address: %IW0:P, %PIW0, %Q*.1
-TOK_ABS_ADDR_PERIPHERAL : '%' [pP]? [iIqQmM] [xXbBwWdDlL]? DIGIT+ ('.' DIGIT+ | '*')? (':' [pP])?;
+TOK_ABS_ADDR_PERIPHERAL : '%' [P]? [IQM] [XBWDL]? DIGIT+ ('.' DIGIT+ | '*')? (':' [P])?;
 
 // Multi-part access: %QW0.1
-TOK_MULTPART_ACCESS : '%' [xXbBwWdD]? DIGIT+;
+TOK_MULTPART_ACCESS : '%' [XBWD]? DIGIT+;
 
 // Partial address: %I* %Q*
-TOK_PART_ADDR : '%' [iIqQmM] '*';
+TOK_PART_ADDR : '%' [IQM] '*';
 
 // RPCF address: @IOSensor.Name
-TOK_RPCF_ADDR : '@' [iIoOsS] [bBwWdDqQsSoOfF] [a-zA-Z_][a-zA-Z0-9_]* ('.' [a-zA-Z_][a-zA-Z0-9_]*)* (':' [a-zA-Z_][a-zA-Z0-9_]*)?;
+TOK_RPCF_ADDR : '@' [IOS] [BWDQSOF] [A-Z_][A-Z0-9_]* ('.' [A-Z_][A-Z0-9_]*)* (':' [A-Z_][A-Z0-9_]*)?;
 
 // Identifier
-TOK_ID : [a-zA-Z_] [a-zA-Z0-9_]*;
+TOK_ID : [A-Z_] [A-Z0-9_]*;
 
 // Operators
 TOK_NEQU           : '<>';

@@ -280,8 +280,7 @@ symbolic_variable
     ;
 
 var_access_or_multi_elem
-    : var_access
-    | multi_elem_var
+    : var_access multi_elem_chain?
     ;
 
 var_access
@@ -291,10 +290,6 @@ var_access
 
 variable_name
     : identifier
-    ;
-
-multi_elem_var
-    : var_access multi_elem_chain
     ;
 
 multi_elem_chain
@@ -460,11 +455,13 @@ statement
     ;
 
 stmt_list
-    : statement (semicolons statement)*
+    : ( statement semicolons )* 
     ;
 
 assignment_statement
-    : expression TOK_ASSIGN expression 
+    // extended the iec 61131-3 spec. the origin
+    // syntax is 'expression TOK_ASSIGN expression'
+    : expression (TOK_ASSIGN expression )*
     ;
 
 assignment_attempt
