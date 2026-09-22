@@ -133,7 +133,8 @@ TOK_PERSISTENT      : 'PERSISTENT';
 // Other keywords
 TOK_AT              : 'AT';
 TOK_MOD             : 'MOD';
-TOK_AND             : ('AND'|'&');
+TOK_AND             : 'AND';
+TOK_AND_OP          : '&';
 TOK_OR              : 'OR';
 TOK_XOR             : 'XOR';
 TOK_NOT             : 'NOT';
@@ -156,6 +157,7 @@ TOK_EXIT            : 'EXIT';
 TOK_METHOD          : 'METHOD';
 TOK_END_METHOD      : 'END_METHOD';
 TOK_LWORD           : 'LWORD';
+TOK_EXTERNAL        : 'EXTERNAL';
 
 // std func name
 TOK_ABS             : 'ABS';
@@ -183,8 +185,8 @@ TOK_TIME : ('T'|'TIME') '#'
           ([0-9]+ ('d' | 'h' | 'm' | 's' | 'ms'))*;
 
 // LT#... or LTIME#...
-TOK_LTIME : ('LT' | 'LTIME') '#'
-           '-'? UNSIGNED_INT ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns')+
+TOK_LTIME : ('L?T' | 'L?TIME' ) '#'
+           ('+' | '-')? UNSIGNED_INT ('.' UNSIGNED_INT)? ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns')+
            ([0-9]+ ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns'))*;
 
 // Date literal D#2024-12-25                                                                                                                                                                                         
@@ -196,24 +198,73 @@ TOK_TIME_OF_DAY : ('TOD' | 'TIME_OF_DAY') '#' (DIGIT DIGIT | DIGIT) ':' DIGIT DI
 // Date and time DT#2024-12-25-14:30:05                                                                                                                                                                              
 TOK_DATE_TIME : ('DT' | 'DATE_AND_TIME') '#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT '-' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
 
-// String literals
-// Standard string: STRING#'...' or S#'...' or '...'
-TOK_STRING : (('S' | 'STRING')'#')? '\'' ('\\$' | ~[$'\r\n])* '\'';
+fragment COMMON_CHAR_VALUE
+    : '$$'              // Matches a literal escaped dollar sign
+    | '$' [LNPRT]  // Matches $ followed by a valid IEC string escape code (case-insensitive)
+    | ~['$\r\n]         // Matches any single character except single quotes, dollar signs, or newlines
+    ;
 
-// Wide string: WSTRING#"..." or W#"..."
-TOK_WSTRING : (('W' | 'WSTRING') '#')? '"' ('\\$' | ~[$"\r\n])* '"';
+fragment CHAR_LITERAL
+    : ('S#' | 'STRING#')? ( CHAR_STR | WCHAR_STR )
+    ;
 
-// Unicode string: USTRING#'...' or U#'...'
-TOK_USTRING : (('U' | 'USTRING') '#')? '\'' ('\\$' | ~[$'\r\n])* '\'';
+fragment WCHAR_LITERAL
+    : ('W#' | 'WSTRING#')? WCHAR_STR    
+    | ('W#' | 'WSTRING#') WCHAR_ALTSTR    
+    ;
+
+fragment UCHAR_LITERAL
+    : ('U#' | 'USTRING#') UCHAR_STR    
+    ;
+
+fragment CHAR_STR
+    : '\'' CHAR_VALUE* '\''
+    ;
+
+fragment WCHAR_STR
+    : '"' WCHAR_VALUE* '"'
+    ;
+
+fragment WCHAR_ALTSTR
+    : '\'' WCHAR_ALTVALUE* '\''
+    ;
+
+fragment UCHAR_STR
+    : '\'' UCHAR_VALUE* '\''
+    ;
+
+fragment CHAR_VALUE
+    : COMMON_CHAR_VALUE | '$\'' | '$' HEX_DIGIT HEX_DIGIT
+    ;
+
+fragment WCHAR_VALUE
+    : COMMON_CHAR_VALUE | '\'' | '$"' | '$' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
+    ;
+
+fragment WCHAR_ALTVALUE
+    : COMMON_CHAR_VALUE | '$\'' | '"' | '$' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
+    ;
+
+fragment UCHAR_VALUE
+    : COMMON_CHAR_VALUE 
+    | '$\'' 
+    | '"' 
+    | '$' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT 
+    | '${' HEX_DIGIT+ '}'
+    ;
+
+TOK_STRING : CHAR_LITERAL;
+TOK_USTRING : UCHAR_LITERAL;
+TOK_WSTRING : WCHAR_LITERAL;
 
 // Character literals: CHAR#'x' or 'x'
-TOK_CHAR : (('C' | 'CHAR') '#')? '\'' ('\\$' | ~[$'\r\n]) '\'';
+TOK_CHAR : (('C' | 'CHAR') '#')? '\'' CHAR_VALUE '\'';
 
 // Unicode char: UCHAR#'x' or UC#'x'
-TOK_UCHAR : (('UC' | 'UCHAR') '#')? '\'' ('\\$' | ~[$'\r\n]) '\'';
+TOK_UCHAR : (('UC' | 'UCHAR') '#')? '\'' UCHAR_VALUE '\'';
 
 // Wide char: WCHAR#'x' or WC#'x'
-TOK_WCHAR : ('WC' | 'WCHAR') '#'? '"' ('\\$' | ~[$"\r\n]) '"';
+TOK_WCHAR : ('WC' | 'WCHAR') '#'? '"' WCHAR_VALUE '"';
 
 // Typed numeric literals: REAL#10, LREAL#-1.5, INT#10
 // Real literals with type

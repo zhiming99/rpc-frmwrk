@@ -105,11 +105,15 @@ namespace_hierarchy
 // Configuration
 // ============================================================
 
+config_name
+    : identifier
+    ;
+
 config_decl
-    : TOK_CONFIGURATION identifier
+    : TOK_CONFIGURATION config_name
       opt_global_var_decls
       resource_decl
-      access_decls_opt
+      opt_access_decls
       opt_config_init
       TOK_END_CONFIGURATION
     ;
@@ -140,10 +144,8 @@ single_resource_decl
     ;
 
 resource_body
-    : task_configuration_list
-    | program_configuration_list
-    | access_decls
-    | resource_init
+    : ( task_config semicolons )*
+    ( prog_config semicolons )+
     ;
 
 // ============================================================
@@ -151,7 +153,7 @@ resource_body
 // ============================================================
 
 task_configuration_list
-    : task_config+
+    : task_config*
     ;
 
 task_config
@@ -159,19 +161,17 @@ task_config
     ;
 
 task_init
-    : TOK_SINGLE opt_single_init
-    | TOK_INTERVAL opt_interval_init
-    | priority_init
+    : TOK_LPAREN opt_single_init opt_interval_init priority_init TOK_RPAREN
     ;
 
 opt_single_init
     : /* empty */
-    | TOK_ASSIGN symbolic_variable
+    | TOK_SINGLE TOK_ASSIGN data_source TOK_COMMA
     ;
 
 opt_interval_init
     : /* empty */
-    | TOK_ASSIGN time_literal
+    | TOK_INTERVAL TOK_ASSIGN data_source TOK_COMMA
     ;
 
 priority_init
@@ -182,32 +182,20 @@ priority_init
 // Program Configuration
 // ============================================================
 
-program_configuration_list
-    : prog_config+
-    ;
-
 prog_config
-    : TOK_PROGRAM identifier
-      opt_prog_conf_elems
+    : TOK_PROGRAM 
       retain?
-      identifier
+      prog_name
       opt_with_task
-      TOK_COLON
       prog_type_access
-      TOK_LPAREN
-      prog_cnxn
-      TOK_RPAREN
-      TOK_SEMICOLON
-      access_decls_opt
-      config_init_opt
+      prog_conf_elems?
     ;
 
-opt_prog_conf_elems
-    : /* empty */
-    | TOK_LPAREN prog_conf_elements TOK_RPAREN
+prog_conf_elems
+    : TOK_LPAREN prog_conf_elem_list TOK_RPAREN
     ;
 
-prog_conf_elements
+prog_conf_elem_list
     : prog_conf_elem ( TOK_COMMA prog_conf_elem)*
     ;
 
@@ -220,33 +208,40 @@ fb_task: fb_instance_name TOK_WITH TOK_ID
     ;
 
 opt_with_task
-    : /* empty */
-    | TOK_WITH identifier
+    : (TOK_WITH identifier)? TOK_COLON
     ;
 
 prog_type_access
-    : instance_path
+    : instance_path? prog_type_name
     ;
 
 prog_cnxn
-    : /* empty */
-    | prog_cnxn TOK_COMMA data_sink
+    : symbolic_variable TOK_ASSIGN prog_data_source
+    | symbolic_variable TOK_OUTPUT_ASSIGN data_sink
     ;
+
+prog_data_source
+    : constant
+    | enum_value
+    | namedval_value
+    | global_var_access
+    | direct_variable
+    ;
+    
 
 // ============================================================
 // Data Source/Sink
 // ============================================================
 
 data_sink
-    : symbolic_variable TOK_ASSIGN expression
-    | symbolic_variable TOK_ASSIGN data_source
-    | symbolic_variable
+    : ( resource_name TOK_DOT )? global_var_name ( TOK_DOT struct_elem_name )?
     ;
 
 data_source
-    : symbolic_variable
-    | tokid_dot symbolic_variable
-    | TOK_ID TOK_DOT symbolic_variable
+    : constant
+    | global_var_access
+    | prog_output_access
+    | direct_variable
     ;
 
 tokid_dot
@@ -280,6 +275,8 @@ symbolic_variable
     ;
 
 var_access_or_multi_elem
+    // equivalent to the spec's rule
+    // ( var_access | multi_elem_var )
     : var_access multi_elem_chain?
     ;
 
@@ -290,6 +287,11 @@ var_access
 
 variable_name
     : identifier
+    | keywords_var_name
+    ;
+
+keywords_var_name
+    : keywords
     ;
 
 multi_elem_chain
@@ -342,7 +344,7 @@ xor_expr
     ;
 
 and_expr
-    : compare_expr (TOK_AND compare_expr)*
+    : compare_expr ((TOK_AND | TOK_AND_OP )compare_expr)*
     ;
 
 compare_expr
@@ -455,7 +457,7 @@ statement
     ;
 
 stmt_list
-    : ( statement semicolons )* 
+    : ( statement semicolons )*
     ;
 
 assignment_statement
@@ -664,7 +666,7 @@ fb_input_decls
     ;
 
 fb_input_decl_list
-    : ( fb_input_decl semicolons )+
+    : fb_input_decl semicolons 
     ;
 
 fb_input_decl
@@ -677,7 +679,7 @@ fb_output_decls
     ;
 
 fb_output_decl_list
-    : (fb_output_decl semicolons)+
+    : fb_output_decl semicolons
     ;
 
 fb_output_decl
@@ -893,7 +895,11 @@ func_body
 // ============================================================
 
 data_type_decl
-    : TOK_TYPE opt_override using_directive_list? type_decl TOK_SEMICOLON TOK_END_TYPE
+    : TOK_TYPE opt_override using_directive_list? type_decls TOK_END_TYPE
+    ;
+
+type_decls
+    : ( type_decl semicolons )+
     ;
 
 type_decl
@@ -1295,7 +1301,7 @@ class_type_access
 // Access Declarations
 // ============================================================
 
-access_decls_opt
+opt_access_decls
     : /* empty */
     | access_decls
     ;
@@ -1329,21 +1335,7 @@ access_direction
 
 opt_config_init
     : /* empty */
-    | config_inst_init
-    ;
-
-config_inst_init
-    : /* empty */
-    | config_inst_init instance_specific_init
-    ;
-
-resource_init
-    : /* to be defined */
-    ;
-
-config_init_opt
-    : /* empty */
-    | config_inst_init
+    | config_init
     ;
 
 initial_value
@@ -1358,7 +1350,19 @@ initial_value
 // ============================================================
 
 pragma_statement
-    : /* to be defined */
+    : TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
+    | TOK_LBRACE TOK_END_REGION TOK_RBRACE
+    | TOK_LBRACE TOK_IF expression TOK_RBRACE
+    | TOK_LBRACE TOK_ELSE TOK_RBRACE
+    | TOK_LBRACE TOK_END_IF TOK_RBRACE
+    | TOK_LBRACE TOK_INFO TOK_STRING TOK_RBRACE
+    | TOK_LBRACE TOK_INCLUDE TOK_STRING TOK_RBRACE
+    | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING attr_values? TOK_RBRACE
+    | TOK_LBRACE ( TOK_REF | TOK_EXTERNAL ) TOK_RBRACE
+    ;
+
+attr_values
+    : TOK_ASSIGN string_list
     ;
 
 conditional_pragma
@@ -1374,7 +1378,7 @@ case_selector_check
 // ============================================================
 
 variable_list
-    : identifier_list
+    : variable_name (TOK_COMMA variable_name)*
     ;
 
 struct_type_access
@@ -1422,10 +1426,6 @@ prog_output_access
     : tokid_dot symbolic_variable
     ;
 
-prog_config_list
-    : prog_config+
-    ;
-
 // Array conformant declaration
 array_conform_decl
     : variable_list TOK_COLON array_conformand
@@ -1467,16 +1467,6 @@ external_var_decls
     : TOK_VAR_EXTERNAL opt_constant external_decls? TOK_END_VAR
     ;
 
-// FB instance or class instance
-fb_inst_or_class_inst
-    : instance_path
-    ;
-
-fb_inst_or_class_inst_list
-    : fb_inst_or_class_inst
-    | fb_inst_or_class_inst_list fb_inst_or_class_inst
-    ;
-
 // Function access
 func_name
     : std_func_name 
@@ -1514,7 +1504,7 @@ global_var_type_set
 
 // Config init
 config_init
-    : TOK_VAR_CONFIG config_inst_init TOK_END_VAR
+    : TOK_VAR_CONFIG (config_inst_init semicolons)* TOK_END_VAR
     ;
 
 // More missing rules
@@ -1561,12 +1551,6 @@ global_var_decl_list
     : ( global_var_decl TOK_SEMICOLON )+
     ;
 
-// Identifier dot list
-identifier_dot_list
-    : identifier
-    | identifier_dot_list TOK_DOT identifier
-    ;
-
 // In/out decls
 in_out_decls
     : TOK_VAR_IN_OUT in_out_var_decl_list? TOK_END_VAR
@@ -1589,6 +1573,7 @@ interface_spec_init
 
 // Interface value
 interface_value
+    // TODO: need predicate in pass2
     : symbolic_variable
     | fb_instance_name
     | class_instance_name
@@ -1610,7 +1595,7 @@ multibit_part_access
     ;
 
 // Instance specific init
-instance_specific_init
+config_inst_init
     : resource_name TOK_DOT prog_name TOK_DOT instance_tail
     ;
 
@@ -1626,12 +1611,12 @@ prog_name
 
 // Instance tail
 instance_tail
-    : opt_fb_inst_or_class_inst_list instance_tail1 
+    : opt_fb_inst_or_class_inst instance_tail1 
     ;
 
 // Instance tail 1
 instance_tail1
-    : identifier locate_at TOK_COLON loc_var_spec_init
+    : variable_name locate_at TOK_COLON loc_var_spec_init
     | instance_tail2 TOK_ASSIGN struct_init
     ;
 
@@ -1665,9 +1650,8 @@ else_statement
 
 
 // Optional FB instance list
-opt_fb_inst_or_class_inst_list
-    : /* empty */
-    | fb_inst_or_class_inst_list
+opt_fb_inst_or_class_inst
+    : ( fb_inst_name_or_class_inst_name TOK_DOT )*
     ;
 
 // Optional FB modifier
@@ -1694,13 +1678,6 @@ opt_method_var_decls
     : /* empty */
     | method_var_decls
     ;
-
-// Optional overlap
-opt_overlap
-    : /* empty */
-    | TOK_OVERLAP
-    ;
-
 
 // Prog var decls set list
 prog_var_decls_set_list
@@ -1757,7 +1734,12 @@ prog_access_decls
 
 // Prog decl
 prog_decl
-    : TOK_PROGRAM opt_internal identifier prog_var_decls_set_list? fb_body TOK_END_PROGRAM
+    : TOK_PROGRAM opt_internal prog_type_name prog_var_decls_set_list? fb_body TOK_END_PROGRAM
+    ;
+
+prog_type_name
+    : identifier
+    | keywords
     ;
 
 // Prog var decls set
@@ -1799,7 +1781,7 @@ signed_int_name
 // String list
 string_list
     : string_literal
-    | string_list TOK_COMMA string_literal
+    | string_literal TOK_COMMA string_list
     ;
 
 // String spec
@@ -1916,3 +1898,42 @@ var_member_init
     | struct_decl
     ;
 
+keywords
+    : TOK_SINGLE | TOK_INTERVAL | TOK_PRIORITY 
+    | TOK_USING | TOK_INCLUDE | TOK_OVERLAP
+    | TOK_REGION | TOK_NAMESPACE 
+    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
+    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
+    | TOK_EXTERNAL
+    ;
+
+keywords1
+    : TOK_VAR | TOK_END_VAR | TOK_END_PROGRAM
+    | TOK_VAR_GLOBAL | TOK_VAR_INPUT | TOK_VAR_OUTPUT | TOK_VAR_IN_OUT
+    | TOK_VAR_TEMP | TOK_VAR_EXTERNAL | TOK_VAR_CONFIG | TOK_VAR_ACCESS
+    | TOK_VAR_STAT | TOK_CONSTANT 
+    | TOK_INT_TYPE | TOK_DINT | TOK_UDINT | TOK_LINT | TOK_ULINT | TOK_SINT | TOK_USINT
+    | TOK_FUNCTION | TOK_END_FUNCTION | TOK_FUNCTION_BLOCK | TOK_END_FUNCTION_BLOCK 
+    | TOK_STRUCT | TOK_END_STRUCT | TOK_PROPERTY | TOK_END_PROPERTY
+    | TOK_METHOD | TOK_END_METHOD | TOK_TYPE | TOK_END_TYPE
+    | TOK_BOOL | TOK_BYTE | TOK_WORD | TOK_DWORD | TOK_LDWORD | TOK_REAL_TYPE | TOK_LREAL_TYPE
+    | TOK_STRING_TYPE | TOK_WSTRING_TYPE | TOK_USTRING_TYPE
+    | TOK_CHAR_TYPE | TOK_WCHAR_TYPE | TOK_UCHAR_TYPE
+    | TOK_END_INTERFACE | TOK_END_CLASS
+    | TOK_IF | TOK_THEN | TOK_ELSE | TOK_ELSIF | TOK_END_IF
+    | TOK_CASE | TOK_OF | TOK_END_CASE | TOK_FOR | TOK_TO | TOK_BY | TOK_DO
+    | TOK_END_FOR | TOK_WHILE | TOK_END_WHILE | TOK_REPEAT | TOK_UNTIL | TOK_END_REPEAT
+    | TOK_ARRAY | TOK_TIME_TYPE | TOK_LTIME_TYPE | TOK_DATE_TYPE | TOK_LDATE_TYPE
+    | TOK_EXTENDS | TOK_IMPLEMENTS | TOK_ABSTRACT | TOK_FINAL | TOK_OVERRIDE
+    | TOK_SUPER | TOK_THIS | TOK_PROPERTY_GET | TOK_PROPERTY_SET
+    | TOK_PRIVATE | TOK_PUBLIC | TOK_PROTECTED | TOK_INTERNAL
+    | TOK_REFERENCE | TOK_REF_TO | TOK_REF | TOK_NULL
+    | TOK_END_RESOURCE | TOK_ON | TOK_END_CONFIGURATION 
+    | TOK_WITH | TOK_RETAIN | TOK_NON_RETAIN | TOK_PERSISTENT
+    | TOK_MOD | TOK_AND | TOK_OR | TOK_XOR | TOK_NOT
+    | TOK_READ_ONLY | TOK_READ_WRITE | TOK_ATTRIBUTE | TOK_INFO
+    | TOK_END_REGION | TOK_END_NAMESPACE
+    | TOK_TRUE | TOK_FALSE | TOK_RETURN | TOK_CONTINUE | TOK_EXIT
+    | TOK_LWORD
+    ;
+    
