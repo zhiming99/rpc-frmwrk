@@ -8,6 +8,7 @@ lexer grammar stlexer;
 options {
     caseInsensitive = true;
 }
+channels { PRAGMA_CHANNEL }
 
 // Keywords - case insensitive
 // Type keywords
@@ -328,6 +329,8 @@ TOK_QASSIGN        : '?=' ;
 TOK_BLOCK_COMMENT_ST : '(*' .*? '*)' -> channel(HIDDEN);
 TOK_BLOCK_COMMENT_C  : '/*' .*? '*/' -> channel(HIDDEN);
 TOK_LINE_COMMENT     : '//' ~[\r\n]* -> channel(HIDDEN);
+
+PRAGMA : '{' ~[}]* '}' -> channel(PRAGMA_CHANNEL) ;
 
 // Whitespace - ignored
 TOK_WHITESPACE : [ \t\r\n]+ -> channel(HIDDEN);

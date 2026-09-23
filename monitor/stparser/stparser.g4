@@ -204,7 +204,7 @@ prog_conf_elem
     | prog_cnxn
     ;
 
-fb_task: fb_instance_name TOK_WITH TOK_ID
+fb_task: fb_instance_name TOK_WITH identifier
     ;
 
 opt_with_task
@@ -245,7 +245,7 @@ data_source
     ;
 
 tokid_dot
-    : TOK_ID TOK_DOT
+    : identifier TOK_DOT
     ;
 
 opt_tokid_dot
@@ -259,7 +259,7 @@ opt_dot_tokid
     ;
 
 dot_tokid
-    : TOK_ID TOK_DOT
+    : identifier TOK_DOT
     ;
 
 // ============================================================
@@ -287,7 +287,6 @@ var_access
 
 variable_name
     : identifier
-    | keywords_var_name
     ;
 
 keywords_var_name
@@ -478,7 +477,7 @@ subprog_ctrl_stmt:
     ;
 
 method_name:
-    TOK_ID
+    identifier
     ;
 
 fb_inst_name_or_class_inst_name:
@@ -619,7 +618,7 @@ fb_modifier
     ;
 
 derived_fb_name
-    : TOK_ID
+    : identifier
     ;
 
 fb_name
@@ -730,6 +729,7 @@ identifier_list
 
 identifier
     : TOK_ID
+    | keywords_var_name
     ;
 
 temp_var_decls
@@ -1171,7 +1171,7 @@ ref_deref
     ;
 
 ref_name
-    : TOK_ID
+    : identifier
     ;
 
 caret_list
