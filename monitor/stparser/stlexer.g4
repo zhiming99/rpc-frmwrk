@@ -179,42 +179,23 @@ fragment UNSIGNED_INT : DIGIT+ ('_'? DIGIT+)*;
 fragment SIGNED_INT  : ('+' | '-')? UNSIGNED_INT;
 fragment BIT : '0' | '1';
 
-// Time literals
-// T#... or TIME#...
-TOK_TIME : ('T'|'TIME') '#'
-          '-'? UNSIGNED_INT ('d' | 'h' | 'm' | 's' | 'ms')+
-          ([0-9]+ ('d' | 'h' | 'm' | 's' | 'ms'))*;
-
-// LT#... or LTIME#...
-TOK_LTIME : ('L?T' | 'L?TIME' ) '#'
-           ('+' | '-')? UNSIGNED_INT ('.' UNSIGNED_INT)? ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns')+
-           ([0-9]+ ('d' | 'h' | 'm' | 's' | 'ms' | 'us' | 'ns'))*;
-
-// Date literal D#2024-12-25                                                                                                                                                                                         
-TOK_DATE :  '[L]?D#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT;
-
-// Time of day TOD#14:30:05.123                                                                                                                                                                                      
-TOK_TIME_OF_DAY : ('TOD' | 'TIME_OF_DAY') '#' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
-
-// Date and time DT#2024-12-25-14:30:05                                                                                                                                                                              
-TOK_DATE_TIME : ('DT' | 'DATE_AND_TIME') '#' DIGIT DIGIT DIGIT DIGIT '-' DIGIT DIGIT '-' DIGIT DIGIT '-' (DIGIT DIGIT | DIGIT) ':' DIGIT DIGIT ':' DIGIT DIGIT ('.' DIGIT+)?;
-
+// string literal
 fragment COMMON_CHAR_VALUE
     : '$$'              // Matches a literal escaped dollar sign
     | '$' [LNPRT]  // Matches $ followed by a valid IEC string escape code (case-insensitive)
     | ~['$\r\n]         // Matches any single character except single quotes, dollar signs, or newlines
     ;
 
-fragment CHAR_LITERAL
+TOK_CHAR_LITERAL
     : ('S#' | 'STRING#')? ( CHAR_STR | WCHAR_STR )
     ;
 
-fragment WCHAR_LITERAL
+TOK_WCHAR_LITERAL
     : ('W#' | 'WSTRING#')? WCHAR_STR    
     | ('W#' | 'WSTRING#') WCHAR_ALTSTR    
     ;
 
-fragment UCHAR_LITERAL
+TOK_UCHAR_LITERAL
     : ('U#' | 'USTRING#') UCHAR_STR    
     ;
 
@@ -253,10 +234,6 @@ fragment UCHAR_VALUE
     | '$' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT 
     | '${' HEX_DIGIT+ '}'
     ;
-
-TOK_STRING : CHAR_LITERAL;
-TOK_USTRING : UCHAR_LITERAL;
-TOK_WSTRING : WCHAR_LITERAL;
 
 // Character literals: CHAR#'x' or 'x'
 TOK_CHAR : (('C' | 'CHAR') '#')? '\'' CHAR_VALUE '\'';
@@ -337,3 +314,31 @@ TOK_WHITESPACE : [ \t\r\n]+ -> channel(HIDDEN);
 
 // Error handling for unknown characters
 TOK_UNKNOWN_CHAR : . -> channel(HIDDEN);
+
+// time_literal
+fragment TIME_TYPE_NAME: 'TIME' | 'LTIME';
+fragment DATE_TYPE_NAME: 'DATE' | 'LDATE';
+fragment TOD_TYPE_NAME : 'TIME_OF_DAY' | 'LTIME_OF_DAY' | 'TOD' | 'LTOD';
+fragment DT_TYPE_NAME :  'DATE_AND_TIME' | 'LDATE_AND_TIME' | 'DT' | 'LDT';
+TOK_DURATION : ( TIME_TYPE_NAME | 'T' | 'LT' ) '#' ( '+' | '-' )? INTERVAL; 
+fragment FIX_POINT  : UNSIGNED_INT ( '.' UNSIGNED_INT )?;
+fragment INTERVAL : DAYS;
+fragment DAYS: FIX_POINT 'd' | ( UNSIGNED_INT 'd' '_'? )? HOURS;
+fragment HOURS: FIX_POINT 'h' | ( UNSIGNED_INT 'h' '_'? )? MINUTES;
+fragment MINUTES: FIX_POINT 'm' | ( UNSIGNED_INT 'm' '_'? )? SECONDS;
+fragment SECONDS: FIX_POINT 's' | ( UNSIGNED_INT 's' '_'? )? MILLISECONDES;
+fragment MILLISECONDES: FIX_POINT 'ms' | ( UNSIGNED_INT 'ms' '_'? )? MICROSECONDES;
+fragment MICROSECONDES: FIX_POINT 'us' | ( UNSIGNED_INT 'us' '_'? )? NANOSECONDES;
+fragment NANOSECONDES: FIX_POINT 'us';
+TOK_TIME_OF_DAY: TOD_TYPE_NAME '#' DAYTIME;
+fragment DAYTIME : DAY_HOUR ':' DAY_MINUTE ':' DAY_SECOND;
+fragment DAY_HOUR : UNSIGNED_INT;
+fragment DAY_MINUTE: UNSIGNED_INT;
+fragment DAY_SECOND: FIX_POINT;
+fragment DATE_LITERAL: YEAR '-' MONTH '-' DAY;
+fragment YEAR: UNSIGNED_INT;
+fragment MONTH: UNSIGNED_INT;
+fragment DAY: UNSIGNED_INT;
+TOK_DATE : ( DATE_TYPE_NAME | 'D' | 'LD' ) '#' DATE_LITERAL;
+TOK_DATE_TIME: DT_TYPE_NAME '#' DATE_LITERAL '-' DAYTIME;
+

@@ -410,17 +410,16 @@ numeric_literal
     ;
 
 time_literal
-    : TOK_TIME
-    | TOK_LTIME
-    | TOK_DATE
+    : TOK_DURATION
     | TOK_TIME_OF_DAY
+    | TOK_DATE
     | TOK_DATE_TIME
     ;
 
 string_literal
-    : TOK_STRING
-    | TOK_WSTRING
-    | TOK_USTRING
+    : TOK_CHAR_LITERAL
+    | TOK_WCHAR_LITERAL
+    | TOK_UCHAR_LITERAL
     ;
 
 bool_value
@@ -1350,14 +1349,14 @@ initial_value
 // ============================================================
 
 pragma_statement
-    : TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
+    : TOK_LBRACE TOK_REGION string_literal TOK_RBRACE
     | TOK_LBRACE TOK_END_REGION TOK_RBRACE
     | TOK_LBRACE TOK_IF expression TOK_RBRACE
     | TOK_LBRACE TOK_ELSE TOK_RBRACE
     | TOK_LBRACE TOK_END_IF TOK_RBRACE
-    | TOK_LBRACE TOK_INFO TOK_STRING TOK_RBRACE
-    | TOK_LBRACE TOK_INCLUDE TOK_STRING TOK_RBRACE
-    | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING attr_values? TOK_RBRACE
+    | TOK_LBRACE TOK_INFO string_literal TOK_RBRACE
+    | TOK_LBRACE TOK_INCLUDE string_literal TOK_RBRACE
+    | TOK_LBRACE TOK_ATTRIBUTE string_literal attr_values? TOK_RBRACE
     | TOK_LBRACE ( TOK_REF | TOK_EXTERNAL ) TOK_RBRACE
     ;
 
