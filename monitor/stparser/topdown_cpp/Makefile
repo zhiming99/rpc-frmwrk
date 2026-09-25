@@ -2,9 +2,9 @@
 
 CXX = g++
 ANTLR4_DIR = /home/zhiming/mywork/antlr4-4.13.2
-jsoncpp=$(shell pkg-config --cflags jsoncpp)
-CXXFLAGS = -std=c++17 -Wall -I. -I../../../include -I$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/include/antlr4-runtime -O0 -ggdb -Wno-overloaded-virtual $(jsoncpp)
-LDFLAGS = -L$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/lib -lantlr4-runtime -Wl,-rpath,$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/lib
+rpcf_dependency=$(shell pkg-config --cflags jsoncpp dbus-1)
+CXXFLAGS = -std=c++17 -Wall -I. -I../../../include -I$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/include/antlr4-runtime -O0 -ggdb -Wno-overloaded-virtual $(rpcf_dependency)
+LDFLAGS = -L$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/lib -lantlr4-runtime -Wl,-rpath,$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/lib -lcombase
 
 # ANTLR tool jar (4.13.2)
 ANTLR4_JAR = $(ANTLR4_DIR)/antlr4-tool.jar
@@ -27,11 +27,11 @@ gen_src=stparserVisitor.cpp stparserBaseListener.cpp stparserListener.cpp stpars
 stparserVisitor.h stparserBaseListener.h stparserListener.h stparserBaseVisitor.h stparser.h stlexer.h
 
 # Build rpcfstc
-$(rpcfstc): stlexer.o stparser.o st_main.o st_parse_listener.o st_parser_ext.o $(other_obj)
+$(rpcfstc): stlexer.o stparser.o st_main.o st_parse_listener.o st_parser_ext.o $(other_obj) astnodes.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compile rpcfstc
-rpcfstc.o: st_main.cpp parse_context.h st_parse_listener.h st_parser_ext.h
+rpcfstc.o: st_main.cpp parse_context.h st_parse_listener.h st_parser_ext.h 
 	$(CXX) $(CXXFLAGS) -c rpcfstc.cpp -o rpcfstc.o
 
 # Compile lexer
