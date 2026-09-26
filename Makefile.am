@@ -38,7 +38,7 @@ EXTRA_DIST= README.md cfgsel Concept.md logs.md LICENSE README_cn.md Concept_cn.
 
 dist_pkgconfig_DATA=rpcf.pc
 
-rev=0
+rev=1
 DISTDIR=$(PACKAGE_NAME)-$(VERSION)
 pkgname=$(DISTDIR).tar.gz
 debtar=$(subst -,_,$(DISTDIR)).orig.tar.gz

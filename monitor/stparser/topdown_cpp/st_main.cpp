@@ -1,48 +1,54 @@
 /*
  * =====================================================================================
  *
- *       Filename:  stmain.cpp
+ *       Filename:  st_main.h
  *
- *    Description:  main entry for ST compiler
+ *    Description:  the main entry of rpcfstc
  *
  *        Version:  1.0
- *        Created:  05/03/2026 09:04:52 AM
+ *        Created:  09/16/2026
  *       Revision:  none
  *       Compiler:  gcc
  *
  *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:
  *
- *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+ *      Copyright:  2026 Ming Zhi( woodhead99@gmail.com )
  *
- *        License:  This program is free software; you can redistribute it
- *                  and/or modify it under the terms of the GNU General Public
- *                  License version 3.0 as published by the Free Software
- *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *        License:  Licensed under GPL-3.0. You may not use this file except in
+ *                  compliance with the License. You may find a copy of the
+ *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
  *
  * =====================================================================================
  */
-
-#include <rpc.h>
-#include <getopt.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include "stclsids.h"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include "antlr4-runtime.h"
 #include "stlexer.h"
 #include "stparser.h"
-#include "lvalvar.h"
+
+#include "parse_context.h"
+#include "st_parse_listener.h"
+#include "st_parser_ext.h"
+#include <getopt.h>
+#include "defines.h"
+#include "stclsids.h"
 #include "astnodes.h"
 #include "stsymtab.h"
+#include <sys/stat.h>
 
-using namespace rpcf;
-std::shared_ptr< CSTParserContext > g_pParserCtx;
+void Usage()
+{
+    printf( "Usage:" );
+    printf( "rpcfstc [options] <ST file> \n" );
+    printf( "\t compile the `ST file'"
+        "and output the RPC skeleton files.\n" );
+    printf( "Options -h:\tPrint this help.\n");
+    printf( "\t-t:\tPrint trace messages.\n" );
+}
 
-// Global AST root
-ObjPtr g_pAstRoot;
-
-gint32 StartParse(
-    CSTParserContext* pCtx,
-    const stdstr& strFile );
+bool g_bTrace = false;
 
 static gint32 IsValidDir( const char* szDir )
 {
@@ -69,11 +75,6 @@ static gint32 IsValidDir( const char* szDir )
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
-
-    INIT_MAP_ENTRY( CLValueVariableInstPath );
-    INIT_MAP_ENTRY( CLValueVariableDataMember  );
-    INIT_MAP_ENTRY( CLValueVariableDefPtr  );
-    INIT_MAP_ENTRY( CLValueVariableArrayAccess );
 
     // AST Expression Nodes
     INIT_MAP_ENTRY( CStLiteralExpr );
@@ -173,166 +174,164 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
-void Usage()
+int main(int argc, char* argv[])
 {
-    printf( "Usage:" );
-    printf( "rpcfstc [options] <st file> \n" );
+    int ret = 0;
+    std::string strFile;
+    if( argc < 1 )
+    {
+        Usage();
+        return 1;
+    }
 
-    printf( "\t compile the `ST file'"
-        "and output the RPC skeleton files.\n" );
+    int option_index = 0;
+    struct option long_options[] = {
+        {0, 0,  0,  0 }
+    };
 
-    printf( "Options -h:\tprint this help.\n");
-
-    printf( "\t-I:\tSpecify the path to"
-        " search for the included `ST files'.\n"
-        "\t\tAnd this option can repeat multiple "
-        "times.\n" );
-}
-
-int main( int argc, char* argv[] )
-{
-    gint32 ret = 0;
+    bool bQuit = false;
+    bool bError = false;
     bool bUninit = false;
+
     do{
-        stdstr strFile;
         ret = CoInitialize( COINIT_NORPC );
         if( ERROR( ret ) )
             break;
         bUninit = true;
-
-        g_pParserCtx.reset( new CSTParserContext );
-        auto pCtx = g_pParserCtx.get();
 
         FactoryPtr pFactory = InitClassFactory();
         ret = CoAddClassFactory( pFactory );
         if( ERROR( ret ) )
             break;
 
-        int opt = 0;
-        bool bQuit = false;
-
-        int option_index = 0;
-        static struct option long_options[] = {
-            {"version", no_argument, 0,  0 },
-            {0, 0,  0,  0 }
-        };
-
-        stdstr strMsg;
         while( true ) 
         {
-
-            opt = getopt_long( argc, argv,
-                "hI:",
+            int opt = getopt_long( argc, argv,
+                "ht",
                 long_options, &option_index );
+
+            if( opt == -1 )
+                break;
 
             switch( opt )
             {
             case 0:
+                break;
+            case 't':
                 {
-                    if( option_index == 0 )
-                    {
-                        printf( "%s", Version() );
-                        bQuit = true;
-                    }
+                    g_bTrace = true;
                     break;
                 }
-            case 'I' :
+            case 'h' :
                 {
-                    ret = IsValidDir( optarg );
-                    if( ret == -ENOTDIR )
-                    {
-                        strMsg = "Error '";
-
-                        strMsg += optarg;
-                        strMsg +=
-                           "' is not a directory";
-                        bQuit = true;
-                        break;
-                    }
-                    else if( ERROR( ret ) )
-                    {
-                        printf( "%s : %s\n", optarg,
-                            strerror( -ret ) );
-                        bQuit = true;
-                        break;
-                    }
-
-                    char szBuf[ 512 ];
-                    int iSize = strnlen(
-                        optarg, sizeof( szBuf ) + 1 );
-                    if( iSize > sizeof( szBuf ) )
-                    {
-                        strMsg =
-                           "Error path is too long";
-                        ret = -ERANGE;
-                        bQuit = true;
-                        break;
-                    }
-                    stdstr strFullPath;
-                    if( optarg[ 0 ] == '/' )
-                    {
-                        strFullPath = optarg;
-                    }
-                    else
-                    {
-                        char* szPath = getcwd(
-                            szBuf, sizeof( szBuf ) );
-                        if( szPath == nullptr )
-                        {
-                            strMsg =
-                               "Error path is too long";
-                            ret = -errno;
-                            bQuit = true;
-                            break;
-                        }
-                        strFullPath = szPath;
-                        strFullPath += "/";
-                        strFullPath += optarg;
-                        if( strFullPath.size() >
-                            sizeof( szBuf ) )
-                        {
-                            strMsg =
-                               "Error path is too long";
-                            ret = -ERANGE;
-                            bQuit = true;
-                            break;
-                        }
-                    }
-                    pCtx->m_vecInclPaths.push_back(
-                        strFullPath );
+                    Usage();
+                    bQuit = true;
                     break;
                 }
-            case -1:
             default:
+                bQuit = true;
+                bError = true;
                 break;
             }
-
-            if( argv[ optind ] == nullptr )
+            if( bQuit )
             {
-                printf( "Missing file to compile\n" );
-                Usage();
-                ret = -ENOENT;
-                break;
+                if( bError )
+                    return 1;
+                return 0;
             }
+        }
 
-            strFile = argv[ optind ];
-            if( strFile.size() > REG_MAX_PATH )
-            {
-                printf( "File name too long\n" );
-                ret = -ENAMETOOLONG;
-                break;
-            }
+        if( argv[ optind ] == nullptr )
+        {
+            printf( "Missing file to compile\n" );
+            Usage();
+            ret = -ENOENT;
             break;
         }
+
+        if( argv[ optind + 1 ] != nullptr )
+        {
+            printf( "too many arguments\n" );
+            Usage();
+            ret = -EINVAL;
+            break;
+        }
+
+        strFile = argv[ optind ];
+
+        if( strFile.size() > REG_MAX_PATH )
+        {
+            printf( "File name too long\n" );
+            ret = -ENAMETOOLONG;
+            break;
+        }
+
+        char* pszFile = realpath(
+            strFile.c_str(), nullptr );
+        if( pszFile == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+
+    }while( 0 );
+    do{
         if( ERROR( ret ) )
             break;
 
-        ret = StartParse( pCtx, strFile );
+        std::ifstream stream(strFile);
+        if (!stream.is_open()) {
+            std::cerr << "Cannot open file: "
+                << strFile << std::endl;
+            ret = -EINVAL;
+            break;
+        }
 
+        // Set up the parse context with a symbol table
+        CStParseContext parseContext;
+
+        antlr4::ANTLRInputStream input(stream);
+        stlexer lexer(&input);
+        antlr4::CommonTokenStream tokens(&lexer);
+
+        // Use the extended parser with predicates
+        CStParser parser(&tokens);
+        parser.SetParseContext(&parseContext);
+
+        // Create and attach the listener
+        CStParseListener listener(&parseContext);
+        listener.SetTokenStream(&tokens);
+        parser.addParseListener(&listener);
+
+        std::cout << "Parsing " 
+            << strFile << "..." << std::endl;
+
+        // Enable parser trace
+        if( g_bTrace )
+            parser.setTrace(true);
+
+        stparser::Start_pointContext* tree =
+            parser.start_point();
+
+        (void)tree; // suppress unused variable warning
+
+        if (parser.getNumberOfSyntaxErrors() > 0) {
+            std::cerr << "Parse failed with "
+                << parser.getNumberOfSyntaxErrors()
+                << " errors" << std::endl;
+            return ERROR_FAIL;
+        }
+
+        std::cout << "Parse successful!" << std::endl;
+
+        // After parsing, check if there are any deferred type references
+        // that need semantic resolution
+        std::cout << "\n=== Parse Summary ===" << std::endl;
+        std::cout << "Pending category after parse: " 
+                  << (int)(parseContext.m_iPendingCategory)
+                  << std::endl;
     }while( 0 );
     if( bUninit )
         CoUninitialize();
-
     return ret;
 }
-

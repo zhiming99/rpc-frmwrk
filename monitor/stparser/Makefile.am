@@ -1,11 +1,17 @@
-EXTRA_DIST=updconst.sh stscript.y stlexer.l stparser.y CMakeLists.txt
+EXTRA_DIST=updconst.sh stscript.y stlexer.l stparser.y CMakeLists.txt \
+test_ast.cpp astdebug.h astdebug.cpp
 
 BUILT_SOURCES = stparser.h stlexer.h
 CLEANFILES = stparser.cpp stparser.h stlexer.cpp stlexer.h
 
 check_PROGRAMS=rpcfstc
-dep_files=lvalvar.h nonterm.h parsrctx.cpp parsrctx.h parsrdrv.cpp stast.h stbase.cpp stbase.h stclsids.h stmain.cpp 
-rpcfstc_SOURCES= stparser.cpp stlexer.cpp stparser.h stlexer.h $(dep_files) 
+dep_files=lvalvar.h nonterm.h parsrctx.cpp parsrctx.h parsrdrv.cpp stast.h \
+stbase.cpp stbase.h stclsids.h stmain.cpp astnodes.cpp astnodes.h astfactory.h \
+astbuilder.h stsymtab.h
+
+rpcfstc_SOURCES= stparser.cpp stlexer.cpp stparser.h stlexer.h $(dep_files) \
+stgenbase.cpp stgenbase.h
+
 rpcfstcdir=$(bindir)
 rpcfstc_LDADD=../../combase/libcombase.la 
 
@@ -18,7 +24,7 @@ stlexer.cpp: stlexer.l stparser.h
 stlexer.h: stlexer.cpp
 
 stparser.cpp: stparser.y
-	LANG=C bison --defines=stparser.h -Wcounterexamples --output=stparser.cpp -r all stparser.y
+	LC_ALL=C bison --defines=stparser.h -Wcounterexamples --output=stparser.cpp -r all stparser.y
 	bash updconst.sh
 
 stparser.h: stparser.cpp

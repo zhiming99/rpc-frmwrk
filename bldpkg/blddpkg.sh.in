@@ -114,7 +114,7 @@ popd
 EOF
 
 cat << 'EOF' >> ./prerm
-#!/bin/bash
+#!/bin/bash -e
 echo INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
 INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
 pushd $INSTALL_DIR
