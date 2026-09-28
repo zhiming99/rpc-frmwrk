@@ -30,6 +30,9 @@ options { tokenVocab=stlexer; }
   virtual bool IsElemTypeName() { return true; }
   virtual bool IsSimpleTypeAccess() { return false; }
 
+  virtual bool IsStdFuncName() { return false; }
+  virtual bool IsStdFbName() { return false; }
+
   bool m_bPass2 = false;
 
   inline bool IsPass2() const
@@ -608,7 +611,7 @@ fb_decl_init
     ;
 
 fb_decl_no_init
-    : variable_list TOK_COLON fb_type_access
+    : fb_name (TOK_COMMA fb_name ) TOK_COLON fb_type_access
     ;
 
 fb_modifier
@@ -622,9 +625,10 @@ derived_fb_name
 
 fb_name
     : derived_fb_name
-//  | std_fb_name
+    | { IsStdFbName() }? std_fb_name
     ;
 
+std_fb_name: identifier;
 
 using_directive_list
     : using_directive+
@@ -690,7 +694,7 @@ func_var_decls
     ;
 
 external_decls
-    : (external_decl semicolons)+
+    : external_decl (semicolons external_decl)* opt_semicolons
     ;
 
 external_decl
@@ -898,7 +902,7 @@ data_type_decl
     ;
 
 type_decls
-    : ( type_decl semicolons )+
+    : type_decl ( semicolons type_decl )* opt_semicolons
     ;
 
 type_decl
@@ -1279,9 +1283,11 @@ derived_type_access
     ;
 
 single_elem_type_access
-    : simple_type_access
+/*    : simple_type_access
     | subrange_type_access
     | enum_type_access
+    */
+    :instance_path
     ;
 
 array_type_name
@@ -1395,6 +1401,7 @@ direct_variable
 
 fb_type_access
     : instance_path
+//  | (instance_path '.')? ( std_fb_name | derived_fb_name )
     ;
 
 loc_var_spec_init
@@ -1473,9 +1480,9 @@ func_name
     ;
 
 std_func_name
-    : TOK_SIN
-    | TOK_ABS | TOK_SQRT | TOK_LN | TOK_EXP | TOK_LOG
-    | TOK_SIN | TOK_COS
+    : ( TOK_SIN | TOK_ABS | TOK_SQRT | TOK_LN |
+        TOK_EXP | TOK_LOG | TOK_SIN | TOK_COS )
+    | { IsStdFuncName() }? identifier
     ;
 
 func_access
@@ -1680,7 +1687,7 @@ opt_method_var_decls
 
 // Prog var decls set list
 prog_var_decls_set_list
-    : (prog_var_decls_set opt_semicolons )+
+    : prog_var_decls_set*
     ;
 
 // More missing
@@ -1733,7 +1740,7 @@ prog_access_decls
 
 // Prog decl
 prog_decl
-    : TOK_PROGRAM opt_internal prog_type_name prog_var_decls_set_list? fb_body TOK_END_PROGRAM
+    : TOK_PROGRAM opt_internal prog_type_name prog_var_decls_set_list fb_body TOK_END_PROGRAM
     ;
 
 prog_type_name
@@ -1794,10 +1801,14 @@ string_spec
 
 // Struct decl
 struct_decl
-    : TOK_STRUCT TOK_OVERLAP? struct_elem_decl+ TOK_END_STRUCT
+    : TOK_STRUCT TOK_OVERLAP? struct_elem_decls TOK_END_STRUCT
     ;
 
 // Struct elem decl
+struct_elem_decls
+    : struct_elem_decl ( semicolons struct_elem_decl )* opt_semicolons
+    ;
+
 struct_elem_decl
     : struct_elem_name ( locate_at multibit_part_access )? TOK_COLON struct_elem_init_set
     | var_decl_init
