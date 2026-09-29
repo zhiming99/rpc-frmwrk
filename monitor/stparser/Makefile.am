@@ -1,5 +1,5 @@
 EXTRA_DIST=updconst.sh stscript.y stlexer.l stparser.y CMakeLists.txt \
-test_ast.cpp astdebug.h astdebug.cpp
+test_ast.cpp astdebug.h astdebug.cpp stparser.g4 stlexer.g4 pragma_expr.g4
 
 BUILT_SOURCES = stparser.h stlexer.h
 CLEANFILES = stparser.cpp stparser.h stlexer.cpp stlexer.h
