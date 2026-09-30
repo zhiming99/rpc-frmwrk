@@ -12,8 +12,12 @@ options {
  */
 pragma_condition
     : expr EOF
+    | include_directive EOF
     ;
 
+include_directive
+    : TOK_INCLUDE TOK_LSTRING
+    ;
 /**
  * Logical OR expression (lowest precedence).
  */
