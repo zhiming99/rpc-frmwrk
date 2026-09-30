@@ -179,7 +179,7 @@ void ParserPrint(
     const char* szFile,
     gint32 iLineNo,
     const char* strMsg,
-    bool bErr )
+    bool bErr = true )
 {
     std::ostringstream ss;
 

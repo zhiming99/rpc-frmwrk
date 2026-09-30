@@ -277,7 +277,7 @@ esac
 DEPLIBS='dbus-1 jsoncpp'
 DEPLIBS_CPPUNIT='dbus-1 jsoncpp cppunit'
 DEPLIBS_SSL='dbus-1 jsoncpp openssl'
-DEPLIBS_KRB5='dbus-1 jsoncpp mit-krb5 mit-krb5-gssapi'
+DEPLIBS_KRB5='dbus-1 jsoncpp openssl mit-krb5 mit-krb5-gssapi'
 DEPLIBS_FUSE3='dbus-1 jsoncpp fuse3'
 
 AC_SUBST(DEPLIBS)

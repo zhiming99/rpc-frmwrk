@@ -1,6 +1,5 @@
+usr/lib/@DEB_HOST_MULTIARCH@/lib*.so
 @TEST_DEBBINS@
 @FUSE3_DEBHEADERS@
-usr/lib/@DEB_HOST_MULTIARCH@/lib*.la
-usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.la
 usr/lib/@DEB_HOST_MULTIARCH@/pkgconfig/rpcf.pc
 @JS_DEBDEVFILES@

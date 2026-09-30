@@ -3,14 +3,14 @@ Maintainer: zhiming <@PACKAGE_BUGREPORT@>
 Section:devel
 Priority:extra
 Standards-Version: 4.5.0
-Build-Depends: debhelper (>= 13~), autoconf, automake, pkg-config, libtool, bison, flex, gcc ( >= 5 ), libdbus-1-dev, libjsoncpp-dev, liblz4-dev, @FUSE3_DEBLIBS@ @KRB5_DEBLIBS@ @OPENSSL_DEBLIBS@ libcppunit-dev, vim, python3, @JAVA_DEBLIBS@ @PYTHON_DEBLIBS@ @JS_DEBLIBS@ devscripts, bash, gettext
+Build-Depends: debhelper (>= 13~), autoconf, automake, pkg-config, libtool, bison, flex, gcc ( >= 5 ), libdbus-1-dev, libjsoncpp-dev, liblz4-dev, @FUSE3_DEBLIBS@ @KRB5_DEBLIBS@ @OPENSSL_DEBLIBS@ libcppunit-dev, vim, python3, @JAVA_DEBLIBS@ @PYTHON_DEBLIBS@ @JS_DEBLIBS@ devscripts, gettext
 X-Python3-Version: >= 3.7
 Vcs-Git: https://github.com/zhiming99/rpc-frmwrk.git
 Homepage: https://github.com/zhiming99/rpc-frmwrk
 
 Package: @PACKAGE_NAME@
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, dbus-daemon, dbus-bin, @FUSE3_DEBPKGS@ @OPENSSL_DEBPKGS@  @JAVA_DEBPKGS@ @PYTHON_DEBPKGS@ bash, attr, procps, python3-urwid, locales
+Depends: ${shlibs:Depends}, ${misc:Depends}, python3:any, dbus-daemon, dbus-bin, @FUSE3_DEBPKGS@ @OPENSSL_DEBPKGS@  @JAVA_DEBPKGS@ @PYTHON_DEBPKGS@ bash, attr, procps, python3-urwid, locales
 Description: RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility. And this package contains rpcrouter, and the runtime libraries, and config tools.
 
 Package: @PACKAGE_NAME@-dev

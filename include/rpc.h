@@ -24,9 +24,9 @@
 #pragma once
 #include <type_traits>
 #include <string.h>
-#include <dbus/dbus.h>
+// #include <dbus/dbus.h>
 #include "clsids.h"
-#include "dbuserr.h"
+// #include "dbuserr.h"
 #include "propids.h"
 #include "defines.h"
 #include "objfctry.h"
@@ -35,4 +35,4 @@
 #include "registry.h"
 #include "buffer.h"
 #include "configdb.h"
-#include "dmsgptr.h"
+// #include "dmsgptr.h"
