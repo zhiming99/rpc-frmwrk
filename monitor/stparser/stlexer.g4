@@ -1,6 +1,25 @@
 /*
- * stlexer.g4 - ANTLR4 Lexer for Structured Text Language (IEC 61131-3)
- * Converted from stlexer.l
+ * =====================================================================================
+ *
+ *       Filename:  stlexer.g4
+ *
+ *    Description:  The lexer for Structured Text Language (IEC 61131-3)
+ *
+ *        Version:  1.0
+ *        Created:  09/10/2026 12:00:00 PM
+ *       Revision:  none
+ *       Compiler:  antlr4
+ *
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
+ *   Organization:
+ *
+ *      Copyright:  2026 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  Licensed under GPL-3.0. You may not use this file except in
+ *                  compliance with the License. You may find a copy of the
+ *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *
+ * =====================================================================================
  */
 
 //Lexer grammar
