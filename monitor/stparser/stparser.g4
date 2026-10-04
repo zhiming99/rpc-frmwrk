@@ -31,34 +31,34 @@ options { tokenVocab=stlexer; }
 // ============================================================
 
 @parser::members {
-  // Semantic predicates for var_decl_init_set disambiguation
-  virtual bool IsSimpleType() { return true; }
-  virtual bool IsArrayType() { return true; }
-  virtual bool IsStructType() { return true; }
-  virtual bool IsFBType() { return true; }
-  virtual bool IsInterfaceType() { return true; }
-  virtual bool IsAmbiguousType() { return true; }
+    // Semantic predicates for var_decl_init_set disambiguation
+    virtual bool IsSimpleType() { return true; }
+    virtual bool IsArrayType() { return true; }
+    virtual bool IsStructType() { return true; }
+    virtual bool IsFBType() { return true; }
+    virtual bool IsInterfaceType() { return true; }
+    virtual bool IsAmbiguousType() { return true; }
 
-  // Semantic predicates for var_decl_init_simple_set disambiguation
-  virtual bool IsSimpleSpec() { return true; }
-  virtual bool IsSubrangeSpec() { return true; }
-  virtual bool IsRefSpec() { return true; }
-  virtual bool IsStringSpec() { return true; }
-  virtual bool IsAmbiguousSpec() { return true; }
+    // Semantic predicates for var_decl_init_simple_set disambiguation
+    virtual bool IsSimpleSpec() { return true; }
+    virtual bool IsSubrangeSpec() { return true; }
+    virtual bool IsRefSpec() { return true; }
+    virtual bool IsStringSpec() { return true; }
+    virtual bool IsAmbiguousSpec() { return true; }
 
-  virtual bool IsElemTypeName() { return true; }
-  virtual bool IsSimpleTypeAccess() { return false; }
+    virtual bool IsElemTypeName() { return true; }
+    virtual bool IsSimpleTypeAccess() { return false; }
 
-  virtual bool IsStdFuncName() { return false; }
-  virtual bool IsStdFbName() { return false; }
+    virtual bool IsStdFuncName() { return false; }
+    virtual bool IsStdFbName() { return false; }
 
-  bool m_bPass2 = false;
+    bool m_bPass2 = false;
 
-  inline bool IsPass2() const
-  { return m_bPass2; }
+    inline bool IsPass2() const
+    { return m_bPass2; }
 
-  void SetPass2( bool bPass2 = true )
-  { m_bPass2 = bPass2; }
+    void SetPass2( bool bPass2 = true )
+    { m_bPass2 = bPass2; }
 }
 
 // ============================================================

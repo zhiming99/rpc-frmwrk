@@ -96,6 +96,7 @@ TOK_DEFINED      : 'DEFINED' ;
 TOK_HASATTRIBUTE : 'HASATTRIBUTE' ;
 TOK_HASVALUE     : 'HASVALUE' ;
 TOK_HASCONSTANT  : 'HASCONSTANT' ;
+TOK_INCLUDE      : 'INCLUDE';
 
 TOK_VARIABLE     : 'VARIABLE' ;
 TOK_TYPE         : 'TYPE' ;
@@ -104,6 +105,11 @@ TOK_LPAREN       : '(' ;
 TOK_RPAREN       : ')' ;
 TOK_COLON        : ':' ;
 TOK_COMMA        : ',' ;
+
+// Single-quoted file path string literal parser (e.g., 'types.st')
+TOK_LSTRING
+    : '\'' (~['\r\n])* '\''
+    ;
 
 // Standard IEC 61131-3 Identifier
 TOK_IDENTIFIER
