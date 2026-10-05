@@ -2,7 +2,7 @@ grammar pragma_expr;
 
 options {
     language = Cpp;
-    caseinsensitive = true;
+    caseInsensitive = true;
 }
 
 // --- Parser Rules ---
