@@ -28,7 +28,6 @@
 #include "stlexer.h"
 #include "stparser.h"
 
-#include "parse_context.h"
 #include "st_parse_listener.h"
 #include "st_parser_ext.h"
 #include <getopt.h>
@@ -37,16 +36,11 @@
 #include "astnodes.h"
 #include "stsymtab.h"
 #include <sys/stat.h>
+#include "stlcont.h"
 
-void Usage()
-{
-    printf( "Usage:" );
-    printf( "rpcfstc [options] <ST file> \n" );
-    printf( "\t compile the `ST file'"
-        "and output the RPC skeleton files.\n" );
-    printf( "Options -h:\tPrint this help.\n");
-    printf( "\t-t:\tPrint trace messages.\n" );
-}
+using namespace rpcf;
+#include "parse_context.h"
+#include "pragma.h"
 
 bool g_bTrace = false;
 
@@ -174,13 +168,31 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
+void Usage( const char* pszAppName)
+{
+    printf( "Usage:" );
+    printf( "%s [options] <ST files> \n", pszAppName );
+    printf( "\t compile the `ST file'"
+        "and output the RPC skeleton files.\n" );
+    printf( "Options -h:\tPrint this help.\n");
+
+    printf( "-D:\t-D MACRO[=VALUE], define a macro, "
+        "for example '-DDEBUG -DABC=1', this option can be"
+        "specified repeatedly\n");
+
+    printf( "-I:\tSpecify a directory to search for st files"
+        " this option can be specified repeatedly\n");
+
+    printf( "\t-t:\tPrint trace messages.\n" );
+}
+
 int main(int argc, char* argv[])
 {
     int ret = 0;
     std::string strFile;
     if( argc < 1 )
     {
-        Usage();
+        Usage( argv[0] );
         return 1;
     }
 
@@ -190,24 +202,24 @@ int main(int argc, char* argv[])
     };
 
     bool bQuit = false;
-    bool bError = false;
-    bool bUninit = false;
 
+    ret = CoInitialize( COINIT_NORPC );
+    if( ret )
+        return ret;
+
+    CStParseContext oCtx;
     do{
-        ret = CoInitialize( COINIT_NORPC );
-        if( ERROR( ret ) )
-            break;
-        bUninit = true;
 
         FactoryPtr pFactory = InitClassFactory();
         ret = CoAddClassFactory( pFactory );
         if( ERROR( ret ) )
             break;
 
+        // Set up the parse context with a symbol table
         while( true ) 
         {
             int opt = getopt_long( argc, argv,
-                "ht",
+                "D:I:ht",
                 long_options, &option_index );
 
             if( opt == -1 )
@@ -222,61 +234,75 @@ int main(int argc, char* argv[])
                     g_bTrace = true;
                     break;
                 }
+            case 'I':
+                {
+                    if( !IsValidDir( optarg ) )
+                    {
+                        bQuit = true;
+                        ret = -EINVAL;
+                        break;
+                    }
+                    (*oCtx.m_pvecIncludePaths)().push_back(
+                        std::string( optarg ) );
+                    break;
+                }
+            case 'D':
+                {
+                    oCtx.m_oMacros.ParseAndRegisterMacro(
+                        std::string(optarg) );
+                    break;
+                }
             case 'h' :
                 {
-                    Usage();
+                    Usage( argv[0] );
                     bQuit = true;
                     break;
                 }
             default:
                 bQuit = true;
-                bError = true;
                 break;
             }
             if( bQuit )
-            {
-                if( bError )
-                    return 1;
-                return 0;
-            }
+                break;
         }
+
+        if( bQuit )
+            break;
 
         if( argv[ optind ] == nullptr )
         {
             printf( "Missing file to compile\n" );
-            Usage();
+            Usage( argv[0] );
             ret = -ENOENT;
             break;
         }
 
-        if( argv[ optind + 1 ] != nullptr )
+        while( optind < argc )
         {
-            printf( "too many arguments\n" );
-            Usage();
-            ret = -EINVAL;
-            break;
-        }
+            strFile = argv[ optind++ ];
 
-        strFile = argv[ optind ];
+            if( strFile.size() > REG_MAX_PATH )
+            {
+                printf( "File name too long\n" );
+                ret = -ENAMETOOLONG;
+                break;
+            }
 
-        if( strFile.size() > REG_MAX_PATH )
-        {
-            printf( "File name too long\n" );
-            ret = -ENAMETOOLONG;
-            break;
-        }
-
-        char* pszFile = realpath(
-            strFile.c_str(), nullptr );
-        if( pszFile == nullptr )
-        {
-            ret = -errno;
-            break;
+            char* pszFile = realpath(
+                strFile.c_str(), nullptr );
+            if( pszFile == nullptr )
+            {
+                ret = -errno;
+                break;
+            }
+            ( *oCtx.m_pvecSrcFiles )().push_back(
+                std::string( pszFile ) );
         }
 
     }while( 0 );
+        
     do{
-        if( ERROR( ret ) )
+        if( bQuit || ERROR( ret ) )
             break;
 
         std::ifstream stream(strFile);
@@ -287,21 +313,47 @@ int main(int argc, char* argv[])
             break;
         }
 
-        // Set up the parse context with a symbol table
-        CStParseContext parseContext;
-
         antlr4::ANTLRInputStream input(stream);
         stlexer lexer(&input);
-        antlr4::CommonTokenStream tokens(&lexer);
+
+        auto pIncludeMaager = std::make_unique
+            <CStIncludeManager>();
+
+        auto pPipeline = std::make_unique
+            <CStTokenPipeline>( pIncludeManager );
+
+        auto pMainStream = std::make_unique
+            <CStPragmaFilteringTokenStream>( pPipeline.get() );
+
+        // Set up the root token source reference so
+        // exception loggers are happy
+        pPipeline->m_pRootTokenSource = &lexer;
+
+        pPipeline->InjectIncludeStream(
+            strFile, nullptr);
+
+        CStParser parser(pMainStream.get());
+
 
         // Use the extended parser with predicates
         CStParser parser(&tokens);
-        parser.SetParseContext(&parseContext);
+        parser.SetParseContext(&oCtx);
 
         // Create and attach the listener
-        CStParseListener listener(&parseContext);
+        CStParseListener listener(&oCtx);
         listener.SetTokenStream(&tokens);
         parser.addParseListener(&listener);
+
+        // Create a shared pointer holding your
+        // custom strategy instance
+        std::shared_ptr< CPragmaRecoveryStrategy >
+            pStrategy = std::make_shared
+                < CPragmaRecoveryStrategy >(
+                stlexer::PRAGMA,
+                &oCtx );
+
+        // Hot-swap the parser's error handler pipeline
+        parser.setErrorHandler( pStrategy );
 
         std::cout << "Parsing " 
             << strFile << "..." << std::endl;
@@ -315,7 +367,8 @@ int main(int argc, char* argv[])
 
         (void)tree; // suppress unused variable warning
 
-        if (parser.getNumberOfSyntaxErrors() > 0) {
+        if( parser.getNumberOfSyntaxErrors() > 0 )
+        {
             std::cerr << "Parse failed with "
                 << parser.getNumberOfSyntaxErrors()
                 << " errors" << std::endl;
@@ -324,14 +377,16 @@ int main(int argc, char* argv[])
 
         std::cout << "Parse successful!" << std::endl;
 
-        // After parsing, check if there are any deferred type references
-        // that need semantic resolution
-        std::cout << "\n=== Parse Summary ===" << std::endl;
+        // After parsing, check if there are any
+        // deferred type references that need semantic
+        // resolution
+        std::cout << "\n=== Parse Summary ==="
+            << std::endl;
         std::cout << "Pending category after parse: " 
-                  << (int)(parseContext.m_iPendingCategory)
-                  << std::endl;
+            << (int)(oCtx.m_iPendingCategory)
+            << std::endl;
+
     }while( 0 );
-    if( bUninit )
-        CoUninitialize();
+    CoUninitialize();
     return ret;
 }
