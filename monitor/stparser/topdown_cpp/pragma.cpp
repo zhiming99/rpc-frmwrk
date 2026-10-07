@@ -21,6 +21,13 @@
  *
  * =====================================================================================
  */
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <filesystem>
+#include "antlr4-runtime.h"
+#include "stlexer.h"
+#include "stparser.h"
 #include "parse_context.h"
 #include "pragma.h"
 #include "pragma_expr/pragma_exprParser.h"
@@ -163,11 +170,11 @@ std::any CStPragmaEvaluator::visitPrimary_expr(
 std::any CStPragmaEvaluator::visitInclude_directive(
     pragma_exprParser::Include_directiveContext* ctx)
 {
-    if (m_pContext == nullptr ||
+    if( m_pContext == nullptr ||
         ctx->TOK_LSTRING() == nullptr)
         return false;
 
-    // 1. Extract the raw string path literal:
+    // Extract the raw string path literal:
     // 'filename.st'
     std::string strRawPath =
         ctx->TOK_LSTRING()->getText();
@@ -180,29 +187,48 @@ std::any CStPragmaEvaluator::visitInclude_directive(
     std::string strCleanPath =
         strRawPath.substr(1, strRawPath.size() - 2);
 
-    // 2. Resolve the target location through your
+    auto pMainStream = m_pContext->m_pMainStream;
+
+    if( pMainStream == nullptr )
+    {
+        std::cerr << "StParser Error: "
+            << "main stream is empty"
+            << std::endl;
+        return false;
+    }
+    auto pPipeLine = pMainStream->GetPipeLine(); 
+    // Resolve the target location through your
     // active include path structures (Assuming you
     // pass or provide the current compiling file path
     // in m_pContext)
+    auto pIncManager =
+        pPipeLine->GetIncludeManager();
     std::string strTargetFile =
-        m_pContext->m_pIncludeManager->ResolveIncludePath(
-            strCleanPath, m_pContext->m_strActiveFile);
+        pIncManager->ResolveIncludePath(
+            strCleanPath );
 
     if (strTargetFile.empty())
     {
-        std::cerr << "CSt Compiler Error: Unable "
-            "to locate include path matching " 
+        std::cerr << "StParser Error: Unable "
+            << "to locate include path matching " 
             << strCleanPath << std::endl;
         return false;
     }
 
     // Callback logic to signal the core token
     // multiplexer stream to append the asset
-    m_pContext->m_pPipelineEngine->
-        InjectIncludeStream(strTargetFile, iNewFileIdx);
-
+    auto pToken = pMainStream->LT( 1 );
+    pPipeLine->InjectIncludeStream(
+        strTargetFile, pToken,
+        pMainStream->index() );
     return true;
 }
+
+CPragmaRecoveryStrategy::CPragmaRecoveryStrategy(
+    guint32 dwPragmaType,
+    CStParseContext* pCtx ) :
+    super(), m_pContext( pCtx )
+{ m_dwPragmaTokenType = dwPragmaType; }
 
 void CPragmaRecoveryStrategy::recover(
     antlr4::Parser* recognizer,
@@ -234,7 +260,7 @@ void CPragmaRecoveryStrategy::recover(
             ProcessAndPruneWholeBlock(
                 pTokens, nStartIndex );
 
-            beginErrorCondition( recognizer );
+            //beginErrorCondition( recognizer );
             return;
         }
 
@@ -242,18 +268,32 @@ void CPragmaRecoveryStrategy::recover(
         // boundary transitions
         if( strText.rfind( "{endincl ", 0 ) == 0 )
         {
-            if( m_pIncludeMgr != nullptr )
+            size_t nStartIndex = pTokens->index();
+
+            auto pStream =
+                m_pContext->m_pMainStream;
+            auto pPipeline =
+                pStream->GetPipeLine();
+            auto pIncMgr =
+                pPipeline->GetIncludeManager();
+
+            if( pIncMgr != nullptr )
             {
-                gint32 iParentFileIdx =
-                    m_pIncludeMgr->GetParentFileIdx();
+                gint32 iParentIdx =
+                    pIncMgr->GetParentFileIdx();
 
-                // Fetch our extended token
-                // coordinate wrapper properties
-                // if accessible from your stream
-                // setup to verify indexing, or
-                // match via stack context
-
-                m_pIncludeMgr->PopFile();
+                auto& vecMaster =
+                    pPipeline->m_vecMasterTokens;
+                if( vecMaster.size() > nStartIndex )
+                {
+                    auto& oToken =
+                        vecMaster[ nStartIndex ];
+                    if( oToken.m_iFileIdx ==
+                        iParentIdx )
+                    {
+                        pIncMgr->PopFile();
+                    }
+                }
             }
 
             // Advance past the marker token
@@ -271,7 +311,13 @@ void CPragmaRecoveryStrategy::recover(
             // Optional: Handle inline processing
             // steps if needed or skip active
             // markers
-            pTokens->consume();
+            EvaluateInclude( strText );
+            auto pToken = dynamic_cast
+                < antlr4::CommonToken* >( pOffendingToken );
+
+            if( pToken )
+                pToken->setChannel(
+                    antlr4::Token::HIDDEN_CHANNEL );
             return;
         }
     }
@@ -399,7 +445,8 @@ bool CPragmaRecoveryStrategy::EvaluateCondition(
 
     // Use the extended parser with predicates
     pragma_exprParser parser(&tokens);
-    parser.SetParseContext(&oCtx);
+
+    parser.SetParseContext( m_pContext );
 
     // Invoke the root rule of your micro-grammar
     // to build the parse tree.  This triggers the
@@ -415,7 +462,7 @@ bool CPragmaRecoveryStrategy::EvaluateCondition(
         return false;
     }
 
-    CStPragmaEvaluator evaluator(&oCtx);
+    CStPragmaEvaluator evaluator(pCtx);
 
     // Traverse the tree dynamically to compute
     // the final boolean outcome.  The visitor
@@ -442,3 +489,49 @@ bool CPragmaRecoveryStrategy::EvaluateCondition(
     }
     return false;
 }
+
+bool CPragmaRecoveryStrategy::EvaluateInclude(
+    const std::string& strIncText )
+{
+    antlr4::ANTLRInputStream input(strCondText);
+    pragma_exprLexer lexer(&input);
+    antlr4::CommonTokenStream tokens(&lexer);
+
+    // Use the extended parser with predicates
+    pragma_exprParser parser(&tokens);
+
+    parser.SetParseContext( m_pContext );
+
+    // Invoke the root rule of your micro-grammar
+    // to build the parse tree.  This triggers the
+    // LL(*) state machine over the pragma
+    // expression tokens.
+    auto pTree = parser.include_directive();
+
+    if (pTree == nullptr)
+    {
+        // Handle extreme syntax tracking failure
+        // states gracefully
+        return false;
+    }
+
+    std::any anyResult = evaluator.visit(pTree);
+
+    // Extract and return the underlying boolean
+    // value safely.
+    try
+    {
+        bool bOutcome =
+            std::any_cast<bool>(anyResult);
+        return bOutcome;
+    }
+    catch (const std::bad_any_cast& e)
+    {
+        std::cerr << "Error: 'include' "
+            << "directive did not compile. "
+            << "Default to false\n";
+        return false;
+    }
+    return false;
+}
+

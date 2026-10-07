@@ -72,9 +72,7 @@ struct CPragmaRecoveryStrategy :
 
     CPragmaRecoveryStrategy(
         guint32 dwPragmaType,
-        CStParseContext* pCtx ) :
-        super(), m_pContext( pCtx )
-    { m_dwPragmaTokenType = dwPragmaType; }
+        CStParseContext* pCtx );
 
     virtual void recover(
         antlr4::Parser* recognizer,
@@ -86,5 +84,7 @@ struct CPragmaRecoveryStrategy :
 
     bool EvaluateCondition(
         const std::string& strCondText );
+    bool EvaluateInclude(
+        const std::string& strIncText );
 };
 

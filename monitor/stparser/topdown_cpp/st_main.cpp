@@ -316,32 +316,33 @@ int main(int argc, char* argv[])
         antlr4::ANTLRInputStream input(stream);
         stlexer lexer(&input);
 
-        auto pIncludeMaager = std::make_unique
+        auto pIncludeManager = std::make_unique
             <CStIncludeManager>();
 
         auto pPipeline = std::make_unique
-            <CStTokenPipeline>( pIncludeManager );
+            <CStTokenPipeline>( pIncludeManager.get() );
 
         auto pMainStream = std::make_unique
-            <CStPragmaFilteringTokenStream>( pPipeline.get() );
+            <CStPragmaFilteringTokenStream>
+                ( pPipeline.get() );
 
         // Set up the root token source reference so
         // exception loggers are happy
         pPipeline->m_pRootTokenSource = &lexer;
 
         pPipeline->InjectIncludeStream(
-            strFile, nullptr);
+            strFile, nullptr, 0);
 
         CStParser parser(pMainStream.get());
+        oCtx.m_pMainStream = pMainStream.get();
 
 
         // Use the extended parser with predicates
-        CStParser parser(&tokens);
         parser.SetParseContext(&oCtx);
 
         // Create and attach the listener
         CStParseListener listener(&oCtx);
-        listener.SetTokenStream(&tokens);
+        listener.SetTokenStream(oCtx.m_pMainStream);
         parser.addParseListener(&listener);
 
         // Create a shared pointer holding your

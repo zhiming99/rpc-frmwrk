@@ -22,11 +22,145 @@
  * =====================================================================================
  */
 
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <filesystem>
+#include "antlr4-runtime.h"
+#include "stlexer.h"
+#include "stparser.h"
 #include "parse_context.h"
+
+std::string CStIncludeManager::ResolveIncludePath(
+    const std::string& strPath ) const
+{
+    namespace fs = std::filesystem;
+    
+    if( strPath.empty() )
+        return std::string( "" );
+
+    fs::path pathTarget( strPath );
+
+    // Verify absolute paths instantly
+    if( pathTarget.is_absolute() )
+    {
+        if( fs::exists( pathTarget ) )
+            return fs::canonical( 
+                pathTarget ).string();
+        return std::string( "" );
+    }
+
+    // 1. Resolve relative to active file dir
+    if( !m_vecIncludeStack.empty() )
+    {
+        gint32 iActiveIdx = 
+            m_vecIncludeStack.back();
+            
+        if( iActiveIdx >= 0 && 
+            iActiveIdx < static_cast<gint32>(
+                m_vecFileRegistry.size()) )
+        {
+            fs::path pathCurrentFile( 
+                m_vecFileRegistry[iActiveIdx]
+                    .m_strAbsolutePath );
+                    
+            fs::path pathParentDir = 
+                pathCurrentFile.parent_path();
+                
+            fs::path pathCombined = 
+                pathParentDir / pathTarget;
+
+            if( fs::exists( pathCombined ) )
+            {
+                return fs::canonical( 
+                    pathCombined ).string();
+            }
+        }
+    }
+
+    // 2. Iterate registered -I flags
+    for( const auto& strSearchDir : m_vecSearchPaths )
+    {
+        if( strSearchDir.empty() )
+            continue;
+
+        fs::path pathBase( strSearchDir );
+        fs::path pathCombined = 
+            pathBase / pathTarget;
+
+        if( fs::exists( pathCombined ) )
+            return fs::canonical( 
+                pathCombined ).string();
+    }
+
+    // 3. Check current execution working dir
+    if( fs::exists( pathTarget ) )
+    {
+        return fs::canonical( 
+            pathTarget ).string();
+    }
+
+    return std::string( "" );
+}
+
+bool CStIncludeManager::IsCyclicInclude(
+    const std::string& strAbsolutePath,
+    int32_t& outExistingIdx)
+{
+    namespace fs = std::filesystem;
+    if (!fs::exists(strAbsolutePath))
+        return false;
+
+    std::string strCanonical =
+        fs::canonical(strAbsolutePath).string();
+
+    // Find if it already exists in the registry
+    int32_t iFoundIdx = -1;
+    for (const auto& fileInfo : m_vecFileRegistry)
+    {
+        if (fileInfo.m_strAbsolutePath == strCanonical)
+        {
+            iFoundIdx = fileInfo.m_iFileIdx;
+            break;
+        }
+    }
+
+    if (iFoundIdx != -1)
+    {
+        outExistingIdx = iFoundIdx;
+        // If the registered index is currently
+        // sitting inside the active stack, it's a
+        // loop!
+        auto it = std::find(
+            m_vecIncludeStack.begin(),
+            m_vecIncludeStack.end(),
+            iFoundIdx);
+        return (it != m_vecIncludeStack.end());
+    }
+
+    outExistingIdx = -1;
+    return false;
+}
+
+int32_t CStIncludeManager::RegisterNewFile(
+    const std::string& strAbsolutePath)
+{
+    namespace fs = std::filesystem;
+    CStFileInfo info;
+    info.m_strAbsolutePath =
+        fs::canonical(strAbsolutePath).string();
+
+    info.m_iFileIdx =
+        static_cast<int32_t>(m_vecFileRegistry.size());
+
+    m_vecFileRegistry.push_back(info);
+    return info.m_iFileIdx;
+}
 
 bool CStTokenPipeline::InjectIncludeStream(
     const std::string& strFilePath,
-    antlr4::Token* pOriginalIncludeToken )
+    antlr4::Token* pOriginalIncludeToken,
+    size_t nInsertIndex )
 {
     gint32 iFileIdx = -1;
 
@@ -38,43 +172,6 @@ bool CStTokenPipeline::InjectIncludeStream(
             << "include detected on file: " 
             << strFilePath << "\n";
         return false;
-    }
-
-    size_t nInsertIndex = 0;
-    if( pOriginalIncludeToken != nullptr )
-    {
-        // Search our adapter vector to find
-        // exactly where the include pragma token
-        // sits right now
-        auto it = std::find_if(
-            m_vecMasterTokens.begin(),
-            m_vecMasterTokens.end(),
-            [pOriginalIncludeToken](const CStToken& wrappedTok) {
-                return wrappedTok.m_pOriginalToken ==
-                    pOriginalIncludeToken;
-            });
-
-        if( it != m_vecMasterTokens.end() )
-        {
-            // Calculate the exact distance offset
-            // to locate our master splice
-            // position
-            nInsertIndex = std::distance(
-                m_vecMasterTokens.begin(), it);
-        }
-        else
-        {
-            // Fallback: If not found, append
-            // safely at the current master tail
-            nInsertIndex = m_vecMasterTokens.size();
-        }
-    }
-    else
-    {
-        // If the token is null, we are processing
-        // the primary root file initialization
-        // pass
-        nInsertIndex = m_vecMasterTokens.size();
     }
 
     if (iFileIdx == -1)
@@ -96,7 +193,7 @@ bool CStTokenPipeline::InjectIncludeStream(
     }
 
     antlr4::ANTLRInputStream input(fileStream);
-    CStLexer lexer(&input);
+    stlexer lexer(&input);
     antlr4::CommonTokenStream tokenStream(&lexer);
     tokenStream.fill();
 
@@ -142,7 +239,9 @@ bool CStTokenPipeline::InjectIncludeStream(
         endMarkerTok.m_pOriginalToken =
             pOriginalIncludeToken;
 
-        endMarkerTok.m_iFileIdx = iFileIdx;
+        endMarkerTok.m_iFileIdx =
+            m_pIncludeMgr->GetParentFileIdx();
+
         endMarkerTok.m_stOrigLine =
             pOriginalIncludeToken->getLine();
 
@@ -172,43 +271,45 @@ bool CStTokenPipeline::InjectIncludeStream(
     return true;
 }
 
+// --- ANTLR4 Core Stream Interface ---
 
-antlr4::Token* CStPragmaFilteringTokenStream::LT( ssize_t k)
+antlr4::Token*
+CStPragmaFilteringTokenStream::LT( ssize_t k)
 {
-    if( m_pPipeline == nullptr || k == 0 )
+    if( m_pPipeline == nullptr || 
+        k == 0 ) 
+    {
         return nullptr;
+    }
 
     ssize_t sstTargetIdx = 0;
     if( k > 0 )
     {
         sstTargetIdx = static_cast<ssize_t>
-            ( m_stCurrentIndex ) + k - 1;
+            ( m_stCurrentIndex) + k - 1;
     }
     else
     {
         sstTargetIdx = static_cast<ssize_t>
-            ( m_stCurrentIndex ) + k;
+            ( m_stCurrentIndex) + k;
     }
 
-    // Safety fallback checks against master
-    // vector boundary limits
-    if( sstTargetIdx < 0 ||
-        sstTargetIdx >= static_cast<ssize_t>(
-            m_pPipeline->m_vecMasterTokens.size() ) )
+    if( sstTargetIdx < 0 || 
+        sstTargetIdx >= static_cast<ssize_t>
+        ( m_pPipeline->m_vecMasterTokens.size() ) )
     {
-        // Fall back to returning standard global
-        // pipeline EOF tokens context
-        return m_pPipeline->m_pEofToken.get();
+        return m_pPipeline->m_pEofToken.get(); 
     }
 
-    auto& a = m_pPipeline->m_vecMasterTokens;
-    return a[sstTargetIdx].m_pOriginalToken;
+    auto& vecMaster = m_pPipeline->m_vecMasterTokens;
+    return vecMaster[sstTargetIdx].m_pOriginalToken;
 }
 
-size_t CStPragmaFilteringTokenStream::LA( ssize_t k )
+size_t CStPragmaFilteringTokenStream::LA(
+    ssize_t k)
 {
     antlr4::Token* pTok = LT(k);
-    if (pTok != nullptr)
+    if( pTok != nullptr )
     {
         return pTok->getType();
     }
@@ -217,30 +318,32 @@ size_t CStPragmaFilteringTokenStream::LA( ssize_t k )
 
 void CStPragmaFilteringTokenStream::consume()
 {
-    if( m_pPipeline != nullptr &&
-        m_stCurrentIndex <
-            m_pPipeline->m_vecMasterTokens.size() )
+    if( m_pPipeline != nullptr && 
+        m_stCurrentIndex < m_pPipeline->
+            m_vecMasterTokens.size() )
     {
         m_stCurrentIndex++;
     }
 }
 
-antlr4::Token*
-CStPragmaFilteringTokenStream::get( size_t index )
+antlr4::Token* CStPragmaFilteringTokenStream::get(
+    size_t index) const
 {
-    if( m_pPipeline == nullptr ||
-        index >= m_pPipeline->m_vecMasterTokens.size() )
+    if( m_pPipeline == nullptr || 
+        index >= m_pPipeline->
+            m_vecMasterTokens.size() )
     {
-        return m_pPipeline->m_pEofToken.get();
+        return m_pPipeline->
+            m_pEofToken.get();
     }
-
-    auto& a = m_pPipeline->m_vecMasterTokens;
-    return a[index].m_pOriginalToken;
+    return m_pPipeline->
+        m_vecMasterTokens[index]
+            .m_pOriginalToken;
 }
 
 size_t CStPragmaFilteringTokenStream::size()
 {
-    return m_pPipeline != nullptr ?
+    return m_pPipeline != nullptr ? 
         m_pPipeline->m_vecMasterTokens.size() : 0;
 }
 
@@ -252,30 +355,31 @@ size_t CStPragmaFilteringTokenStream::index()
 void CStPragmaFilteringTokenStream::seek(
     size_t index)
 {
-    // Instantly snaps index cursors to historical
-    // parser checkpoints / rewinds
     m_stCurrentIndex = index;
 }
 
-antlr4::TokenSource*
-CStPragmaFilteringTokenStream::getTokenSource()
+antlr4::TokenSource* 
+CStPragmaFilteringTokenStream::getTokenSource() const
 {
     if( m_pPipeline != nullptr )
-    {
         return m_pPipeline->m_pRootTokenSource;
-    }
     return nullptr;
 }
 
-std::string
-CStPragmaFilteringTokenStream::getText()
+// --- Range Text Extractions ---
+
+std::string CStPragmaFilteringTokenStream::getText()
 {
-    if( m_pPipeline == nullptr ||
-        m_pPipeline->m_vecMasterTokens.empty() )
+    if( m_pPipeline == nullptr || 
+        m_pPipeline-> m_vecMasterTokens.empty() ) 
         return "";
-    auto& a = m_pPipeline->m_vecMasterTokens;
-    return getText( a.front().m_pOriginalToken,
-                   a.back().m_pOriginalToken);
+
+    auto& vecMaster = 
+        m_pPipeline->m_vecMasterTokens;
+
+    return getText(
+        vecMaster.front().m_pOriginalToken, 
+        vecMaster.back().m_pOriginalToken);
 }
 
 std::string CStPragmaFilteringTokenStream::getText(
@@ -283,73 +387,134 @@ std::string CStPragmaFilteringTokenStream::getText(
 {
     if( ctx == nullptr )
         return "";
-    return getText(ctx->start, ctx->stop);
+
+    auto* pParserCtx = dynamic_cast<
+        antlr4::ParserRuleContext*>( ctx );
+        
+    if( pParserCtx == nullptr )
+        return "";
+
+    return getText( 
+        pParserCtx->start, pParserCtx->stop );
 }
 
 std::string CStPragmaFilteringTokenStream::getText(
     const antlr4::misc::Interval& interval)
 {
-    if( m_pPipeline == nullptr ||
-        m_pPipeline->m_vecMasterTokens.empty())
-       return "";
-    auto& vecMaster = m_pPipeline->m_vecMasterTokens;
-    size_t stStart = static_cast<size_t>(interval.a);
-    size_t stStop  = static_cast<size_t>(interval.b);
-
-    if( stStart >= vecMaster.size() )
+    if( m_pPipeline == nullptr || 
+        m_pPipeline->
+            m_vecMasterTokens.empty() ) 
+    {
         return "";
-    if( stStop >= vecMaster.size() )
-        stStop = vecMaster.size() - 1;
+    }
+    size_t stStart = 
+        static_cast<size_t>(interval.a);
+    size_t stStop  = 
+        static_cast<size_t>(interval.b);
+    
+    auto& vecMaster = 
+        m_pPipeline->m_vecMasterTokens;
+    if( stStart >= vecMaster.size() ) 
+        return "";
 
-    return getText(vecMaster[stStart].m_pOriginalToken,
+    if( stStop >= vecMaster.size() ) 
+    {
+        stStop = vecMaster.size() - 1;
+    }
+    
+    return getText(
+        vecMaster[stStart].m_pOriginalToken, 
         vecMaster[stStop].m_pOriginalToken);
 }
 
 std::string CStPragmaFilteringTokenStream::getText(
-    antlr4::Token* start,
+    antlr4::Token* start, 
     antlr4::Token* stop)
 {
-    if( start == nullptr ||
-        stop == nullptr ||
+    if( start == nullptr || 
+        stop == nullptr || 
         m_pPipeline == nullptr )
         return "";
 
-    size_t stStartIdx = start->getTokenIndex();
-    size_t stStopIdx  = stop->getTokenIndex();
+    // Safe direct pointer distance check 
+    // to bypass file token index shifts
+    auto& vecMaster = 
+        m_pPipeline->m_vecMasterTokens;
+        
+    auto itStart = std::find_if(
+        vecMaster.begin(), vecMaster.end(),
+        [start](const CStToken& wrapped) {
+            return wrapped.m_pOriginalToken 
+                   == start;
+        });
+        
+    auto itStop = std::find_if(
+        vecMaster.begin(), vecMaster.end(),
+        [stop](const CStToken& wrapped) {
+            return wrapped.m_pOriginalToken == stop;
+        });
 
-    // High-Precision Bridge: If capturing our
-    // custom text-swapped virtual {endincl}
-    // pragma, intercept and return our rewritten
-    // string payload instantly instead of
-    // original token buffer text.
-    auto& vecMaster = m_pPipeline->m_vecMasterTokens;
-    if (stStartIdx == stStopIdx &&
-        stStartIdx < vecMaster.size())
-    {
-        const CStToken& oCStTok = vecMaster[stStartIdx];
-        if( oCStTok.m_eVirtualType ==
-            ECStVirtualTokenType::EndIncludeMarker )
-        {
-            // Returns "{endincl 'path/to/file.st'}"
-            return oCStTok.m_strMarkerPath;
-        }
-    }
+    if( itStart == vecMaster.end() || 
+        itStop == vecMaster.end() || 
+        itStart > itStop )
+        return "";
 
     std::string strResult = "";
-    for( size_t i = stStartIdx;
-        i <= stStopIdx && i < vecMaster.size(); ++i )
+    for( auto it = itStart; it <= itStop; ++it )
     {
-        const CStToken& oCStTok = vecMaster[i];
-        if( oCStTok.m_eVirtualType ==
-            ECStVirtualTokenType::EndIncludeMarker )
+        if( it->m_eVirtualType == 
+            ECStVirtualTokenType:: EndIncludeMarker )
         {
-            strResult += oCStTok.m_strMarkerPath;
+            strResult += it->m_strMarkerPath;
         }
-        else if (oCStTok.m_pOriginalToken != nullptr)
+        else if( it->m_pOriginalToken != nullptr )
         {
             strResult +=
-                oCStTok.m_pOriginalToken->getText();
+                it->m_pOriginalToken->getText();
         }
     }
     return strResult;
 }
+
+// Establishes a speculative lookahead 
+// checkpoint and returns a unique marker ID
+ssize_t CStPragmaFilteringTokenStream::mark()
+{
+    // ANTLR4 expects a unique index tracking 
+    // marker. Returning the current absolute 
+    // stream index acts as a perfect marker ID.
+    return static_cast<ssize_t>(
+        m_stCurrentIndex );
+}
+
+// Releases a previously allocated checkpoint
+void CStPragmaFilteringTokenStream::
+    release( ssize_t marker )
+{
+    // Because our vector buffer is stable 
+    // and managed inside m_vecMasterTokens, 
+    // no physical allocation occurs during 
+    // mark(). This can be a safe no-op block.
+    (void)marker; 
+}
+
+// Returns the active source stream identifier 
+// text for diagnostic compilers log formatters
+std::string CStPragmaFilteringTokenStream::
+    getSourceName() const
+{
+    std::string strDefault(
+        "CStVirtualEngineStream" );
+
+    if( m_pPipeline == nullptr )
+        return strDefault;
+
+    auto& ts = 
+        m_pPipeline->m_pRootTokenSource;
+
+    if( ts != nullptr )
+        return ts->getSourceName();
+    
+    return strDefault;
+}
+

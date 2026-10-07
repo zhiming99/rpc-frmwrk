@@ -136,9 +136,8 @@ struct CStFileInfo
     int32_t     m_iFileIdx = -1;
 };
 
-struct CStIncludeManager :
+struct CStIncludeManager
 {
-
     std::vector<CStFileInfo> m_vecFileRegistry;
     std::vector<std::string> m_vecSearchPaths;
 
@@ -151,57 +150,10 @@ struct CStIncludeManager :
     // Check for cyclical references before opening a file
     bool IsCyclicInclude(
         const std::string& strAbsolutePath,
-        int32_t& outExistingIdx)
-    {
-        namespace fs = std::filesystem;
-        if (!fs::exists(strAbsolutePath))
-            return false;
-
-        std::string strCanonical =
-            fs::canonical(strAbsolutePath).string();
-
-        // Find if it already exists in the registry
-        int32_t iFoundIdx = -1;
-        for (const auto& fileInfo : m_vecFileRegistry)
-        {
-            if (fileInfo.m_strAbsolutePath == strCanonical)
-            {
-                iFoundIdx = fileInfo.m_iFileIdx;
-                break;
-            }
-        }
-
-        if (iFoundIdx != -1)
-        {
-            outExistingIdx = iFoundIdx;
-            // If the registered index is currently
-            // sitting inside the active stack, it's a
-            // loop!
-            auto it = std::find(
-                m_vecIncludeStack.begin(),
-                m_vecIncludeStack.end(),
-                iFoundIdx);
-            return (it != m_vecIncludeStack.end());
-        }
-
-        outExistingIdx = -1;
-        return false;
-    }
+        int32_t& outExistingIdx );
 
     int32_t RegisterNewFile(
-        const std::string& strAbsolutePath)
-    {
-        namespace fs = std::filesystem;
-        CStFileInfo info;
-        info.m_strAbsolutePath =
-            fs::canonical(strAbsolutePath).string();
-
-        info.m_iFileIdx =
-            static_cast<int32_t>(m_vecFileRegistry.size());
-
-        m_vecFileRegistry.push_back(info);
-        return info.m_iFileIdx;
-    }
+        const std::string& strAbsolutePath );
 
     // Push file onto the active compilation stack
     inline void PushFile(int32_t iFileIdx)
@@ -221,6 +173,9 @@ struct CStIncludeManager :
         }
         return -1;
     }
+
+    std::string ResolveIncludePath(
+        const std::string& strPath ) const;
 };
 
 // Token classification types for tracking your structural markers
@@ -230,11 +185,8 @@ enum class ECStVirtualTokenType
     EndIncludeMarker
 };
 
-struct CStToken :
-    public CObjBase
+struct CStToken
 {
-    typedef CObjBase super;
-
     // Pointer to the raw underlying ANTLR token
     // generated during the lexer pass
     antlr4::Token*       m_pOriginalToken = nullptr;
@@ -265,7 +217,7 @@ struct CStToken :
     // (e.g., "{endincl 'path/to/file.st'}")
     std::string          m_strMarkerPath;
 
-    CStToken() : super()
+    CStToken()
     {}
 };
 
@@ -274,14 +226,34 @@ struct CStTokenPipeline
     CStIncludeManager*    m_pIncludeMgr = nullptr;
     std::vector<CStToken> m_vecMasterTokens;
     size_t                m_stGlobalLineCounter = 1;
+    antlr4::TokenSource*  m_pRootTokenSource = nullptr;
+    std::unique_ptr<antlr4::Token> m_pEofToken;
 
     CStTokenPipeline(CStIncludeManager* pMgr) : 
         m_pIncludeMgr(pMgr)
-    {}
+    {
+        m_vecMasterTokens.reserve( 500000 );
+        auto* pFactory = antlr4::
+            CommonTokenFactory::DEFAULT.get();
+
+        m_pEofToken = pFactory->create(
+            {nullptr, nullptr},
+            antlr4::Token::EOF,
+            "",
+            antlr4::Token::DEFAULT_CHANNEL,
+            0, 0, 0, 0 );
+    }
 
     bool InjectIncludeStream(
         const std::string& strFilePath,
-        antlr4::Token* pOriginalIncludeToken );
+        antlr4::Token* pOriginalIncludeToken,
+        size_t nInsertIndex );
+
+    inline const CStIncludeManager* GetIncludeManager() const
+    { return m_pIncludeMgr; }
+
+    inline CStIncludeManager* GetIncludeManager()
+    { return m_pIncludeMgr; }
 };
 
 class CStPragmaFilteringTokenStream :
@@ -306,15 +278,26 @@ public:
     inline const CStToken* GetCustomToken(
         size_t stIndex) const
     {
-        if (m_pPipeline != nullptr &&
-            stIndex < m_pPipeline->m_vecMasterTokens.size() )
-        {
-            return &(m_pPipeline->m_vecMasterTokens[stIndex]);
-        }
+        if (m_pPipeline == nullptr )
+            return nullptr;
+
+        auto& vecMaster =
+            m_pPipeline->m_vecMasterTokens;
+
+        if( stIndex < vecMaster.size() )
+            return &(vecMaster[stIndex]);
+
         return nullptr;
     }
 
-    // --- Overriding ANTLR4's Immutable Stream Navigation Interface ---
+    inline const CStTokenPipeline* GetPipeLine() const
+    { return m_pPipeline; }
+
+    inline CStTokenPipeline* GetPipeLine()
+    { return m_pPipeline; }
+
+    // Overriding ANTLR4's Immutable Stream
+    // Navigation Interface
 
     virtual antlr4::Token* LT( ssize_t k) override;
 
@@ -322,18 +305,19 @@ public:
 
     virtual void consume() override;
 
-    virtual antlr4::Token* get( size_t index) override;
+    virtual antlr4::Token* get( size_t index) const override;
 
-    virtual size_t size() override
+    virtual size_t size() override;
 
     virtual size_t index() override;
 
     virtual void seek( size_t index) override;
 
     virtual antlr4::TokenSource*
-        getTokenSource() override
+        getTokenSource() const override;
 
-    // --- High-Precision Continuous Range Text Extraction Layout Overrides ---
+    // High-Precision Continuous Range Text
+    // Extraction Layout Overrides
 
     virtual std::string getText() override;
 
@@ -346,10 +330,17 @@ public:
     virtual std::string getText(
         antlr4::Token* start,
         antlr4::Token* stop) override;
+
+    virtual ssize_t mark() override;
+
+    virtual void release( ssize_t marker ) override;
+
+    virtual std::string getSourceName() const override;
 };
 
 
-// Parse context shared between listener and parser predicates
+// Parse context shared between listener and parser
+// predicates
 struct CStParseContext {
 
     CStParseContext()
@@ -364,7 +355,8 @@ struct CStParseContext {
     CStCmdlineMacros        m_oMacros;
     rpcf::StrVecPtr         m_pvecIncludePaths;
     rpcf::StrVecPtr         m_pvecSrcFiles;
-
+    CStPragmaFilteringTokenStream*
+        m_pMainStream = nullptr;
 
     // Pending type category - set by listener, read by
     // predicates
@@ -381,16 +373,18 @@ struct CStParseContext {
     EnumTypeCategory ResolveType(
         const std::string& strName) const
     {
-        if (!m_pSymTab) return
-            EnumTypeCategory::Invalid;
+        if (!m_pSymTab)
+            return EnumTypeCategory::Invalid;
         return m_pSymTab->lookup(strName);
     }
 
     // Check if a type is known in the symbol table
-    bool IsTypeKnown(const std::string& strName) const
+    bool IsTypeKnown(
+        const std::string& strName) const
     {
-        if (!m_pSymTab) return false;
-        return m_pSymTab->isKnown(strName);
+        if (!m_pSymTab)
+            return false;
+        return m_pSymTab->isKnown( strName );
     }
 
     auto GetMacros() const
