@@ -209,7 +209,6 @@ int main(int argc, char* argv[])
 
     CStParseContext oCtx;
     do{
-
         FactoryPtr pFactory = InitClassFactory();
         ret = CoAddClassFactory( pFactory );
         if( ERROR( ret ) )
@@ -236,10 +235,11 @@ int main(int argc, char* argv[])
                 }
             case 'I':
                 {
-                    if( !IsValidDir( optarg ) )
+                    ret = IsValidDir( optarg );
+                    if( ERROR( ret ) )
                     {
                         bQuit = true;
-                        ret = -EINVAL;
+                        perror( optarg );
                         break;
                     }
                     (*oCtx.m_pvecIncludePaths)().push_back(
@@ -293,10 +293,32 @@ int main(int argc, char* argv[])
             if( pszFile == nullptr )
             {
                 ret = -errno;
-                break;
+                for( auto elem :
+                    (*oCtx.m_pvecIncludePaths)() )
+                {
+                    stdstr strPath =
+                        elem + "/" + strFile;
+                    pszFile = realpath(
+                        strPath.c_str(), nullptr );
+                    if( pszFile )
+                    {
+                        ( *oCtx.m_pvecSrcFiles )().push_back(
+                            std::string( pszFile ) );
+                        ret = 0;
+                        break;
+                    }
+                }
+                if( ERROR( ret ) )
+                {
+                    bQuit = true;
+                    break;
+                }
             }
-            ( *oCtx.m_pvecSrcFiles )().push_back(
-                std::string( pszFile ) );
+            else
+            {
+                ( *oCtx.m_pvecSrcFiles )().push_back(
+                    std::string( pszFile ) );
+            }
         }
 
     }while( 0 );
@@ -305,6 +327,7 @@ int main(int argc, char* argv[])
         if( bQuit || ERROR( ret ) )
             break;
 
+        strFile = ( *oCtx.m_pvecSrcFiles )()[0];
         std::ifstream stream(strFile);
         if (!stream.is_open()) {
             std::cerr << "Cannot open file: "
@@ -350,7 +373,7 @@ int main(int argc, char* argv[])
         std::shared_ptr< CPragmaRecoveryStrategy >
             pStrategy = std::make_shared
                 < CPragmaRecoveryStrategy >(
-                stlexer::PRAGMA,
+                stlexer::TOK_PRAGMA,
                 &oCtx );
 
         // Hot-swap the parser's error handler pipeline
@@ -373,7 +396,8 @@ int main(int argc, char* argv[])
             std::cerr << "Parse failed with "
                 << parser.getNumberOfSyntaxErrors()
                 << " errors" << std::endl;
-            return ERROR_FAIL;
+            ret = ERROR_FAIL;
+            goto cleanup;
         }
 
         std::cout << "Parse successful!" << std::endl;
@@ -386,8 +410,13 @@ int main(int argc, char* argv[])
         std::cout << "Pending category after parse: " 
             << (int)(oCtx.m_iPendingCategory)
             << std::endl;
+cleanup:
+        pPipeline->m_pRootTokenSource = nullptr;
+        oCtx.m_pMainStream = nullptr;
+        listener.SetTokenStream( nullptr );
 
     }while( 0 );
+
     CoUninitialize();
     return ret;
 }

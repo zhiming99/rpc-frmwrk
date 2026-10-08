@@ -27,7 +27,6 @@ lexer grammar stlexer;
 options {
     caseInsensitive = true;
 }
-channels { PRAGMA_CHANNEL }
 
 // Keywords - case insensitive
 // Type keywords
@@ -195,7 +194,7 @@ fragment LETTER     : [A-Z];
 
 // Integer literals with underscores
 fragment UNSIGNED_INT : DIGIT+ ('_'? DIGIT+)*;
-fragment SIGNED_INT  : ('+' | '-')? UNSIGNED_INT;
+fragment SIGNED_INT  : ('-')? UNSIGNED_INT;
 fragment BIT : '0' | '1';
 
 // string literal
@@ -322,17 +321,11 @@ TOK_UNDERSCORE     : '_';
 TOK_QASSIGN        : '?=' ;
 
 // Comments - match entire comment including delimiters
-TOK_BLOCK_COMMENT_ST : '(*' .*? '*)' -> channel(HIDDEN);
-TOK_BLOCK_COMMENT_C  : '/*' .*? '*/' -> channel(HIDDEN);
-TOK_LINE_COMMENT     : '//' ~[\r\n]* -> channel(HIDDEN);
+TOK_BLOCK_COMMENT_ST : '(*' .*? '*)' -> channel(1);
+TOK_BLOCK_COMMENT_C  : '/*' .*? '*/' -> channel(1);
+TOK_LINE_COMMENT     : '//' ~[\r\n]* -> channel(1);
 
-PRAGMA : '{' ~[}]* '}' -> channel(PRAGMA_CHANNEL) ;
-
-// Whitespace - ignored
-TOK_WHITESPACE : [ \t\r\n]+ -> channel(HIDDEN);
-
-// Error handling for unknown characters
-TOK_UNKNOWN_CHAR : . -> channel(HIDDEN);
+TOK_PRAGMA : '{' ~[}]* '}';
 
 // time_literal
 fragment TIME_TYPE_NAME: 'TIME' | 'LTIME';
@@ -360,4 +353,10 @@ fragment MONTH: UNSIGNED_INT;
 fragment DAY: UNSIGNED_INT;
 TOK_DATE : ( DATE_TYPE_NAME | 'D' | 'LD' ) '#' DATE_LITERAL;
 TOK_DATE_TIME: DT_TYPE_NAME '#' DATE_LITERAL '-' DAYTIME;
+
+// Whitespace - ignored
+WS : [ \t\r\n]+ -> channel(1);
+
+// Error handling for unknown characters
+TOK_UNKNOWN_CHAR : . -> channel(1);
 

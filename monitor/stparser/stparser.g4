@@ -67,16 +67,14 @@ options { tokenVocab=stlexer; }
 
 start_point
     : decls
-    | conditional_pragma
-    | case_selector_check
-    ;
+    ; 
 
 // ============================================================
 // Declarations
 // ============================================================
 
 decls
-    : ( decl_set )*
+    : decl_set+
     ;
 
 decl_set
@@ -84,6 +82,7 @@ decl_set
     | config_decl
     | access_decl
     | using_directive
+    | TOK_PRAGMA
     ;
 
 // ============================================================
@@ -389,7 +388,7 @@ power_expr
     ;
 
 unary_expr
-    : ( TOK_NOT | TOK_MINUS | TOK_CARET )? primary_expr
+    : ( TOK_NOT | TOK_ADD | TOK_MINUS | TOK_CARET )? primary_expr
     ;
 
 primary_expr
@@ -906,7 +905,8 @@ func_var_decls_set
     ;
 
 func_body
-    : stmt_list
+    : /* empty */
+    | stmt_list
 //  | ladder_diagram
 //  | fb_diagram
 //  | other_languages
@@ -1367,34 +1367,6 @@ initial_value
     | array_init
     | struct_init
     | ref_value
-    ;
-
-// ============================================================
-// Pragma
-// ============================================================
-
-pragma_statement
-    : TOK_LBRACE TOK_REGION string_literal TOK_RBRACE
-    | TOK_LBRACE TOK_END_REGION TOK_RBRACE
-    | TOK_LBRACE TOK_IF expression TOK_RBRACE
-    | TOK_LBRACE TOK_ELSE TOK_RBRACE
-    | TOK_LBRACE TOK_END_IF TOK_RBRACE
-    | TOK_LBRACE TOK_INFO string_literal TOK_RBRACE
-    | TOK_LBRACE TOK_INCLUDE string_literal TOK_RBRACE
-    | TOK_LBRACE TOK_ATTRIBUTE string_literal attr_values? TOK_RBRACE
-    | TOK_LBRACE ( TOK_REF | TOK_EXTERNAL ) TOK_RBRACE
-    ;
-
-attr_values
-    : TOK_ASSIGN string_list
-    ;
-
-conditional_pragma
-    : TOK_IF expression TOK_RBRACE
-    ;
-
-case_selector_check
-    : expression
     ;
 
 // ============================================================

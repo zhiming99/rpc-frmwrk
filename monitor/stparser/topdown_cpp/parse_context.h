@@ -229,6 +229,20 @@ struct CStTokenPipeline
     antlr4::TokenSource*  m_pRootTokenSource = nullptr;
     std::unique_ptr<antlr4::Token> m_pEofToken;
 
+    using TokStream =
+        std::unique_ptr< antlr4::CommonTokenStream>;
+    std::vector<TokStream> m_vecIncludeStreams;
+
+    using InStream =
+        std::unique_ptr< antlr4::ANTLRInputStream>;
+    std::vector<InStream> m_vecStreams;
+
+    using stlexerptr= std::unique_ptr<antlr4::Lexer>;
+    std::vector<stlexerptr> m_vecLexers;
+
+    using filestream=std::unique_ptr< std::ifstream>;
+    std::vector<filestream> m_vecFileStreams;
+
     CStTokenPipeline(CStIncludeManager* pMgr) : 
         m_pIncludeMgr(pMgr)
     {
@@ -242,6 +256,7 @@ struct CStTokenPipeline
             "",
             antlr4::Token::DEFAULT_CHANNEL,
             0, 0, 0, 0 );
+        m_vecIncludeStreams.reserve( 5 );
     }
 
     bool InjectIncludeStream(
@@ -298,6 +313,9 @@ public:
 
     // Overriding ANTLR4's Immutable Stream
     // Navigation Interface
+    ssize_t GetNextTokenOnChannel(
+        ssize_t sstStartIdx,
+        ssize_t sstDirection );
 
     virtual antlr4::Token* LT( ssize_t k) override;
 
@@ -326,6 +344,9 @@ public:
 
     virtual std::string getText(
         const antlr4::misc::Interval& interval) override;
+
+    ssize_t FindMasterVectorIndex(
+        antlr4::Token* pTargetTok ) const;
 
     virtual std::string getText(
         antlr4::Token* start,

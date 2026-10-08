@@ -24,6 +24,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <regex>
 #include <filesystem>
 #include "antlr4-runtime.h"
 #include "stlexer.h"
@@ -31,6 +32,7 @@
 #include "parse_context.h"
 #include "pragma.h"
 #include "pragma_expr/pragma_exprParser.h"
+#include "pragma_expr/pragma_exprLexer.h"
 
 std::any CStPragmaEvaluator::visitPragma_condition(
     pragma_exprParser::Pragma_conditionContext* ctx)
@@ -109,7 +111,8 @@ std::any CStPragmaEvaluator::visitPrimary_expr(
 
         // TODO: Query your compiler's live symbol
         // table environment here
-        // return m_pSymbolTable->CheckVariableValue(strTarget, strVal);
+        // return m_pSymbolTable->CheckVariableValue(
+        //    strTarget, strVal);
         return false;
     }
 
@@ -125,9 +128,10 @@ std::any CStPragmaEvaluator::visitPrimary_expr(
         std::string strAttr   =
             ctx->TOK_IDENTIFIER(1)->getText();
 
-        // TODO: Query variable metadata attributes or
-        // reflection properties
-        // return m_pSymbolTable->HasVariableAttribute(strTarget, strAttr);
+        // TODO: Query variable metadata
+        // attributes or reflection properties
+        // return m_pSymbolTable->HasVariableAttribute(
+        //     strTarget, strAttr);
         return false;
     }
 
@@ -224,6 +228,19 @@ std::any CStPragmaEvaluator::visitInclude_directive(
     return true;
 }
 
+std::any CStPragmaEvaluator::visitIdentifier_type_pair(
+    pragma_exprParser::Identifier_type_pairContext* ctx )
+{
+    return visitChildren( ctx );
+}
+
+std::any CStPragmaEvaluator::visitQuery_type(
+    pragma_exprParser::Query_typeContext* ctx )
+{
+    return visitChildren( ctx );
+}
+
+
 CPragmaRecoveryStrategy::CPragmaRecoveryStrategy(
     guint32 dwPragmaType,
     CStParseContext* pCtx ) :
@@ -252,21 +269,35 @@ void CPragmaRecoveryStrategy::recover(
         std::string strText =
             pOffendingToken->getText();
 
+        std::regex reIf(
+            "^\\{[ \t]*if[ \t]+",
+            std::regex_constants::icase );
+
+        std::regex reInclude(
+            "^\\{[ \t]*include[ \t]+",
+            std::regex_constants::icase );
+
+        std::regex reEndIncl(
+            "^\\{[ \t]*endincl[ \t]*}?",
+            std::regex_constants::icase );
+
+
         // Handle conditional pruning blocks
-        if( strText.rfind( "{IF ", 0 ) == 0 )
+        if( std::regex_search( strText, reIf ) )
         {
             size_t nStartIndex = pTokens->index();
 
-            ProcessAndPruneWholeBlock(
-                pTokens, nStartIndex );
+            size_t nNextIndex = 
+                ProcessAndPruneWholeBlock(
+                    pTokens, nStartIndex );
 
-            //beginErrorCondition( recognizer );
+            pTokens->seek( nNextIndex );
             return;
         }
 
         // Handle End of Include marker token
         // boundary transitions
-        if( strText.rfind( "{endincl ", 0 ) == 0 )
+        if( std::regex_search( strText, reEndIncl ) )
         {
             size_t nStartIndex = pTokens->index();
 
@@ -306,18 +337,21 @@ void CPragmaRecoveryStrategy::recover(
         // Handle standalone inline active
         // inclusion paths if skipped or evaluated
         // on the fly
-        if( strText.rfind( "{include ", 0 ) == 0 )
+        if( std::regex_search( strText, reInclude ) )
         {
             // Optional: Handle inline processing
             // steps if needed or skip active
             // markers
-            EvaluateInclude( strText );
+            std::string strClause =
+                strText.substr(1, strText.size() - 2);
+            EvaluateInclude( strClause );
             auto pToken = dynamic_cast
                 < antlr4::CommonToken* >( pOffendingToken );
 
             if( pToken )
                 pToken->setChannel(
                     antlr4::Token::HIDDEN_CHANNEL );
+            // pTokens->consume();
             return;
         }
     }
@@ -325,8 +359,7 @@ void CPragmaRecoveryStrategy::recover(
     super::recover( recognizer, e );
 }
 
-
-void CPragmaRecoveryStrategy::ProcessAndPruneWholeBlock(
+size_t CPragmaRecoveryStrategy::ProcessAndPruneWholeBlock(
     antlr4::TokenStream* pTokens,
     size_t nIfIndex )
 {
@@ -409,13 +442,19 @@ void CPragmaRecoveryStrategy::ProcessAndPruneWholeBlock(
         }
     }
 
+    constexpr size_t hidden =
+        antlr4::Token::HIDDEN_CHANNEL;
+
     for( size_t i = 0; i < vecClauses.size(); ++i )
     {
         antlr4::Token* pPragTok =
             pTokens->get( vecClauses[i].nPragmaIdx );
 
-        const_cast< antlr4::Token* >( pPragTok )->setChannel(
-            antlr4::Token::HIDDEN_CHANNEL );
+        auto pToken = dynamic_cast
+            < antlr4::CommonToken* >( pPragTok );
+
+        if( pToken )
+            pToken->setChannel( hidden );
 
         if( static_cast< gint32 >( i ) !=
             iWinningBranchIdx )
@@ -424,16 +463,24 @@ void CPragmaRecoveryStrategy::ProcessAndPruneWholeBlock(
             size_t nEnd = vecClauses[i].nContentEndIdx;
             for( size_t nIdx = nStart; nIdx <= nEnd; ++nIdx )
             {
-                antlr4::Token* pTok = pTokens->get( nIdx );
-                const_cast< antlr4::Token* >( pTok )->setChannel(
-                    antlr4::Token::HIDDEN_CHANNEL );
+                auto pTok = dynamic_cast<antlr4::CommonToken*>
+                    ( pTokens->get( nIdx ) );
+                if( pTok )
+                    pTok->setChannel( hidden );
             }
         }
     }
 
-    antlr4::Token* pEndIfTok = pTokens->get( nCursor - 1 );
-    const_cast< antlr4::Token* >( pEndIfTok )->setChannel(
-        antlr4::Token::HIDDEN_CHANNEL );
+    auto pEndIfTok =
+        dynamic_cast<antlr4::CommonToken*>
+        ( pTokens->get( nCursor - 1 ) );
+    if( pEndIfTok )
+        pEndIfTok->setChannel( hidden );
+
+    if( iWinningBranchIdx == -1 )
+        return -1;
+    auto& winning = vecClauses[ iWinningBranchIdx ];
+    return winning.nContentStartIdx;
 }
 
 bool CPragmaRecoveryStrategy::EvaluateCondition(
@@ -444,7 +491,7 @@ bool CPragmaRecoveryStrategy::EvaluateCondition(
     antlr4::CommonTokenStream tokens(&lexer);
 
     // Use the extended parser with predicates
-    pragma_exprParser parser(&tokens);
+    CStPragmaParser parser(&tokens);
 
     parser.SetParseContext( m_pContext );
 
@@ -452,17 +499,11 @@ bool CPragmaRecoveryStrategy::EvaluateCondition(
     // to build the parse tree.  This triggers the
     // LL(*) state machine over the pragma
     // expression tokens.
-    pragma_exprParser::Pragma_conditionContext*
-        pTree = parser.pragma_condition();
-
+    auto pTree = parser.pragma_condition();
     if (pTree == nullptr)
-    {
-        // Handle extreme syntax tracking failure
-        // states gracefully
         return false;
-    }
 
-    CStPragmaEvaluator evaluator(pCtx);
+    CStPragmaEvaluator evaluator( m_pContext );
 
     // Traverse the tree dynamically to compute
     // the final boolean outcome.  The visitor
@@ -493,12 +534,12 @@ bool CPragmaRecoveryStrategy::EvaluateCondition(
 bool CPragmaRecoveryStrategy::EvaluateInclude(
     const std::string& strIncText )
 {
-    antlr4::ANTLRInputStream input(strCondText);
+    antlr4::ANTLRInputStream input(strIncText);
     pragma_exprLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
 
     // Use the extended parser with predicates
-    pragma_exprParser parser(&tokens);
+    CStPragmaParser parser(&tokens);
 
     parser.SetParseContext( m_pContext );
 
@@ -507,14 +548,10 @@ bool CPragmaRecoveryStrategy::EvaluateInclude(
     // LL(*) state machine over the pragma
     // expression tokens.
     auto pTree = parser.include_directive();
-
     if (pTree == nullptr)
-    {
-        // Handle extreme syntax tracking failure
-        // states gracefully
         return false;
-    }
 
+    CStPragmaEvaluator evaluator( m_pContext );
     std::any anyResult = evaluator.visit(pTree);
 
     // Extract and return the underlying boolean

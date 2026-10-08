@@ -33,7 +33,7 @@ pragma_auto_headers = $(pragma_header_name:%=pragma_expr/%)
 pragma_obj = $(pragma_auto_gen:.cpp=.o)
 
 # Build rpcfstc
-$(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parser_ext.o astnodes.o parse_context.o 
+$(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parser_ext.o astnodes.o parse_context.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) -L. -lpragma
 
 %.o: %.cpp
@@ -43,8 +43,11 @@ $(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parse
 $(gen_src): ../stparser.g4 ../stlexer.g4
 	cd .. && java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o ./topdown_cpp stparser.g4 stlexer.g4
 
-$(PRAGMA_TARGET): $(pragma_obj) pragma.o pragma.h
+$(PRAGMA_TARGET): $(pragma_obj) pragma.o
 	$(AR) $(ARFLAGS) -o $@ $^
+
+parse_context.o: parse_context.cpp parse_context.h
+pragma.o: pragma.cpp pragma.h parse_context.h
 
 $(pragma_auto_gen) : pragma_expr.g4
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o ./pragma_expr pragma_expr.g4

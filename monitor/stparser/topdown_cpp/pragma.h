@@ -60,6 +60,12 @@ struct CStPragmaEvaluator :
 
     virtual std::any visitInclude_directive(
         pragma_exprParser::Include_directiveContext* ctx) override;
+
+    virtual std::any visitIdentifier_type_pair(
+        pragma_exprParser:: Identifier_type_pairContext* ctx ) override;
+
+    virtual std::any visitQuery_type(
+        pragma_exprParser:: Query_typeContext* ctx ) override;
 };
 
 struct CPragmaRecoveryStrategy :
@@ -78,7 +84,7 @@ struct CPragmaRecoveryStrategy :
         antlr4::Parser* recognizer,
         std::exception_ptr e ) override;
 
-    void ProcessAndPruneWholeBlock(
+    size_t ProcessAndPruneWholeBlock(
         antlr4::TokenStream* pTokens,
         size_t nIfIndex );
 
@@ -86,5 +92,23 @@ struct CPragmaRecoveryStrategy :
         const std::string& strCondText );
     bool EvaluateInclude(
         const std::string& strIncText );
+
+    virtual void sync( antlr4::Parser* ) override
+    {}
 };
 
+class CStPragmaParser : public pragma_exprParser
+{
+public:
+    CStParseContext* m_pContext = nullptr;
+
+    CStPragmaParser (antlr4::TokenStream* input) :
+        pragma_exprParser(input), m_pContext(nullptr)
+    {}
+
+    void SetParseContext(CStParseContext* ctx)
+    { m_pContext = ctx; }
+
+    CStParseContext* GetParseContext() const
+    { return m_pContext; }
+};

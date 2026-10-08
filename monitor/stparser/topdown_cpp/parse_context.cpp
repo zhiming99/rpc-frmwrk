@@ -182,23 +182,36 @@ bool CStTokenPipeline::InjectIncludeStream(
 
     // Standard ANTLR file stream payload
     // extraction pass
-    std::ifstream fileStream(strFilePath);
-    if (!fileStream.is_open())
+    auto pFileStream = std::make_unique<
+        std::ifstream>( strFilePath );
+    if( !pFileStream->is_open() )
     {
-        std::cerr << "CSt Compiler Error: Unable "
+        std::cerr << "stparser Error: Unable "
             << "to open file stream: "
             << strFilePath << "\n";
         m_pIncludeMgr->PopFile();
         return false;
     }
 
-    antlr4::ANTLRInputStream input(fileStream);
-    stlexer lexer(&input);
-    antlr4::CommonTokenStream tokenStream(&lexer);
-    tokenStream.fill();
+    auto pInput = std::make_unique
+        <antlr4::ANTLRInputStream>( *pFileStream );
+
+    auto pLexer = std::make_unique<stlexer>( pInput.get() );
+
+    auto pTokenStream = std::make_unique
+        <antlr4::CommonTokenStream>( pLexer.get() );
+    pTokenStream->fill();
 
     std::vector<antlr4::Token*> vecRawTokens =
-        tokenStream.getTokens();
+        pTokenStream->getTokens();
+
+    m_vecIncludeStreams.push_back(
+        std::move( pTokenStream ) );
+
+    m_vecStreams.push_back( std::move( pInput ) );
+    m_vecLexers.push_back( std::move( pLexer ) );
+    m_vecFileStreams.push_back(
+        std::move( pFileStream ) );
 
     std::vector<CStToken> vecFileTokens;
     vecFileTokens.reserve( vecRawTokens.size() + 1 );
@@ -273,37 +286,114 @@ bool CStTokenPipeline::InjectIncludeStream(
 
 // --- ANTLR4 Core Stream Interface ---
 
-antlr4::Token*
-CStPragmaFilteringTokenStream::LT( ssize_t k)
+// Helper method to find the next valid
+// token on the target channel
+ssize_t CStPragmaFilteringTokenStream::
+GetNextTokenOnChannel(
+    ssize_t sstStartIdx,
+    ssize_t sstDirection )
 {
-    if( m_pPipeline == nullptr || 
-        k == 0 ) 
+    if( m_pPipeline == nullptr )
+        return -1;
+
+    auto& vecMaster =
+        m_pPipeline->m_vecMasterTokens;
+    ssize_t sstMax = static_cast<ssize_t>
+        ( vecMaster.size());
+
+    ssize_t sstCurr = sstStartIdx;
+    while( sstCurr >= 0 &&
+       sstCurr < sstMax )
+    {
+        auto* pTok =
+            vecMaster[sstCurr].m_pOriginalToken;
+
+        // Verify token sits on the
+        // DEFAULT_CHANNEL (usually 0)
+        if( pTok != nullptr &&
+            pTok->getChannel() ==
+                antlr4::Token::DEFAULT_CHANNEL )
+        {
+            return sstCurr;
+        }
+
+        sstCurr += sstDirection;
+    }
+
+    return -1;
+}
+
+// Refactored lookahead supporting
+// channel filters
+antlr4::Token*
+CStPragmaFilteringTokenStream::LT(
+    ssize_t k )
+{
+    if( m_pPipeline == nullptr ||
+        k == 0 )
     {
         return nullptr;
     }
 
-    ssize_t sstTargetIdx = 0;
-    if( k > 0 )
+    if( k < 0 )
     {
-        sstTargetIdx = static_cast<ssize_t>
-            ( m_stCurrentIndex) + k - 1;
+        // Handle negative lookback
+        // if needed by reversing search
+        return nullptr;
+    }
+
+    ssize_t sstCurrIdx = static_cast<ssize_t>
+        ( m_stCurrentIndex );
+
+    ssize_t sstFoundIdx = -1;
+    ssize_t sstCount = 0;
+
+    // Advance k times across matching
+    // channel tokens
+    while( sstCount < k )
+    {
+        sstFoundIdx = GetNextTokenOnChannel(
+                sstCurrIdx, 1 );
+
+        if( sstFoundIdx == -1 )
+            return m_pPipeline-> m_pEofToken.get();
+
+        sstCount++;
+        sstCurrIdx = sstFoundIdx + 1;
+    }
+
+    return m_pPipeline->
+        m_vecMasterTokens[sstFoundIdx]
+            .m_pOriginalToken;
+}
+
+// Refactored consume tracking
+void CStPragmaFilteringTokenStream::consume()
+{
+    if( m_pPipeline == nullptr )
+    {
+        return;
+    }
+
+    // Locate the current active token
+    // position on the default channel
+    ssize_t sstActiveIdx = GetNextTokenOnChannel(
+            m_stCurrentIndex, 1 );
+
+    if( sstActiveIdx != -1 )
+    {
+        // Advance past the consumed token
+        m_stCurrentIndex =
+            static_cast<size_t>
+            ( sstActiveIdx + 1);
     }
     else
     {
-        sstTargetIdx = static_cast<ssize_t>
-            ( m_stCurrentIndex) + k;
+        m_stCurrentIndex = m_pPipeline->
+            m_vecMasterTokens.size();
     }
-
-    if( sstTargetIdx < 0 || 
-        sstTargetIdx >= static_cast<ssize_t>
-        ( m_pPipeline->m_vecMasterTokens.size() ) )
-    {
-        return m_pPipeline->m_pEofToken.get(); 
-    }
-
-    auto& vecMaster = m_pPipeline->m_vecMasterTokens;
-    return vecMaster[sstTargetIdx].m_pOriginalToken;
 }
+
 
 size_t CStPragmaFilteringTokenStream::LA(
     ssize_t k)
@@ -316,16 +406,6 @@ size_t CStPragmaFilteringTokenStream::LA(
     return antlr4::Token::INVALID_TYPE;
 }
 
-void CStPragmaFilteringTokenStream::consume()
-{
-    if( m_pPipeline != nullptr && 
-        m_stCurrentIndex < m_pPipeline->
-            m_vecMasterTokens.size() )
-    {
-        m_stCurrentIndex++;
-    }
-}
-
 antlr4::Token* CStPragmaFilteringTokenStream::get(
     size_t index) const
 {
@@ -333,8 +413,7 @@ antlr4::Token* CStPragmaFilteringTokenStream::get(
         index >= m_pPipeline->
             m_vecMasterTokens.size() )
     {
-        return m_pPipeline->
-            m_pEofToken.get();
+        return m_pPipeline->m_pEofToken.get();
     }
     return m_pPipeline->
         m_vecMasterTokens[index]
@@ -427,54 +506,104 @@ std::string CStPragmaFilteringTokenStream::getText(
         vecMaster[stStop].m_pOriginalToken);
 }
 
-std::string CStPragmaFilteringTokenStream::getText(
-    antlr4::Token* start, 
-    antlr4::Token* stop)
+// Finds the absolute index of a token pointer
+// inside the master tracking vector database
+ssize_t CStPragmaFilteringTokenStream::
+FindMasterVectorIndex(
+    antlr4::Token* pTargetTok ) const
 {
-    if( start == nullptr || 
-        stop == nullptr || 
+    if( pTargetTok == nullptr ||
         m_pPipeline == nullptr )
-        return "";
+    {
+        return -1;
+    }
 
-    // Safe direct pointer distance check 
-    // to bypass file token index shifts
-    auto& vecMaster = 
+    auto& vecMaster =
         m_pPipeline->m_vecMasterTokens;
-        
-    auto itStart = std::find_if(
-        vecMaster.begin(), vecMaster.end(),
-        [start](const CStToken& wrapped) {
-            return wrapped.m_pOriginalToken 
-                   == start;
-        });
-        
-    auto itStop = std::find_if(
-        vecMaster.begin(), vecMaster.end(),
-        [stop](const CStToken& wrapped) {
-            return wrapped.m_pOriginalToken == stop;
+
+    auto it = std::find_if(
+        vecMaster.begin(),
+        vecMaster.end(),
+        [pTargetTok](const CStToken& wrapped) {
+            return wrapped.m_pOriginalToken ==
+                   pTargetTok;
         });
 
-    if( itStart == vecMaster.end() || 
-        itStop == vecMaster.end() || 
-        itStart > itStop )
-        return "";
+    if( it != vecMaster.end() )
+    {
+        return std::distance(
+            vecMaster.begin(), it );
+    }
+
+    return -1;
+}
+
+// Fixed continuous range text extraction layout
+std::string CStPragmaFilteringTokenStream::getText(
+    antlr4::Token* start,
+    antlr4::Token* stop )
+{
+    if( start == nullptr ||
+        stop == nullptr ||
+        m_pPipeline == nullptr )
+    {
+        return std::string( "" );
+    }
+
+    // Resolve the true absolute vector locations
+    ssize_t sstStartIdx =
+        FindMasterVectorIndex( start );
+    ssize_t sstStopIdx =
+        FindMasterVectorIndex( stop );
+
+    if( sstStartIdx == -1 ||
+        sstStopIdx == -1 ||
+        sstStartIdx > sstStopIdx )
+    {
+        return std::string( "" );
+    }
+
+    // Single virtual {endincl} payload intercept
+    if( sstStartIdx == sstStopIdx )
+    {
+        const CStToken& oCStTok =
+            m_pPipeline->
+                m_vecMasterTokens[sstStartIdx];
+
+        if( oCStTok.m_eVirtualType ==
+            ECStVirtualTokenType::
+                EndIncludeMarker )
+        {
+            return oCStTok.m_strMarkerPath;
+        }
+    }
 
     std::string strResult = "";
-    for( auto it = itStart; it <= itStop; ++it )
+    for( ssize_t i = sstStartIdx;
+         i <= sstStopIdx; ++i )
     {
-        if( it->m_eVirtualType == 
-            ECStVirtualTokenType:: EndIncludeMarker )
-        {
-            strResult += it->m_strMarkerPath;
-        }
-        else if( it->m_pOriginalToken != nullptr )
+        const CStToken& oCStTok =
+            m_pPipeline->
+                m_vecMasterTokens[i];
+
+        if( oCStTok.m_eVirtualType ==
+            ECStVirtualTokenType::
+                EndIncludeMarker )
         {
             strResult +=
-                it->m_pOriginalToken->getText();
+                oCStTok.m_strMarkerPath;
+        }
+        else if( oCStTok.m_pOriginalToken
+                 != nullptr )
+        {
+            // Includes all channels (comments/WS)
+            strResult += oCStTok.
+                m_pOriginalToken->getText();
         }
     }
     return strResult;
 }
+
 
 // Establishes a speculative lookahead 
 // checkpoint and returns a unique marker ID

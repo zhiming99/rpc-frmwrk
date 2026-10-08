@@ -56,6 +56,8 @@ public:
         // Keep pendingCategory set from parent for potential use
     }
 
+    virtual void exitEveryRule(antlr4::ParserRuleContext * /*ctx*/) override;
+
 private:
     CStParseContext* m_pCtx = nullptr;
     antlr4::TokenStream* m_pTokenStream = nullptr;
