@@ -26,10 +26,13 @@
 #include <fstream>
 #include <string>
 #include <filesystem>
+#include <regex>
 #include "antlr4-runtime.h"
 #include "stlexer.h"
 #include "stparser.h"
+#include "pragma.h"
 #include "parse_context.h"
+#include "pragma_expr/pragma_exprLexer.h"
 
 std::string CStIncludeManager::ResolveIncludePath(
     const std::string& strPath ) const
@@ -239,7 +242,7 @@ bool CStTokenPipeline::InjectIncludeStream(
 
         stFileLastLine = pTok->getLine();
 
-        vecFileTokens.push_back(cstTok);
+        vecFileTokens.push_back( cstTok );
     }
 
     m_stGlobalLineCounter += stFileLastLine;
@@ -249,8 +252,24 @@ bool CStTokenPipeline::InjectIncludeStream(
     if (pOriginalIncludeToken != nullptr)
     {
         CStToken endMarkerTok;
+
+        std::string strText =
+            "{endincl '" + strFilePath + "'}";
+
+        auto pFactory = antlr4::
+            CommonTokenFactory::DEFAULT.get();
+
+        auto pUnique = pFactory->create(
+            {nullptr, nullptr},
+            stlexer::TOK_PRAGMA, strText,
+            antlr4::Token::DEFAULT_CHANNEL,
+            0, 0, 0, 0 );
+
+        endMarkerTok.m_pBackup =
+            std::move( pUnique );
+
         endMarkerTok.m_pOriginalToken =
-            pOriginalIncludeToken;
+            endMarkerTok.m_pBackup.get();
 
         endMarkerTok.m_iFileIdx =
             m_pIncludeMgr->GetParentFileIdx();
@@ -267,10 +286,9 @@ bool CStTokenPipeline::InjectIncludeStream(
         endMarkerTok.m_eVirtualType =
             ECStVirtualTokenType::EndIncludeMarker;
 
-        endMarkerTok.m_strMarkerPath =
-            "{endincl '" + strFilePath + "'}";
+        endMarkerTok.m_strMarkerPath = strText;
 
-        vecFileTokens.push_back(endMarkerTok);
+        m_vecMasterTokens[ nInsertIndex ] = endMarkerTok;
     }
 
     // Safely insert all wrapped tokens inline
@@ -367,13 +385,146 @@ CStPragmaFilteringTokenStream::LT(
             .m_pOriginalToken;
 }
 
+
+bool CStPragmaFilteringTokenStream::EvaluateInclude(
+    const std::string& strIncText )
+{
+    antlr4::ANTLRInputStream input(strIncText);
+    pragma_exprLexer lexer(&input);
+    antlr4::CommonTokenStream tokens(&lexer);
+
+    // Use the extended parser with predicates
+    CStPragmaParser parser(&tokens);
+
+    parser.SetParseContext( m_pContext );
+
+    // Invoke the root rule of your micro-grammar
+    // to build the parse tree.  This triggers the
+    // LL(*) state machine over the pragma
+    // expression tokens.
+    auto pTree = parser.include_directive();
+    if (pTree == nullptr)
+        return false;
+
+    CStPragmaEvaluator evaluator( m_pContext );
+    std::any anyResult = evaluator.visit(pTree);
+
+    // Extract and return the underlying boolean
+    // value safely.
+    try
+    {
+        bool bOutcome =
+            std::any_cast<bool>(anyResult);
+        return bOutcome;
+    }
+    catch (const std::bad_any_cast& e)
+    {
+        std::cerr << "Error: 'include' "
+            << "directive did not compile. "
+            << "Default to false\n";
+        return false;
+    }
+    return false;
+}
+
+gint32 CStPragmaFilteringTokenStream::HandlePragma(
+    CStToken* pPragmaToken )
+{
+    auto pToken =
+        pPragmaToken->m_pOriginalToken;
+    guint32 dwType = pToken->getType();
+    if( dwType == stlexer::TOK_PRAGMA )
+    {
+        std::string strText =
+            pToken->getText();
+
+        std::regex reIf(
+            "^\\{[ \t]*if[ \t]+",
+            std::regex_constants::icase );
+
+        std::regex reInclude(
+            "^\\{[ \t]*include[ \t]+",
+            std::regex_constants::icase );
+
+        std::regex reEndIncl(
+            "^\\{[ \t]*endincl[ \t]*}?",
+            std::regex_constants::icase );
+
+
+        // Handle conditional pruning blocks
+        if( std::regex_search( strText, reIf ) )
+        {
+            /*size_t nStartIndex = pTokens->index();
+
+            size_t nNextIndex = 
+                ProcessAndPruneWholeBlock(
+                    pTokens, nStartIndex );
+
+            pTokens->seek( nNextIndex );
+            */
+            return 1;
+        }
+
+        // Handle End of Include marker token
+        // boundary transitions
+        if( std::regex_search( strText, reEndIncl ) )
+        {
+            size_t nStartIndex = this->index();
+
+            auto pPipeline =
+                this->GetPipeLine();
+            auto pIncMgr =
+                pPipeline->GetIncludeManager();
+
+            if( pIncMgr != nullptr )
+            {
+                gint32 iParentIdx =
+                    pIncMgr->GetParentFileIdx();
+
+                auto& vecMaster =
+                    pPipeline->m_vecMasterTokens;
+                if( vecMaster.size() > nStartIndex )
+                {
+                    auto& oToken =
+                        vecMaster[ nStartIndex ];
+                    if( oToken.m_iFileIdx ==
+                        iParentIdx )
+                    {
+                        pIncMgr->PopFile();
+                    }
+                }
+            }
+
+            // Advance past the marker token
+            // seamlessly so it does not trigger
+            // parser errors
+            this->consume();
+            return 1;
+        }
+
+        // Handle standalone inline active
+        // inclusion paths if skipped or evaluated
+        // on the fly
+        if( std::regex_search( strText, reInclude ) )
+        {
+            // Optional: Handle inline processing
+            // steps if needed or skip active
+            // markers
+            std::string strClause =
+                strText.substr(1, strText.size() - 2);
+            EvaluateInclude( strClause );
+        }
+    }
+    return 0;
+}
 // Refactored consume tracking
 void CStPragmaFilteringTokenStream::consume()
 {
     if( m_pPipeline == nullptr )
-    {
         return;
-    }
+
+    if( m_stCurrentIndex == ( size_t )-1 )
+        return;
 
     // Locate the current active token
     // position on the default channel
@@ -383,14 +534,39 @@ void CStPragmaFilteringTokenStream::consume()
     if( sstActiveIdx != -1 )
     {
         // Advance past the consumed token
-        m_stCurrentIndex =
-            static_cast<size_t>
-            ( sstActiveIdx + 1);
+        m_stCurrentIndex = GetNextTokenOnChannel(
+            sstActiveIdx + 1, 1 );
+        if( m_stCurrentIndex == ( size_t )-1 )
+            return;
     }
     else
     {
-        m_stCurrentIndex = m_pPipeline->
-            m_vecMasterTokens.size();
+        return;
+    }
+    auto& vecMaster =
+        m_pPipeline->m_vecMasterTokens;
+
+    auto dwIdx = m_stCurrentIndex;
+    auto itr = vecMaster.begin() + dwIdx;
+    while( itr != vecMaster.end() )
+    {
+        auto& oToken = *itr;
+        auto pToken = oToken.m_pOriginalToken;
+        if( pToken->getChannel() !=
+            antlr4::Token::DEFAULT_CHANNEL )
+        {
+            itr++;
+            dwIdx++;
+            continue;
+        }
+        if( pToken->getType() !=
+            stlexer::TOK_PRAGMA )
+            break;
+        auto iSavedIdx = m_stCurrentIndex;
+        seek( dwIdx );
+        if( HandlePragma( &oToken ) == 0 )
+            seek( iSavedIdx );
+        break;
     }
 }
 

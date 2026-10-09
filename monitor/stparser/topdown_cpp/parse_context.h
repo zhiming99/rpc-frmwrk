@@ -217,8 +217,11 @@ struct CStToken
     // (e.g., "{endincl 'path/to/file.st'}")
     std::string          m_strMarkerPath;
 
+    std::shared_ptr<antlr4::CommonToken> m_pBackup;
+
     CStToken()
     {}
+
 };
 
 struct CStTokenPipeline
@@ -271,6 +274,8 @@ struct CStTokenPipeline
     { return m_pIncludeMgr; }
 };
 
+class CStParseContext;
+
 class CStPragmaFilteringTokenStream :
     public antlr4::TokenStream
 {
@@ -279,10 +284,13 @@ public:
 
     CStTokenPipeline* m_pPipeline      = nullptr;
     size_t            m_stCurrentIndex = 0;
+    CStParseContext*  m_pContext = nullptr;
 
     CStPragmaFilteringTokenStream(
-        CStTokenPipeline* pPipeline) :
-        super(), m_pPipeline(pPipeline)
+        CStTokenPipeline* pPipeline,
+        CStParseContext* pCtx ) :
+        super(), m_pPipeline(pPipeline),
+        m_pContext( pCtx )
     {}
 
     /** High-Precision Bridge: Extracts the full
@@ -357,6 +365,11 @@ public:
     virtual void release( ssize_t marker ) override;
 
     virtual std::string getSourceName() const override;
+
+    bool EvaluateInclude(
+        const std::string& strIncText );
+
+    gint32 HandlePragma( CStToken* pPragmaToken );
 };
 
 

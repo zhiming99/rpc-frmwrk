@@ -347,7 +347,7 @@ int main(int argc, char* argv[])
 
         auto pMainStream = std::make_unique
             <CStPragmaFilteringTokenStream>
-                ( pPipeline.get() );
+                ( pPipeline.get(), &oCtx );
 
         // Set up the root token source reference so
         // exception loggers are happy
