@@ -465,7 +465,6 @@ AC_CONFIG_FILES([Makefile
                  monitor/client/js/appmoncli/Makefile
                  monitor/client/js/appmoncli/Makefile.skel
                  monitor/Makefile
-                 monitor/stparser/Makefile
                  docs/Makefile
                  rpcf.pc ])
 
