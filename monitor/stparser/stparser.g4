@@ -733,7 +733,7 @@ var_decl_init
     | {IsStructType()}? struct_var_decl_init
     | {IsFBType()}? fb_decl_init
     | {IsInterfaceType()}? interface_spec_init
-    | variable_list TOK_COLON ambiguous_var_decl_init
+    | {IsAmbiguousType()}? variable_list TOK_COLON ambiguous_var_decl_init
     ;
 
 ambiguous_var_decl_init
@@ -1519,7 +1519,12 @@ class_method_or_property_decl
 
 // Method decl
 method_decl
-    : TOK_METHOD identifier opt_data_type_access method_var_decls* func_body TOK_END_METHOD
+    : TOK_METHOD identifier
+        opt_data_type_access
+        using_directive_list?
+        method_var_decls*
+        func_body
+      TOK_END_METHOD
     ;
 
 // Method decl list
@@ -1678,7 +1683,9 @@ opt_method_var_decls
 
 // Prog var decls set list
 prog_var_decls_set_list
-    : prog_var_decls_set*
+    // SPEC extention: allowing semicolons between var
+    // declaration blocks
+    : ( prog_var_decls_set opt_semicolons)*
     ;
 
 // More missing

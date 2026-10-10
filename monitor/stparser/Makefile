@@ -47,7 +47,10 @@ $(PRAGMA_TARGET): $(pragma_obj) pragma.o
 	$(AR) $(ARFLAGS) -o $@ $^
 
 parse_context.o: parse_context.cpp parse_context.h
-pragma.o: pragma.cpp pragma.h parse_context.h
+pragma.o: pragma.cpp pragma.h parse_context.h pragma_expr/pragma_exprVisitor.h
+st_parse_listener.o: st_parse_listener.cpp st_parse_listener.h parse_context.h stparser.h
+parse_context.o: parse_context.cpp parse_context.h pragma.h pragma_expr/pragma_exprLexer.h stparser.h 
+st_parser_ext.o: st_parser_ext.cpp st_parser_ext.h stparser.h
 
 $(pragma_auto_gen) : pragma_expr.g4
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o ./pragma_expr pragma_expr.g4

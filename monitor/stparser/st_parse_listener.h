@@ -42,6 +42,13 @@ public:
         }
     }
 
+    void exitVar_decl_init(stparser::Var_decl_initContext* ctx) override {
+        if (m_pCtx) {
+            m_pCtx->m_iPendingCategory = EnumTypeCategory::Invalid;
+            m_pCtx->m_strPendingTypeName.clear();
+        }
+    }
+
     /**
      * Called when entering var_decl_init_simple_set rule.
      * Further disambiguates between simple_spec, subrange_spec, ref_spec, string_spec.
