@@ -6,7 +6,7 @@ ARFLAGS = rcs
 
 ANTLR4_DIR = /home/zhiming/mywork/antlr4-4.13.2
 rpcf_dependency=$(shell pkg-config --cflags jsoncpp dbus-1)
-CXXFLAGS = -std=c++17 -Wall -I. -I../../../include -I$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/include/antlr4-runtime -O0 -ggdb -Wno-overloaded-virtual $(rpcf_dependency)
+CXXFLAGS = -std=c++17 -Wall -I. -I../../include -I$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/include/antlr4-runtime -O0 -ggdb -Wno-overloaded-virtual $(rpcf_dependency)
 LDFLAGS = -L$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/lib -lantlr4-runtime -Wl,-rpath,$(ANTLR4_DIR)/runtime/Cpp/run/usr/local/lib -lcombase
 
 # ANTLR tool jar (4.13.2)
@@ -40,8 +40,8 @@ $(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parse
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Regenerate parser from grammar
-$(gen_src): ../stparser.g4 ../stlexer.g4
-	cd .. && java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o ./topdown_cpp stparser.g4 stlexer.g4
+$(gen_src): stparser.g4 stlexer.g4
+	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o . stparser.g4 stlexer.g4
 
 $(PRAGMA_TARGET): $(pragma_obj) pragma.o
 	$(AR) $(ARFLAGS) -o $@ $^

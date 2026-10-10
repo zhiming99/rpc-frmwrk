@@ -48,12 +48,14 @@ class CStVarDeclNode;
 /**
  * @brief Base class for all expression nodes
  */
-struct CStExprNode : public CStAstNodeBase
+struct CStExprNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     CStExprNode() : super()
-    {}
+    {
+        m_iToken = YYUNDEF;
+    }
 
     virtual std::string GetNodeInfo() const override;
     virtual std::string GetSignature() const override;
@@ -226,9 +228,9 @@ struct CStCallExpr : public CStExprNode
  * are flattened into CStCallExpr when the enclosing call is reduced,
  * so this node is transient and does not appear in the final AST.
  */
-struct CStArgListNode : public CStAstNodeBase
+struct CStArgListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecArgs;                  // positional
     std::vector< CStCallExpr::CNamedArg > m_vecNamed; // named
@@ -317,9 +319,9 @@ struct CStPointerMemberExpr : public CStExprNode
  * This provides a clear boundary for semantic analysis to distinguish
  * l-values from r-values.
  */
-struct CStLValueNode : public CStAstNodeBase
+struct CStLValueNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pExpression;  // The actual l-value expression (identifier, member access, etc.)
 
@@ -336,9 +338,9 @@ struct CStLValueNode : public CStAstNodeBase
  * This provides a clear boundary for semantic analysis to distinguish
  * extended l-values from standard l-values.
  */
-struct CStLValueExtNode : public CStAstNodeBase
+struct CStLValueExtNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pExpression;  // The actual extended l-value expression
 
@@ -358,9 +360,9 @@ struct CStLValueExtNode : public CStAstNodeBase
  *  - m_vecNameComponents: the path components for name-extraction contexts
  *    (derived types, USING namespaces, FOR loop variables).
  */
-struct CStInstancePathNode : public CStAstNodeBase
+struct CStInstancePathNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< std::string > m_vecNameComponents;
     ObjPtr m_pExpression;
@@ -418,9 +420,9 @@ struct CStFullExpressionNode : public CStExprNode
  * the variable tables of the semantic phase. The parser performs
  * no numeric evaluation.
  */
-struct CStSubrangeNode : public CStAstNodeBase
+struct CStSubrangeNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pStart;
     ObjPtr m_pEnd;
@@ -441,9 +443,9 @@ struct CStSubrangeNode : public CStAstNodeBase
  * element is reduced). This node is transient and does not appear in
  * the final AST.
  */
-struct CStSubrangeListNode : public CStAstNodeBase
+struct CStSubrangeListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecRanges;  // CStSubrangeNode items
 
@@ -461,9 +463,9 @@ struct CStSubrangeListNode : public CStAstNodeBase
  * statement/declaration node when the block is reduced, so this node
  * is transient and does not appear in the final AST.
  */
-struct CStStmtListNode : public CStAstNodeBase
+struct CStStmtListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecStatements;
 
@@ -480,9 +482,9 @@ struct CStStmtListNode : public CStAstNodeBase
 /**
  * @brief Base class for type nodes
  */
-struct CStTypeNode : public CStAstNodeBase
+struct CStTypeNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     CStTypeNode() : super()
     {}
@@ -610,9 +612,9 @@ struct CStEnumTypeNode : public CStTypeNode
  * When no explicit value is given, the compiler assigns the next
  * sequential value (auto-increment from last value or 0).
  */
-struct CStEnumValueNode : public CStAstNodeBase
+struct CStEnumValueNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strName;      // Name of the enum value
     ObjPtr m_pExplicitValue;    // Optional explicit value expression
@@ -629,9 +631,9 @@ struct CStEnumValueNode : public CStAstNodeBase
  * This node holds the list of enum values and can be used by
  * backends to process all values together.
  */
-struct CStEnumValueListNode : public CStAstNodeBase
+struct CStEnumValueListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     // Temporary storage for enum type name during parsing
     // This is extracted and stored in CStEnumTypeNode.m_strName later
@@ -651,9 +653,9 @@ struct CStEnumValueListNode : public CStAstNodeBase
  * into a uniform node for use in type_spec. This allows type_spec to have a
  * consistent child type instead of handling multiple node type variants.
  */
-struct CStDataTypeSpecNode : public CStAstNodeBase
+struct CStDataTypeSpecNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pTypeSpec;  // Can be CStBasicTypeNode, CStEnumTypeNode, etc.
 
@@ -670,9 +672,9 @@ struct CStDataTypeSpecNode : public CStAstNodeBase
  * reference_type, pointer_type, derived_type) into a uniform node type.
  * This allows the parent rules to handle a consistent node type.
  */
-struct CStTypeSpecNode : public CStAstNodeBase
+struct CStTypeSpecNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pType;  // Can be CStDataTypeSpecNode, CStArrayTypeNode, CStReferenceTypeNode, etc.
 
@@ -688,9 +690,9 @@ struct CStTypeSpecNode : public CStAstNodeBase
  * Contains all type declarations within a TYPE ... END_TYPE block.
  * This wraps the type_assignments to provide a uniform container.
  */
-struct CStTypeDefinitionBlockNode : public CStAstNodeBase
+struct CStTypeDefinitionBlockNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecTypeDecls;  // CStTypeDeclNode or CStEnumTypeNode, etc.
 
@@ -756,9 +758,9 @@ struct CStDerivedTypeNode : public CStTypeNode
 /**
  * @brief Variable declaration node
  */
-struct CStVarDeclNode : public CStAstNodeBase
+struct CStVarDeclNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     enum enumVarCategory {
         vcInput,
@@ -812,9 +814,9 @@ struct CStVarDeclNode : public CStAstNodeBase
 /**
  * @brief Base class for statement nodes
  */
-struct CStStmtNode : public CStAstNodeBase
+struct CStStmtNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     CStStmtNode() : super()
     {}
@@ -887,9 +889,9 @@ struct CStIfStmt : public CStStmtNode
  * the if statement is reduced, so this node is transient and does not
  * appear in the final AST.
  */
-struct CStIfBranchListNode : public CStAstNodeBase
+struct CStIfBranchListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< CStIfStmt::CIfBranch > m_vecBranches;
 
@@ -1018,9 +1020,9 @@ struct CStPragmaStmt : public CStStmtNode
 /**
  * @brief Base class for POU declaration nodes
  */
-struct CStPouDeclNode : public CStAstNodeBase
+struct CStPouDeclNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     enum enumPouType {
         ptProgram,
@@ -1102,9 +1104,9 @@ struct CStFunctionBlockDecl : public CStPouDeclNode
  * IMPLEMENTS clauses) until the function_block rule builds the
  * final CStFunctionBlockDecl.
  */
-struct CStFunctionBlockHeaderNode : public CStAstNodeBase
+struct CStFunctionBlockHeaderNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strName;
     CStFunctionBlockDecl::enumModifier m_eModifier;
@@ -1186,9 +1188,9 @@ struct CStMethodDecl : public CStPouDeclNode
  * which can be used to explicitly mark the boundary between global
  * declarations and backend-specific constructs.
  */
-struct CStNamespaceDecl : public CStAstNodeBase
+struct CStNamespaceDecl : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strName;
     std::vector< ObjPtr > m_vecElements;
@@ -1217,9 +1219,9 @@ struct CStNamespaceDecl : public CStAstNodeBase
 /**
  * @brief Interface declaration
  */
-struct CStInterfaceDecl : public CStAstNodeBase
+struct CStInterfaceDecl : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strName;
     std::vector< ObjPtr > m_vecMethods;
@@ -1234,9 +1236,9 @@ struct CStInterfaceDecl : public CStAstNodeBase
 /**
  * @brief Type declaration
  */
-struct CStTypeDecl : public CStAstNodeBase
+struct CStTypeDecl : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strName;
     ObjPtr m_pType;
@@ -1251,9 +1253,9 @@ struct CStTypeDecl : public CStAstNodeBase
 /**
  * @brief Variable configuration declaration
  */
-struct CStVarConfigDecl : public CStAstNodeBase
+struct CStVarConfigDecl : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     // Instance configuration
     struct CInstanceConfig
@@ -1278,9 +1280,9 @@ struct CStVarConfigDecl : public CStAstNodeBase
  * Represents a task configuration in IEC 61131-3, e.g.:
  * TASK MyTask (SINGLE := x, INTERVAL := t#100ms, PRIORITY := 3);
  */
-struct CStTaskConfigNode : public CStAstNodeBase
+struct CStTaskConfigNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strTaskName;
     ObjPtr m_pSingle;    // optional SINGLE := data_source
@@ -1298,9 +1300,9 @@ struct CStTaskConfigNode : public CStAstNodeBase
  *
  * Collects task configurations inside a resource declaration.
  */
-struct CStTaskConfigListNode : public CStAstNodeBase
+struct CStTaskConfigListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecTasks;
 
@@ -1313,9 +1315,9 @@ struct CStTaskConfigListNode : public CStAstNodeBase
 /**
  * @brief Using directive
  */
-struct CStUsingDirective : public CStAstNodeBase
+struct CStUsingDirective : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strNamespace;
     std::vector< std::string > m_vecNamespace;
@@ -1332,9 +1334,9 @@ struct CStUsingDirective : public CStAstNodeBase
  * Represents an access declaration in IEC 61131-3:
  * id : access_path : type_spec [READ_ONLY | READ_WRITE]
  */
-struct CStAccessDeclNode : public CStAstNodeBase
+struct CStAccessDeclNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strId;        // The identifier being declared
     ObjPtr m_pAccessPath;       // The access path (instance_path)
@@ -1352,9 +1354,9 @@ struct CStAccessDeclNode : public CStAstNodeBase
  *
  * Collects access declarations inside an access declaration block.
  */
-struct CStAccessDeclListNode : public CStAstNodeBase
+struct CStAccessDeclListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecAccessDecls;
 
@@ -1370,9 +1372,9 @@ struct CStAccessDeclListNode : public CStAstNodeBase
  * Wraps the access declarations in VAR_ACCESS ... END_VAR block.
  * Can be empty or contain a list of access declarations.
  */
-struct CStAccessDeclsNode : public CStAstNodeBase
+struct CStAccessDeclsNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pAccessDeclList;  // CStAccessDeclListNode or empty
 
@@ -1387,9 +1389,9 @@ struct CStAccessDeclsNode : public CStAstNodeBase
  *
  * Collects global variable declarations.
  */
-struct CStGlobalVarDeclListNode : public CStAstNodeBase
+struct CStGlobalVarDeclListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecGlobalVars;
 
@@ -1410,9 +1412,9 @@ struct CStGlobalVarDeclListNode : public CStAstNodeBase
  *     config_init
  * END_CONFIGURATION
  */
-struct CStConfigDeclNode : public CStAstNodeBase
+struct CStConfigDeclNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strConfigName;
     ObjPtr m_pGlobalVars;      // global_var_decls_opt_list
@@ -1432,9 +1434,9 @@ struct CStConfigDeclNode : public CStAstNodeBase
  * Collects top-level declarations: namespace_elements, config_declaration,
  * and access_declarations.
  */
-struct CStDeclsNode : public CStAstNodeBase
+struct CStDeclsNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecDecls;
 
@@ -1450,9 +1452,9 @@ struct CStDeclsNode : public CStAstNodeBase
  * Represents a single resource declaration in IEC 61131-3:
  * Contains task configurations and program configurations.
  */
-struct CStSingleResourceDeclNode : public CStAstNodeBase
+struct CStSingleResourceDeclNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pTaskList;   // task_config_list
     ObjPtr m_pProgList;   // prog_config_list
@@ -1471,9 +1473,9 @@ struct CStSingleResourceDeclNode : public CStAstNodeBase
  *     ... task_config_list, prog_config_list
  * END_RESOURCE
  */
-struct CStResourceDeclNode : public CStAstNodeBase
+struct CStResourceDeclNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strResourceName;
     std::string m_strResourceType;  // from TOK_ID after TOK_ON
@@ -1491,9 +1493,9 @@ struct CStResourceDeclNode : public CStAstNodeBase
  *
  * Collects multiple resource declarations.
  */
-struct CStResourceDeclListNode : public CStAstNodeBase
+struct CStResourceDeclListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecResources;
 
@@ -1509,9 +1511,9 @@ struct CStResourceDeclListNode : public CStAstNodeBase
  * Represents a resource section in IEC 61131-3 configuration.
  * Can contain either a single resource or a list of resources.
  */
-struct CStResourceSectionNode : public CStAstNodeBase
+struct CStResourceSectionNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     enum enumResourceType {
         rtSingle,
@@ -1538,9 +1540,9 @@ struct CStResourceSectionNode : public CStAstNodeBase
  * explicit type information, making the AST backend-neutral for both
  * C++ and WASM code generation.
  */
-struct CStInitialValueNode : public CStAstNodeBase
+struct CStInitialValueNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     enum enumInitType {
         initExpression,  // Simple expression: x := 10;
@@ -1561,9 +1563,9 @@ struct CStInitialValueNode : public CStAstNodeBase
 /**
  * @brief Array initialization node
  */
-struct CStArrayInitNode : public CStAstNodeBase
+struct CStArrayInitNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecValues;
 
@@ -1584,9 +1586,9 @@ struct CStArrayInitNode : public CStAstNodeBase
  * translator cares about the nesting. This node is an element of
  * CStArrayInitNode::m_vecValues.
  */
-struct CStArrayRepeatNode : public CStAstNodeBase
+struct CStArrayRepeatNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     gint32 m_iCount;    // repeat count, from TOK_NUMBER
     ObjPtr m_pElement;  // the repeated element: an initial value
@@ -1602,9 +1604,9 @@ struct CStArrayRepeatNode : public CStAstNodeBase
 /**
  * @brief Struct initialization node
  */
-struct CStStructInitNode : public CStAstNodeBase
+struct CStStructInitNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< std::string > m_vecMembers;
     std::vector< ObjPtr > m_vecValues;
@@ -1618,9 +1620,9 @@ struct CStStructInitNode : public CStAstNodeBase
 /**
  * @brief Identifier list node
  */
-struct CStIdentifierListNode : public CStAstNodeBase
+struct CStIdentifierListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< std::string > m_vecIdentifiers;
 
@@ -1639,9 +1641,9 @@ struct CStIdentifierListNode : public CStAstNodeBase
  * split the list into the input/output/local/temp vectors of the
  * POU declaration.
  */
-struct CStVarDeclListNode : public CStAstNodeBase
+struct CStVarDeclListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecVarDecls;
 
@@ -1659,9 +1661,9 @@ struct CStVarDeclListNode : public CStAstNodeBase
  * The var_config_declaration rule consumes this list and
  * attaches it to the program/function block.
  */
-struct CStVarConfigListNode : public CStAstNodeBase
+struct CStVarConfigListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecConfigs;
 
@@ -1677,9 +1679,9 @@ struct CStVarConfigListNode : public CStAstNodeBase
  * Represents a program configuration in IEC 61131-3, e.g.:
  * PROGRAM MainProg WITH MyTask : PLC_PRG(x := y, a := b);
  */
-struct CStProgConfigNode : public CStAstNodeBase
+struct CStProgConfigNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::string m_strProgName;
     enum {
@@ -1704,9 +1706,9 @@ struct CStProgConfigNode : public CStAstNodeBase
  * e.g., 'input1' in 'input1 := sensor1 OUTPUT_ASSIGN actuator1'.
  * Can be a simple identifier, array access, or this.member access.
  */
-struct CStSymbolicVarNode : public CStAstNodeBase
+struct CStSymbolicVarNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pVarPath;       // The instance_path (identifier or member access)
     ObjPtr m_pSubscript;    // Optional array subscript
@@ -1725,9 +1727,9 @@ struct CStSymbolicVarNode : public CStAstNodeBase
  * e.g., 'fbInstance' in 'PROGRAM Main : PLC_PRG(fbInstance)'.
  * Can include pointer indicators (^, ^^).
  */
-struct CStFbTaskNode : public CStAstNodeBase
+struct CStFbTaskNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pInstancePath;  // The instance path (identifier or member access)
     guint32 m_iCaretCount;   // Number of pointer indicators (^)
@@ -1744,9 +1746,9 @@ struct CStFbTaskNode : public CStAstNodeBase
  * Represents a program connection in a PROGRAM configuration,
  * e.g., 'input1 := sensor1 OUTPUT_ASSIGN actuator1'.
  */
-struct CStProgCnxnNode : public CStAstNodeBase
+struct CStProgCnxnNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     ObjPtr m_pInputVar;    // symbolic_var (e.g., input1)
     ObjPtr m_pExpression;  // full_expression (e.g., sensor1)
@@ -1764,9 +1766,9 @@ struct CStProgCnxnNode : public CStAstNodeBase
  * Wraps either an fb_task (function block instance) or prog_cnxn
  * (program connection) within a PROGRAM configuration.
  */
-struct CStProgConfElemNode : public CStAstNodeBase
+struct CStProgConfElemNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     enum enumElemType {
         elemFbTask,   // fb_task: instance_path
@@ -1787,9 +1789,9 @@ struct CStProgConfElemNode : public CStAstNodeBase
  *
  * Collects program configurations inside a resource declaration.
  */
-struct CStProgConfigListNode : public CStAstNodeBase
+struct CStProgConfigListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecProgs;
 
@@ -1802,9 +1804,9 @@ struct CStProgConfigListNode : public CStAstNodeBase
 /**
  * @brief Transient accumulator for method_declaration_list
  */
-struct CStMethodDeclListNode : public CStAstNodeBase
+struct CStMethodDeclListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecMethods;
 
@@ -1823,9 +1825,9 @@ struct CStMethodDeclListNode : public CStAstNodeBase
  * list is consumed by case_statement and does not appear in the final
  * AST.
  */
-struct CStCaseBranchListNode : public CStAstNodeBase
+struct CStCaseBranchListNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< CStCaseStmt::CCaseBranch > m_vecBranches;
 
@@ -1841,9 +1843,9 @@ struct CStCaseBranchListNode : public CStAstNodeBase
  * The root node contains all top-level declarations and provides
  * access to the global namespace scope for absolute path resolution.
  */
-struct CStRootNode : public CStAstNodeBase
+struct CStRootNode : public CSTAstNodeBase
 {
-    typedef CStAstNodeBase super;
+    typedef CSTAstNodeBase super;
 
     std::vector< ObjPtr > m_vecChildren;
     std::vector< ObjPtr > m_vecDeclarations;

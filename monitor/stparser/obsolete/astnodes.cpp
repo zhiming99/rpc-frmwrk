@@ -23,6 +23,7 @@
  */
 
 #include "stlexer.h"
+#include "parsrctx.h"
 #include "stclsids.h"
 #include "astnodes.h"
 #include <sstream>
@@ -157,7 +158,7 @@ std::string CStLValueNode::GetNodeInfo() const
     oss << "LValue";
     if( !m_pExpression.IsEmpty() )
     {
-        CStAstNodeBase* pBase = dynamic_cast< CStAstNodeBase* >(
+        CSTAstNodeBase* pBase = dynamic_cast< CSTAstNodeBase* >(
             ( CObjBase* )m_pExpression );
         if( pBase )
             oss << "{" << pBase->GetNodeInfo() << "}";
@@ -175,7 +176,7 @@ std::string CStLValueExtNode::GetNodeInfo() const
     oss << "LValueExt";
     if( !m_pExpression.IsEmpty() )
     {
-        CStAstNodeBase* pBase = dynamic_cast< CStAstNodeBase* >(
+        CSTAstNodeBase* pBase = dynamic_cast< CSTAstNodeBase* >(
             ( CObjBase* )m_pExpression );
         if( pBase )
             oss << "{" << pBase->GetNodeInfo() << "}";

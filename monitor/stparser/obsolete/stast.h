@@ -13,7 +13,7 @@
  *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:
  *
- *      Copyright:  2026 Ming Zhi( woodhead99@gmail.com )
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
  *
  *        License:  This program is free software; you can redistribute it
  *                  and/or modify it under the terms of the GNU General Public
@@ -24,32 +24,52 @@
  */
 #pragma once
 
+#include "stparser.h"
+
+/* the node is a constant value */
+#define NODE_FLAG_CONST         0x1
+/* the node is a pointer variable */
+#define NODE_FLAG_POINTER       0x2
+/* the node is a reference variable */
+#define NODE_FLAG_REF           0x4
+/* the node is for input parameter, read-only*/
+#define NODE_FLAG_INPUT         0x8
+/* the node is for output parameter, write-only*/
+#define NODE_FLAG_OUTPUT        0x10
+/* the node is for a block of memory */
+#define NODE_FLAG_MEM           0x20
+/* target code is generated */
+#define NODE_FLAG_GENERATED     0x40
+
 namespace rpcf
 {
 
-struct CStAstNodeBase :
+struct CSTAstNodeBase :
     public CObjBase
 {
     typedef CObjBase super;
     guint32 m_dwFlags = 0;
-    CStAstNodeBase():super()
+    CSTAstNodeBase():super()
     {} 
-    CStAstNodeBase* m_pParent = nullptr;
+    CSTAstNodeBase* m_pParent = nullptr;
+    gint32 m_iToken = YYUNDEF;
+    YYLTYPE2  m_oLocation;
 
     // the file index in the include file stack.
     // -1 means the file to parse.
     gint32 m_iFileIdx = -1;
+    YYSTYPE m_oValue;
     
-    std::vector< CStAstNodeBase > m_vecChildren;
+    std::vector< CSTAstNodeBase > m_vecChildren;
 
     inline void SetParent(
-        CStAstNodeBase* pParent )
+        CSTAstNodeBase* pParent )
     {
         if( pParent != nullptr )
             m_pParent = pParent;
     }
 
-    CStAstNodeBase* GetParent() const
+    CSTAstNodeBase* GetParent() const
     { return m_pParent; }
 
     virtual std::string ToString() const
@@ -57,6 +77,15 @@ struct CStAstNodeBase :
 
     virtual std::string GetSignature() const
     { return std::string( "" ); }
+
+    inline void SetLocation( const YYLTYPE2& oLoc )
+    { m_oLocation = oLoc; }
+
+    const YYLTYPE2& GetLocation() const
+    { return m_oLocation; }
+
+    YYLTYPE2& GetLocation()
+    { return m_oLocation; }
 
     virtual std::string GetNodeInfo() const 
     { return ""; }
