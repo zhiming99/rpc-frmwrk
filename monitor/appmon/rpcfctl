@@ -389,7 +389,7 @@ case "$cmd" in
             expect - << EOF > /dev/null
 #!/usr/bin/expect -f
 set timeout -1
-echo initializing user registry...
+send_user "initializing user registry...\n"
 spawn $cmddir/inituser.sh -s 
 expect {
     "Password:" { send "123\n";exp_continue}

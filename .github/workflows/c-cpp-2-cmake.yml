@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: checkout gmssl
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
           repository: zhiming99/GmSSL
           path: ./gmssl
@@ -31,7 +31,7 @@ jobs:
       run:  pip3 install numpy wheel sip
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
             node-version: '24'
 
@@ -52,7 +52,7 @@ jobs:
       run: cd build && sudo cmake --install .
 
     - name: initsvr
-      run: /usr/local/bin/rpcfctl initsvr
+      run: LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/local/lib/rpcf /usr/local/bin/rpcfctl initsvr
 
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
@@ -69,7 +69,7 @@ jobs:
     - name: make debian package
       run: cd build; cmake .. && cpack -G DEB; sudo apt-get -y install ./rpcf_*deb && sudo apt-get install ./rpcf-dev_*deb
     - name: upload debian packages
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
           name: runtime-package
           path: |
@@ -82,7 +82,7 @@ jobs:
 
     - name: Upload Test Results on Canceled
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
           name: logfiles
           path: |

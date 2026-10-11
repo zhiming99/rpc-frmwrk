@@ -17,7 +17,7 @@ tempNo=${stateNo#case};stateNo=${tempNo%: }
 sed -i "s/define LVALUE_BIT_STATES .*/define LVALUE_BIT_STATES     $stateNo/" parsrctx.h
 echo LVALUE_BIT_STATES=$stateNo
 
-stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $2; } /TOK_METHOD .*instance_path \. TOK_VSEMICOLON/ { printf( "%d, ",last_match ); }' ${output_path}/stparser.output`
+stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $2; } /TOK_METHOD .*data_type_access \. TOK_VSEMICOLON/ { printf( "%d, ",last_match ); }' ${output_path}/stparser.output`
 stateNo="${stateNo%, }"
 sed -i "s/define METHOD_RET_STATE.*/define METHOD_RET_STATE     $stateNo/" parsrctx.h
 echo METHOD_RET_STATE=$stateNo
@@ -31,3 +31,4 @@ stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $2; } /TOK_VSTART
 stateNo="${stateNo%, }"
 sed -i "s/define CASESEL_CHECK_STATES .*/define CASESEL_CHECK_STATES     std::vector<int>({ ${stateNo} })/" parsrctx.h
 echo CASESEL_CHECK_STATES=$stateNo;
+

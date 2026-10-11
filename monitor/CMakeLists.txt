@@ -21,5 +21,5 @@ endif()
 # 3. Remaining Subdirectories
 # ==============================================================================
 add_subdirectory(appmon)
-add_subdirectory(stparser)
+#add_subdirectory(stparser)
 
