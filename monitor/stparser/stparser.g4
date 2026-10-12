@@ -61,6 +61,12 @@ options { tokenVocab=stlexer; }
     { m_bPass2 = bPass2; }
 }
 
+@parser::header {
+    // Injects directly into YourIEC61131Parser.h
+#include "parse_context.h"
+#include "st_parser_ext.h"
+}
+
 // ============================================================
 // Start Point
 // ============================================================
@@ -109,8 +115,17 @@ namespace_name
     ;
 
 namespace_decl
-    : TOK_NAMESPACE opt_internal namespace_name ( TOK_DOT namespace_name )*
-    using_directive_list? namespace_elements TOK_END_NAMESPACE
+    : TOK_NAMESPACE opt_internal
+        first=namespace_name ( TOK_DOT rest+=namespace_name )*
+        {
+            auto pParser = static_cast< CStParser* >
+                ( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->RegisterNamespace( first, rest );
+        }
+        using_directive_list?
+        namespace_elements
+        TOK_END_NAMESPACE
     ;
 
 namespace_global_name
