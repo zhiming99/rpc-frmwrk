@@ -31,6 +31,7 @@
 #include "stlexer.h"
 #include "stparser.h"
 #include "pragma.h"
+#include "defines.h"
 #include "parse_context.h"
 #include "pragma_expr/pragma_exprLexer.h"
 
@@ -823,3 +824,85 @@ std::string CStPragmaFilteringTokenStream::
     return strDefault;
 }
 
+gint32 CStParseContext::DeclareNamespace(
+    const std::string& strFirst,
+    const std::vector<stparser::Namespace_nameContext*>& rest) 
+{
+    gint32 ret = 0;
+    do{
+        // Construct the complete trailing path
+        std::vector< std::string > vecComps;
+        vecComps.push_back( strFirst );
+        for( size_t i = 0; i < rest.size() - 1; i++ )
+            vecComps.push_back( rest[i]->getText() );
+
+        stdstr strNsName;
+        if( rest.size() ) 
+        {
+            strNsName = rest.back()->getText();
+        }
+        else
+        {
+            strNsName = strFirst;
+        }
+
+        bool bCreate = false;
+        for( auto strName : vecComps )
+        {
+            SymVector sv;
+            m_oSymTab.FindByKind( symNamespace, sv );
+            if( sv.empty() )
+            {
+                bCreate = true;
+                m_oSymTab.DeclareScopeOwner(
+                    symNamespace,
+                    scopeNamespace,
+                    strName, ObjPtr() );
+                continue;
+            }
+            else if( !sv.empty() && bCreate )
+            {
+                std::cerr << "stparser Error: "
+                    << "Duplicated namespace name'"
+                    << strName << "'\n";
+                ret = -EEXIST;
+                break;
+            }
+            else
+            {
+                SymPtr pSym = sv[0];
+                if( pSym.IsEmpty() )
+                {
+                    std::cerr << "stparser Internal Error: "
+                        << "Scope object is empty '"
+                        << strName << "'\n";
+                    ret = -EFAULT;
+                    break;
+                }
+                ScopePtr pScope( pSym->m_pDefScope );
+                m_oSymTab.PushScope( pScope );
+            }
+        }
+
+        m_oSymTab.DeclareScopeOwner(
+            symNamespace,
+            scopeNamespace,
+            strNsName, ObjPtr() );
+
+    }while( 0 );
+    return ret;
+}
+
+void CStParseContext::LeaveNamespace(
+    const std::string& strFirst,
+    const std::vector<stparser::Namespace_nameContext*>& rest)
+{
+    // Calculate the total number of layers pushed:
+    // 1 (for strFirst) + number of trailing parts
+    size_t uTotalLayers = 1 + rest.size();
+
+    // Safely unwind the LIFO scope stack layers
+    for (size_t i = 0; i < uTotalLayers; ++i) {
+        m_oSymTab.PopScope();
+    }
+}

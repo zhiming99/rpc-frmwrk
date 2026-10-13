@@ -34,6 +34,7 @@
 #include <fstream>
 #include <iostream>
 #include "stlcont.h"
+#include "stsymtab.h"
 
 enum class EnumTypeCategory {
     Invalid = -1,
@@ -62,30 +63,6 @@ struct TypeEntry {
     std::string name;
     EnumTypeCategory category;
     // Additional type info can be added here
-};
-
-class SymbolTable {
-public:
-    void addType(
-        const std::string& strName,
-        EnumTypeCategory cat)
-    { types[strName] = {strName, cat}; }
-
-    EnumTypeCategory lookup(const std::string& name) const
-    {
-        auto it = types.find(name);
-        if (it != types.end()) {
-            return it->second.category;
-        }
-        return EnumTypeCategory::Unknown;
-    }
-
-    bool isKnown(const std::string& name) const {
-        return types.find(name) != types.end();
-    }
-
-private:
-    std::map<std::string, TypeEntry> types;
 };
 
 struct CStCmdlineMacros
@@ -375,8 +352,8 @@ public:
 
 // Parse context shared between listener and parser
 // predicates
-struct CStParseContext {
-
+struct CStParseContext
+{
     CStParseContext()
     {
         m_pvecIncludePaths.NewObj();
@@ -384,7 +361,7 @@ struct CStParseContext {
     }
     
     // Symbol table for type resolution
-    SymbolTable* m_pSymTab = nullptr;
+    CStSymbolTable m_oSymTab;
 
     CStCmdlineMacros        m_oMacros;
     rpcf::StrVecPtr         m_pvecIncludePaths;
@@ -407,18 +384,17 @@ struct CStParseContext {
     EnumTypeCategory ResolveType(
         const std::string& strName) const
     {
-        if (!m_pSymTab)
-            return EnumTypeCategory::Invalid;
-        return m_pSymTab->lookup(strName);
+        // TODO: add implementation
+        m_oSymTab.Lookup(strName);
+        return EnumTypeCategory::Invalid;
     }
 
     // Check if a type is known in the symbol table
     bool IsTypeKnown(
         const std::string& strName) const
     {
-        if (!m_pSymTab)
-            return false;
-        return m_pSymTab->isKnown( strName );
+        // TODO: add implementation
+        return false;
     }
 
     auto GetMacros() const
@@ -426,6 +402,14 @@ struct CStParseContext {
 
     auto GetMacros()
     { return m_oMacros.m_mapMacros; }
+
+    gint32 DeclareNamespace(
+        const std::string& sFirst,
+        const std::vector<stparser::Namespace_nameContext*>& rest);
+
+    void LeaveNamespace(
+        const std::string& sFirst,
+        const std::vector<stparser::Namespace_nameContext*>& rest);
 };
 
 #endif // ST_PARSE_CONTEXT_H

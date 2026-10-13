@@ -164,6 +164,7 @@ static FactoryPtr InitClassFactory()
 
     // Symbol table
     INIT_MAP_ENTRY( CStSymbol );
+    INIT_MAP_ENTRY( CStScope );
 
     END_FACTORY_MAPS;
 };

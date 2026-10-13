@@ -128,6 +128,7 @@ typedef enum
 
     // Symbol table
     DECL_CLSID( CStSymbol ),
+    DECL_CLSID( CStScope ),
 
 }EnumSTParserClsid;
 
