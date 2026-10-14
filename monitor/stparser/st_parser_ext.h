@@ -5,6 +5,11 @@
 #include "parse_context.h"
 #include "clsids.h"
 
+enum class DiagnosticSeverity {
+    Warning,
+    Error,
+    Fatal
+};
 /**
  * Extended parser that adds semantic predicates for type disambiguation.
  * 
