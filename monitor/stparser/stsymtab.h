@@ -33,7 +33,8 @@
 /**
  * @brief What kind of entity a symbol represents
  */
-using namespace rpcf;
+namespace rpcf
+{
 
 enum enumSymKind {
     symUnknown = 0,
@@ -76,8 +77,9 @@ struct CStScope;
  * lookup keys and the cheap-to-read summary the semantic phase needs
  * on its hot paths.
  */
-struct CStSymbol : public CObjBase
+class CStSymbol : public rpcf::CObjBase
 {
+    public:
     std::string m_strName;
     enumSymKind m_eKind;
 
@@ -178,7 +180,7 @@ struct CStSymbol : public CObjBase
     { return m_bResolved; }
 };
 
-typedef CAutoPtr< clsid( CStSymbol ), CStSymbol > SymPtr;
+typedef CAutoPtr<clsid( CStSymbol ), CStSymbol> SymPtr;
 typedef std::vector< SymPtr > SymVector;
 
 /**
@@ -191,7 +193,7 @@ typedef std::vector< SymPtr > SymVector;
 struct CStScope;
 typedef CAutoPtr< clsid( CStScope ), CStScope > ScopePtr;
 
-struct CStScope : public CObjBase
+struct CStScope : public rpcf::CObjBase
 {
     enumScopeKind m_eKind;
     std::string m_strName;
@@ -591,6 +593,17 @@ public:
         return;
     }
 
+    //! all candidates of current scope
+    void LookupAllLocal(
+        const std::string& strName,
+        SymVector& vecOut ) const
+    {
+        if( m_stackScopes.size() )
+            m_stackScopes.back()->GetAllLocal(
+                strName, vecOut );
+        return;
+    }
+
     //! lookup in one scope only, no chain walk
     SymPtr LookupLocal(
         const std::string& strName,
@@ -735,4 +748,5 @@ public:
         return strOut;
     }
 };
+}
 

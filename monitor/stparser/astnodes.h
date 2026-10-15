@@ -1186,13 +1186,15 @@ struct CStMethodDecl : public CStPouDeclNode
  * which can be used to explicitly mark the boundary between global
  * declarations and backend-specific constructs.
  */
+struct CStSymbol;
 struct CStNamespaceDecl : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    std::string m_strName;
+    CStSymbol* m_pSymbol;
     std::vector< ObjPtr > m_vecElements;
     std::vector< ObjPtr > m_vecDeclarations;
+    std::vector< ObjPtr > m_vecUsing;
 
     CStNamespaceDecl() : super()
     { SetClassId( clsid( CStNamespaceDecl ) ); }
@@ -1201,15 +1203,13 @@ struct CStNamespaceDecl : public CStAstNodeBase
      * @brief Check if this is the global scope boundary
      * @return true if m_strName is empty (global scope)
      */
-    bool IsGlobalScope() const 
-    { return m_strName.empty(); }
+    bool IsGlobalScope() const;
 
     /**
      * @brief Check if this is a named namespace
      * @return true if m_strName is not empty
      */
-    bool IsNamedNamespace() const
-    { return !m_strName.empty(); }
+    bool IsNamedNamespace() const;
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -1317,11 +1317,24 @@ struct CStUsingDirective : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    std::string m_strNamespace;
     std::vector< std::string > m_vecNamespace;
 
     CStUsingDirective() : super()
     { SetClassId( clsid( CStUsingDirective ) ); }
+
+    bool AddNamespace( const std::string& strns ) 
+    {
+        if( strns.empty() )
+            return false;
+        auto& vec = m_vecNamespace;
+        bool bExists = (std::find(
+            vec.begin(), vec.end(), strns) !=
+            vec.end());
+        if( bExists )
+            return false;
+        vec.push_back( strns );
+        return true;
+    }
 
     virtual std::string GetNodeInfo() const override;
 };

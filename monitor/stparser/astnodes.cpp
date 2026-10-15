@@ -26,6 +26,7 @@
 #include "stclsids.h"
 #include "astnodes.h"
 #include <sstream>
+#include "stsymtab.h"
 
 namespace rpcf
 {
@@ -442,6 +443,12 @@ std::string CStArrayRepeatNode::GetNodeInfo() const
     oss << " }";
     return oss.str();
 }
+
+bool CStNamespaceDecl::IsGlobalScope() const 
+{ return m_pSymbol->m_strName.empty(); }
+
+bool CStNamespaceDecl::IsNamedNamespace() const
+{ return !m_pSymbol->m_strName.empty(); }
 
 // ========================================================================
 // Default implementations for AST nodes

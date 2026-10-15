@@ -62,6 +62,10 @@ options { tokenVocab=stlexer; }
 }
 
 @parser::context {
+#include "rpc.h"
+#include "astnodes.h"
+#include "stsymtab.h"
+using namespace rpcf;
 }
 
 // ============================================================
@@ -115,12 +119,53 @@ namespace_decl
     : TOK_NAMESPACE opt_internal
         first=namespace_name ( TOK_DOT rest+=namespace_name )*
         {
-            auto pParser = static_cast< CStParser* >
-                ( this );
+            auto pParser = static_cast< CStParser* >( this );
             auto pCtx = pParser->GetParseContext();
-            pCtx->DeclareNamespace( $first.text, $rest );
+            auto ret = pCtx->DeclareNamespace(
+                $first.text, $rest );
+            if( ERROR( ret ) )
+            {
+                pCtx->LogError( $first.start,
+                    "Declare namespace failed:'%s'(%d).",
+                    $first.text.c_str(), ret );
+            }
         }
-        using_directive_list?
+        (uds = using_directive_list
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            std::string strNsName;
+            if( $rest.size() )
+                strNsName = $rest.back()->getText();
+            else
+                strNsName = $first.text;
+            SymVector vecOut;
+            auto pScope =
+                pCtx->m_oSymTab.GetCurrentScope();
+            auto& symt = pCtx->m_oSymTab;
+            symt.LookupAllLocal( strNsName, vecOut );
+            bool bFound = false;
+            for( auto elem : vecOut )
+            {
+                if( elem->m_strName != strNsName ||
+                    elem->m_eKind != symNamespace )
+                    continue;
+                CStNamespaceDecl* pnsd =
+                    elem->m_pDeclNode;
+                if( pnsd )
+                {
+                    pnsd->m_vecUsing = $uds.vecUsings;
+                    bFound = true;
+                    break;
+                }
+            }
+            if( !bFound )
+            {
+                pCtx->LogError( $first.start,
+                    "Unable to find the declared namespace:'%s'",
+                    $first.text.c_str() );
+            }
+        })?
         namespace_elements
         TOK_END_NAMESPACE
         { 
@@ -663,12 +708,58 @@ fb_name
 
 std_fb_name: identifier;
 
-using_directive_list
-    : using_directive+
+using_directive_list returns [ std::vector<ObjPtr> vecUsings ]
+    : ( ud = using_directive
+        {
+            if( !$ud.pNode.IsEmpty() )
+                $vecUsings.push_back( $ud.pNode );
+        }
+    )+
     ;
 
-using_directive
-    : TOK_USING instance_path (TOK_COMMA instance_path)* semicolons
+using_directive returns [rpcf::ObjPtr pNode]
+    : TOK_USING
+      first = instance_path
+      {
+          rpcf::ObjPtr pObj;
+          pObj.NewObj( clsid( CStUsingDirective ) );
+          CStUsingDirective* pud = pObj;
+          if( !pud->AddNamespace( $first.text ) )
+          {
+            auto pParser =
+                static_cast<CStParser*>(this);
+              CStParseContext* pCtx =
+                pParser->GetParseContext();
+              pCtx->LogError( $first.start,
+                  "Duplicate path in USING directive:'%s'",
+                  $first.text.c_str() );
+              $pNode = ObjPtr();
+          }
+          else
+              $pNode = pObj;
+      }
+      (TOK_COMMA rest+=instance_path
+          {
+              // Skip processing if initial path failed
+              if (!$pNode.IsEmpty()) 
+              {
+                  CStUsingDirective* pud = $pNode;
+                  auto pCurCtx = $rest.back();
+                  std::string strPath = pCurCtx->getText();
+                  if (!pud->AddNamespace(strPath))
+                  {
+                      auto pParser = 
+                          static_cast<CStParser*>(this);
+                      CStParseContext* pCtx =
+                        pParser->GetParseContext();
+                      pCtx->LogError( pCurCtx->start, 
+                          "Duplicate path in USING directive '%s'.",
+                          strPath.c_str());
+                  }
+              }
+          }
+      )*
+      semicolons
     ;
 
 extends_clause

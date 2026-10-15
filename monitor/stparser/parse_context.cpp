@@ -35,6 +35,9 @@
 #include "parse_context.h"
 #include "pragma_expr/pragma_exprLexer.h"
 
+namespace rpcf
+{
+
 std::string CStIncludeManager::ResolveIncludePath(
     const std::string& strPath ) const
 {
@@ -172,8 +175,7 @@ bool CStTokenPipeline::InjectIncludeStream(
     if( m_pIncludeMgr->IsCyclicInclude(
         strFilePath, iFileIdx ) )
     {
-        std::cerr << "CSt Compiler Error: Cyclic "
-            << "include detected on file: " 
+        std::cerr << "stparsr error: Cyclic include detected on file: " 
             << strFilePath << "\n";
         return false;
     }
@@ -190,8 +192,7 @@ bool CStTokenPipeline::InjectIncludeStream(
         std::ifstream>( strFilePath );
     if( !pFileStream->is_open() )
     {
-        std::cerr << "stparser Error: Unable "
-            << "to open file stream: "
+        std::cerr << "stparser error: Unable to open file stream: "
             << strFilePath << "\n";
         m_pIncludeMgr->PopFile();
         return false;
@@ -420,9 +421,7 @@ bool CStPragmaFilteringTokenStream::EvaluateInclude(
     }
     catch (const std::bad_any_cast& e)
     {
-        std::cerr << "Error: 'include' "
-            << "directive did not compile. "
-            << "Default to false\n";
+        std::cerr << "stparser error: 'include' directive did not compile. Default to false\n";
         return false;
     }
     return false;
@@ -833,18 +832,8 @@ gint32 CStParseContext::DeclareNamespace(
         // Construct the complete trailing path
         std::vector< std::string > vecComps;
         vecComps.push_back( strFirst );
-        for( size_t i = 0; i < rest.size() - 1; i++ )
+        for( size_t i = 0; i < rest.size(); i++ )
             vecComps.push_back( rest[i]->getText() );
-
-        stdstr strNsName;
-        if( rest.size() ) 
-        {
-            strNsName = rest.back()->getText();
-        }
-        else
-        {
-            strNsName = strFirst;
-        }
 
         bool bCreate = false;
         for( auto strName : vecComps )
@@ -853,17 +842,25 @@ gint32 CStParseContext::DeclareNamespace(
             m_oSymTab.FindByKind( symNamespace, sv );
             if( sv.empty() )
             {
+                ObjPtr pObj;
+                ret = pObj.NewObj(
+                    clsid( CStNamespaceDecl ) );
+                if( ERROR( ret ) )
+                    break;
+                auto pnsd = ( CStNamespaceDecl* )pObj;
+                
                 bCreate = true;
-                m_oSymTab.DeclareScopeOwner(
+                auto pSym = m_oSymTab.DeclareScopeOwner(
                     symNamespace,
                     scopeNamespace,
-                    strName, ObjPtr() );
+                    strName, pObj );
+                if( !pSym.IsEmpty() )
+                    pnsd->m_pSymbol = pSym;
                 continue;
             }
             else if( !sv.empty() && bCreate )
             {
-                std::cerr << "stparser Error: "
-                    << "Duplicated namespace name'"
+                std::cerr << "stparser error: Duplicated namespace name'"
                     << strName << "'\n";
                 ret = -EEXIST;
                 break;
@@ -873,8 +870,7 @@ gint32 CStParseContext::DeclareNamespace(
                 SymPtr pSym = sv[0];
                 if( pSym.IsEmpty() )
                 {
-                    std::cerr << "stparser Internal Error: "
-                        << "Scope object is empty '"
+                    std::cerr << "stparser Internal error: Scope object is empty '"
                         << strName << "'\n";
                     ret = -EFAULT;
                     break;
@@ -883,11 +879,6 @@ gint32 CStParseContext::DeclareNamespace(
                 m_oSymTab.PushScope( pScope );
             }
         }
-
-        m_oSymTab.DeclareScopeOwner(
-            symNamespace,
-            scopeNamespace,
-            strNsName, ObjPtr() );
 
     }while( 0 );
     return ret;
@@ -902,7 +893,8 @@ void CStParseContext::LeaveNamespace(
     size_t uTotalLayers = 1 + rest.size();
 
     // Safely unwind the LIFO scope stack layers
-    for (size_t i = 0; i < uTotalLayers; ++i) {
+    for (size_t i = 0; i < uTotalLayers; ++i)
         m_oSymTab.PopScope();
-    }
+}
+
 }

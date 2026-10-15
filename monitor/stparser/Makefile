@@ -40,7 +40,7 @@ $(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parse
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Regenerate parser from grammar
-$(gen_src): stparser.g4 stlexer.g4
+$(gen_src) &: stparser.g4 stlexer.g4
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o . stparser.g4 stlexer.g4
 	@echo "Injecting extension at the tail of stparser.h"
 	@echo '#include "parse_context.h"' >> stparser.h
