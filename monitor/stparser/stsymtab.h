@@ -220,35 +220,7 @@ struct CStScope : public rpcf::CObjBase
      * @return false on a duplicate name. Exception: functions may
      *         share a name with functions (overloads).
      */
-    bool AddSymbol( SymPtr pSymbol )
-    {
-        if( pSymbol.IsEmpty() )
-            return false;
-        CStSymbol* pSym = pSymbol;
-        if( pSym == nullptr ||
-            pSym->m_strName.empty() )
-            return false;
-        auto& vec = m_mapSymbols[ pSym->m_strName ];
-        if( !vec.empty() )
-        {
-            bool bOverload =
-                ( pSym->m_eKind == symFunction );
-            for( guint32 i = 0;
-                i < vec.size() && bOverload;
-                ++i )
-            {
-                CStSymbol* pOld = vec[ i ];
-                if( pOld == nullptr ||
-                    pOld->m_eKind != symFunction )
-                    bOverload = false;
-            }
-            if( !bOverload )
-                return false;
-        }
-        pSym->m_pScope = this;
-        vec.push_back( pSymbol );
-        return true;
-    }
+    gint32 AddSymbol( SymPtr pSymbol );
 
     //! first symbol with this name, or a null SymPtr
     SymPtr LookupLocal( const std::string& strName ) const
@@ -333,128 +305,23 @@ private:
     ScopeStack m_stackScopes;
 
     ScopePtr NewScopeInternal(
-        enumScopeKind eKind, const std::string& strName )
-    {
-        ScopePtr pScope( true );
-        m_dequeScopes.push_back( pScope );
-        pScope->m_eKind = eKind;
-        pScope->m_strName = strName;
-        return pScope;
-    }
+        enumScopeKind eKind,
+        const std::string& strName );
 
-    static void WalkByKind( CStScope* pScope,
-        enumSymKind eKind, bool bRecurse, SymVector& vecOut )
-    {
-        if( pScope == nullptr )
-            return;
-        std::map< std::string, SymVector >::iterator itr;
-        for( itr = pScope->m_mapSymbols.begin();
-            itr != pScope->m_mapSymbols.end(); ++itr )
-        {
-            SymVector& vec = itr->second;
-            for( guint32 i = 0; i < vec.size(); ++i )
-            {
-                CStSymbol* pSym = vec[ i ];
-                if( pSym != nullptr && pSym->m_eKind == eKind )
-                    vecOut.push_back( vec[ i ] );
-            }
-        }
-        if( !bRecurse )
-            return;
-        std::map< std::string, ScopePtr >::iterator itrC;
-        for( itrC = pScope->m_mapChildren.begin();
-            itrC != pScope->m_mapChildren.end(); ++itrC )
-        {
-            WalkByKind( itrC->second, eKind, true, vecOut );
-        }
-        return;
-    }
+    static void WalkByKind(
+        CStScope* pScope,
+        enumSymKind eKind,
+        bool bRecurse,
+        SymVector& vecOut );
 
-    static void WalkByDataType( CStScope* pScope,
-        const std::string& strTypeName, bool bRecurse,
-        SymVector& vecOut )
-    {
-        if( pScope == nullptr )
-            return;
-        std::map< std::string, SymVector >::iterator itr;
-        for( itr = pScope->m_mapSymbols.begin();
-            itr != pScope->m_mapSymbols.end(); ++itr )
-        {
-            SymVector& vec = itr->second;
-            for( guint32 i = 0; i < vec.size(); ++i )
-            {
-                CStSymbol* pSym = vec[ i ];
-                if( pSym == nullptr )
-                    continue;
-                if( pSym->m_strTypeName == strTypeName )
-                    vecOut.push_back( vec[ i ] );
-            }
-        }
-        if( !bRecurse )
-            return;
-        std::map< std::string, ScopePtr >::iterator itrC;
-        for( itrC = pScope->m_mapChildren.begin();
-            itrC != pScope->m_mapChildren.end(); ++itrC )
-        {
-            WalkByDataType( itrC->second, strTypeName, true, vecOut );
-        }
-        return;
-    }
+    static void WalkByDataType(
+        CStScope* pScope,
+        const std::string& strTypeName,
+        bool bRecurse,
+        SymVector& vecOut );
 
     static void DumpScope( CStScope* pScope,
-        gint32 iDepth, std::string& strOut )
-    {
-        if( pScope == nullptr )
-            return;
-        const char* szKind = "unknown";
-        switch( pScope->m_eKind )
-        {
-        case scopeGlobal:
-            szKind = "global";
-            break;
-        case scopeNamespace:
-            szKind = "namespace";
-            break;
-        case scopePou:
-            szKind = "pou";
-            break;
-        case scopeStruct:
-            szKind = "struct";
-            break;
-        case scopeInterface:
-            szKind = "interface";
-            break;
-        default:
-            break;
-        }
-        std::string strIndent( iDepth * 2, ' ' );
-        strOut += strIndent + szKind;
-        if( !pScope->m_strName.empty() )
-            strOut += " " + pScope->m_strName;
-        strOut += " {\n";
-        std::map< std::string, SymVector >::iterator itr;
-        for( itr = pScope->m_mapSymbols.begin();
-            itr != pScope->m_mapSymbols.end(); ++itr )
-        {
-            SymVector& vec = itr->second;
-            for( guint32 i = 0; i < vec.size(); ++i )
-            {
-                CStSymbol* pSym = vec[ i ];
-                if( pSym == nullptr )
-                    continue;
-                strOut += strIndent + "  " +
-                    pSym->GetSymbolInfo() + "\n";
-            }
-        }
-        std::map< std::string, ScopePtr >::iterator itrC;
-        for( itrC = pScope->m_mapChildren.begin();
-            itrC != pScope->m_mapChildren.end(); ++itrC )
-        {
-            DumpScope( itrC->second, iDepth + 1, strOut );
-        }
-        strOut += strIndent + "}\n";
-        return;
-    }
+        gint32 iDepth, std::string& strOut );
 
 public:
     CStSymbolTable() : m_pGlobal( nullptr )
@@ -525,21 +392,7 @@ public:
         ObjPtr pDeclNode,
         const std::string& strTypeName = std::string(),
         CStVarDeclNode::enumVarCategory eCategory =
-            CStVarDeclNode::vcLocal )
-    {
-        CStScope* pScope = GetCurrentScope();
-        if( pScope == nullptr || strName.empty() )
-            return SymPtr();
-        SymPtr pSym( true );
-        pSym->m_strName = strName;
-        pSym->m_eKind = eKind;
-        pSym->m_eCategory = eCategory;
-        pSym->m_strTypeName = strTypeName;
-        pSym->m_pDeclNode = pDeclNode;
-        if( !pScope->AddSymbol( pSym ) )
-            return SymPtr();
-        return pSym;
-    }
+            CStVarDeclNode::vcLocal );
 
     /**
      * @brief Declare a symbol that opens a scope of its own
@@ -553,68 +406,25 @@ public:
         enumSymKind eKind,
         enumScopeKind eScopeKind,
         const std::string& strName,
-        ObjPtr pDeclNode )
-    {
-        SymPtr pSymbol = Declare(
-            strName, eKind, pDeclNode );
-        CStSymbol* pSym = pSymbol;
-        if( pSym == nullptr )
-            return pSymbol;
-        pSym->m_pDefScope =
-            PushScope( eScopeKind, strName );
-        return pSymbol;
-    }
+        ObjPtr pDeclNode );
 
     //! lookup by name, walking the lexical chain up to the globals
-    SymPtr Lookup( const std::string& strName ) const
-    {
-        for( auto i = ( gint32 )m_stackScopes.size() - 1;
-            i >= 0; --i )
-        {
-            SymPtr pSym =
-                m_stackScopes[ i ]->LookupLocal( strName );
-            if( !pSym.IsEmpty() )
-                return pSym;
-        }
-        return SymPtr();
-    }
+    SymPtr Lookup( const std::string& strName ) const;
 
     //! all candidates along the lexical chain, incl. overloads
     void LookupAll(
         const std::string& strName,
-        SymVector& vecOut ) const
-    {
-        for( gint32 i = ( gint32 )m_stackScopes.size() - 1;
-            i >= 0; --i )
-        {
-            m_stackScopes[ i ]->GetAllLocal(
-                strName, vecOut );
-        }
-        return;
-    }
+        SymVector& vecOut ) const;
 
     //! all candidates of current scope
     void LookupAllLocal(
         const std::string& strName,
-        SymVector& vecOut ) const
-    {
-        if( m_stackScopes.size() )
-            m_stackScopes.back()->GetAllLocal(
-                strName, vecOut );
-        return;
-    }
+        SymVector& vecOut ) const;
 
     //! lookup in one scope only, no chain walk
     SymPtr LookupLocal(
         const std::string& strName,
-        ScopePtr pScope = nullptr ) const
-    {
-        if( pScope.IsEmpty() )
-            pScope = GetCurrentScope();
-        if( pScope.IsEmpty() )
-            return SymPtr();
-        return pScope->LookupLocal( strName );
-    }
+        ScopePtr pScope = nullptr ) const;
 
     /**
      * @brief Lookup a qualified name, e.g. 'Pump.Start' or '::Msg'
@@ -628,125 +438,42 @@ public:
      */
     SymPtr LookupQualified(
         const std::vector< std::string >& vecNames,
-        bool bAbsolute = false )
-    {
-        if( vecNames.empty() )
-            return SymPtr();
-        SymPtr pSym = bAbsolute ?
-            m_pGlobal->LookupLocal( vecNames[ 0 ] ) :
-            Lookup( vecNames[ 0 ] );
-        for( guint32 i = 1; i < vecNames.size(); ++i )
-        {
-            CStSymbol* pCur = pSym;
-            if( pCur == nullptr ||
-                pCur->m_pDefScope == nullptr )
-                return SymPtr();
-            pSym = pCur->m_pDefScope->LookupLocal(
-                vecNames[ i ] );
-        }
-        return pSym;
-    }
+        bool bAbsolute = false );
 
     std::vector<std::string> BreakdownQualified(
-        const std::string& strFullName)
-    {
-        std::vector<std::string> vecComponents;
-        size_t posStart = 0;
-        size_t posEnd = strFullName.find('.');
-
-        while (true) {
-            std::string strPart =
-                (posEnd == std::string::npos)
-                ? strFullName.substr(posStart)
-                : strFullName.substr(posStart,
-                     posEnd - posStart);
-
-            if (!strPart.empty()) {
-                vecComponents.push_back(strPart);
-            }
-
-            if (posEnd == std::string::npos) {
-                break;
-            }
-            posStart = posEnd + 1;
-            posEnd = strFullName.find('.', posStart);
-        }
-
-        return vecComponents;
-    }
+        const std::string& strFullName);
 
     SymPtr LookupQualified(
         const std::string& strFullName,
-        bool bAbsolute = false )
-    {
-        auto vecComps = BreakdownQualified(
-            strFullName );
-        if( vecComps.empty() )
-            return SymPtr();
-        return LookupQualified(
-            vecComps, bAbsolute );
-    }
+        bool bAbsolute = false );
 
     //! symbols of a kind in one scope (default: the current scope)
     void FindByKind(
         enumSymKind eKind,
         SymVector& vecOut,
-        CStScope* pScope = nullptr )
-    {
-        if( pScope == nullptr )
-            pScope = GetCurrentScope();
-        WalkByKind( pScope,
-            eKind, false, vecOut );
-        return;
-    }
+        CStScope* pScope = nullptr );
 
     //! symbols of a kind in a scope subtree (default: the globals)
     void FindByKindAll(
         enumSymKind eKind,
         SymVector& vecOut,
-        CStScope* pScope = nullptr )
-    {
-        if( pScope == nullptr )
-            pScope = m_pGlobal;
-        WalkByKind( pScope,
-            eKind, true, vecOut );
-        return;
-    }
+        CStScope* pScope = nullptr );
 
     //! symbols of a data type in one scope, e.g. all 'Counter'
     //! instances (default: the current scope)
     void FindByDataType(
         const std::string& strTypeName,
         SymVector& vecOut,
-        CStScope* pScope = nullptr )
-    {
-        if( pScope == nullptr )
-            pScope = GetCurrentScope();
-        WalkByDataType( pScope,
-            strTypeName, false, vecOut );
-        return;
-    }
+        CStScope* pScope = nullptr );
 
     //! symbols of a data type in a scope subtree (default: globals)
     void FindByDataTypeAll(
         const std::string& strTypeName,
         SymVector& vecOut,
-        CStScope* pScope = nullptr )
-    {
-        if( pScope == nullptr )
-            pScope = m_pGlobal;
-        WalkByDataType( pScope,
-            strTypeName, true, vecOut );
-        return;
-    }
+        CStScope* pScope = nullptr );
 
     //! indented scope tree listing, for debugging the semantic phase
-    std::string Dump()
-    {
-        std::string strOut;
-        DumpScope( m_pGlobal, 0, strOut );
-        return strOut;
-    }
+    std::string Dump();
 };
 }
 

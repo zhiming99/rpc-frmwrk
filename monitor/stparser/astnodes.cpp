@@ -26,7 +26,9 @@
 #include "stclsids.h"
 #include "astnodes.h"
 #include <sstream>
+#include <string_view>
 #include "stsymtab.h"
+#include "st_parser_ext.h"
 
 namespace rpcf
 {
@@ -450,6 +452,59 @@ bool CStNamespaceDecl::IsGlobalScope() const
 bool CStNamespaceDecl::IsNamedNamespace() const
 { return !m_pSymbol->m_strName.empty(); }
 
+gint32 CStNamespaceDecl::ResolveUsingNs(
+    void* pctx )
+{
+    gint32 ret = 0;
+    do{
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto ost = pCtx->m_oSymTab;
+        for( auto pObj : m_vecUsings )
+        {
+            CStUsingDirective* pud = pObj;
+            if( pud == nullptr )
+                continue;
+            auto& vecNames = pud->m_vecNamespaces;
+            for( auto elem: vecNames )
+            {
+                if( !elem.second.IsEmpty() )
+                    continue;
+
+                auto vecComps = 
+                    ost.BreakdownQualified( elem.first );
+
+                if( vecComps.empty() )
+                    continue;
+
+                auto& strPath = vecComps[ 0 ];
+                if( strPath[ 0 ] == '.' ||
+                    std::string_view(strPath).substr(0,2)
+                        == ("_.") ) 
+                {
+                    ret = ResolveAbsolutePath(
+                        strPath, pctx );
+                }
+                else
+                {
+                    ret = ResolveRelativePath(
+                        strPath, pctx );
+                }
+            }
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CStNamespaceDecl::ResolveRelativePath(
+    const stdstr& strName,
+    void* pctx )
+{ return 0; }
+
+gint32 CStNamespaceDecl::ResolveAbsolutePath(
+    const stdstr& strName,
+    void* pctx )
+{ return 0; }
 // ========================================================================
 // Default implementations for AST nodes
 // These use base class dummy implementation via override

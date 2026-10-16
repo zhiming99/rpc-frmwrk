@@ -118,7 +118,7 @@ namespace_name
 namespace_decl
     : TOK_NAMESPACE opt_internal
         first=namespace_name ( TOK_DOT rest+=namespace_name )*
-        {
+        {{
             auto pParser = static_cast< CStParser* >( this );
             auto pCtx = pParser->GetParseContext();
             auto ret = pCtx->DeclareNamespace(
@@ -129,9 +129,9 @@ namespace_decl
                     "Declare namespace failed:'%s'(%d).",
                     $first.text.c_str(), ret );
             }
-        }
+        }}
         (uds = using_directive_list
-        {
+        {{
             auto pParser = static_cast< CStParser* >( this );
             auto pCtx = pParser->GetParseContext();
             std::string strNsName;
@@ -139,38 +139,32 @@ namespace_decl
                 strNsName = $rest.back()->getText();
             else
                 strNsName = $first.text;
-            SymVector vecOut;
-            auto pScope =
-                pCtx->m_oSymTab.GetCurrentScope();
-            auto& symt = pCtx->m_oSymTab;
-            symt.LookupAllLocal( strNsName, vecOut );
-            bool bFound = false;
-            for( auto elem : vecOut )
-            {
-                if( elem->m_strName != strNsName ||
-                    elem->m_eKind != symNamespace )
-                    continue;
-                CStNamespaceDecl* pnsd =
-                    elem->m_pDeclNode;
-                if( pnsd )
-                {
-                    pnsd->m_vecUsing = $uds.vecUsings;
-                    bFound = true;
-                    break;
-                }
-            }
-            if( !bFound )
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            if( pSym->m_strName != strNsName )
             {
                 pCtx->LogError( $first.start,
-                    "Unable to find the declared namespace:'%s'",
+                    "wrong scope name:'%s'",
                     $first.text.c_str() );
             }
-        })?
+            else
+            {
+                CStNamespaceDecl* pnsd =
+                    pSym->m_pDeclNode;
+                pnsd->m_vecUsings = $uds.vecUsings;
+            }
+        }})?
         namespace_elements
         TOK_END_NAMESPACE
-        { 
+        {{ 
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            CStNamespaceDecl* pnsd = pSym->m_pDeclNode;
+            pnsd->ResolveUsingNs( pCtx );
             pCtx->LeaveNamespace( $first.text, $rest );
-        }
+        }}
     ;
 
 namespace_global_name
@@ -724,7 +718,8 @@ using_directive returns [rpcf::ObjPtr pNode]
           rpcf::ObjPtr pObj;
           pObj.NewObj( clsid( CStUsingDirective ) );
           CStUsingDirective* pud = pObj;
-          if( !pud->AddNamespace( $first.text ) )
+          if( !pud->AddNamespace(
+              $first.text, ObjPtr() ) )
           {
             auto pParser =
                 static_cast<CStParser*>(this);
@@ -746,7 +741,8 @@ using_directive returns [rpcf::ObjPtr pNode]
                   CStUsingDirective* pud = $pNode;
                   auto pCurCtx = $rest.back();
                   std::string strPath = pCurCtx->getText();
-                  if (!pud->AddNamespace(strPath))
+                  if( !pud->AddNamespace(
+                      strPath, ObjPtr()))
                   {
                       auto pParser = 
                           static_cast<CStParser*>(this);

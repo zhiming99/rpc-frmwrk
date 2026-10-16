@@ -1193,11 +1193,21 @@ struct CStNamespaceDecl : public CStAstNodeBase
 
     CStSymbol* m_pSymbol;
     std::vector< ObjPtr > m_vecElements;
-    std::vector< ObjPtr > m_vecDeclarations;
-    std::vector< ObjPtr > m_vecUsing;
+    // std::vector< ObjPtr > m_vecDeclarations;
+    std::vector< ObjPtr > m_vecUsings;
 
     CStNamespaceDecl() : super()
     { SetClassId( clsid( CStNamespaceDecl ) ); }
+
+    gint32 ResolveUsingNs( void* pCtx );
+
+    gint32 ResolveAbsolutePath(
+        const stdstr& strName,
+        void* pCtx );
+
+    gint32 ResolveRelativePath(
+        const stdstr& strName,
+        void* pCtx );
 
     /**
      * @brief Check if this is the global scope boundary
@@ -1317,22 +1327,45 @@ struct CStUsingDirective : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    std::vector< std::string > m_vecNamespace;
+    using NS_ELEM =
+        std::pair< std::string, ObjPtr >;
+    std::vector< NS_ELEM > m_vecNamespaces;
 
     CStUsingDirective() : super()
     { SetClassId( clsid( CStUsingDirective ) ); }
 
-    bool AddNamespace( const std::string& strns ) 
+    bool AddNamespace(
+        const std::string& strns,
+        ObjPtr pSym ) 
     {
         if( strns.empty() )
             return false;
-        auto& vec = m_vecNamespace;
-        bool bExists = (std::find(
-            vec.begin(), vec.end(), strns) !=
-            vec.end());
-        if( bExists )
+        auto& vec = m_vecNamespaces;
+        auto itr = std::find_if(
+            vec.begin(), vec.end(),
+            [ strns ]( const NS_ELEM& elem){
+                return elem.first == strns;
+            });
+        if( itr != vec.end() )
             return false;
-        vec.push_back( strns );
+        vec.push_back( {strns, pSym} );
+        return true;
+    }
+    bool UpdateSymbol(
+        const std::string& strns,
+        ObjPtr pSym ) 
+    {
+        if( strns.empty() )
+            return false;
+        auto& vec = m_vecNamespaces;
+        auto itr = std::find_if(
+            vec.begin(), vec.end(),
+            [ strns ]( const NS_ELEM& elem){
+                return elem.first == strns;
+            });
+        if( itr == vec.end() )
+            return false;
+        itr->second = pSym;
         return true;
     }
 

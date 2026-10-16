@@ -720,7 +720,6 @@ std::string CStPragmaFilteringTokenStream::getText(
     antlr4::Token* stop )
 {
     if( start == nullptr ||
-        stop == nullptr ||
         m_pPipeline == nullptr )
     {
         return std::string( "" );
@@ -729,12 +728,12 @@ std::string CStPragmaFilteringTokenStream::getText(
     // Resolve the true absolute vector locations
     ssize_t sstStartIdx =
         FindMasterVectorIndex( start );
-    ssize_t sstStopIdx =
-        FindMasterVectorIndex( stop );
+    ssize_t sstStopIdx = ( stop != nullptr ?
+        FindMasterVectorIndex( stop ): -1 );
 
     if( sstStartIdx == -1 ||
-        sstStopIdx == -1 ||
-        sstStartIdx > sstStopIdx )
+        ( sstStartIdx > sstStopIdx && 
+          sstStopIdx >= 0 ) )
     {
         return std::string( "" );
     }
@@ -753,6 +752,9 @@ std::string CStPragmaFilteringTokenStream::getText(
             return oCStTok.m_strMarkerPath;
         }
     }
+
+    if( sstStopIdx == -1 )
+        sstStopIdx = sstStartIdx;
 
     std::string strResult = "";
     for( ssize_t i = sstStartIdx;
@@ -840,6 +842,26 @@ gint32 CStParseContext::DeclareNamespace(
         {
             SymVector sv;
             m_oSymTab.FindByKind( symNamespace, sv );
+            stdstr strDup;
+            if( sv.size() )
+            {
+                auto it = std::find_if(
+                    sv.begin(), sv.end(),
+                    [ strName ](const SymPtr& pSym) {
+                        return pSym->m_strName == strName;
+                    });
+                if( it != sv.end() )
+                {
+                    SymPtr pDup = *it;
+                    sv.clear();
+                    sv.push_back( pDup );
+                }
+                else
+                {
+                    sv.clear();
+                }
+            }
+
             if( sv.empty() )
             {
                 ObjPtr pObj;
@@ -855,7 +877,12 @@ gint32 CStParseContext::DeclareNamespace(
                     scopeNamespace,
                     strName, pObj );
                 if( !pSym.IsEmpty() )
+                {
                     pnsd->m_pSymbol = pSym;
+                    auto pScope =
+                        m_oSymTab.GetCurrentScope();
+                    pScope->m_pSymbol = pSym;
+                }
                 continue;
             }
             else if( !sv.empty() && bCreate )
@@ -870,7 +897,7 @@ gint32 CStParseContext::DeclareNamespace(
                 SymPtr pSym = sv[0];
                 if( pSym.IsEmpty() )
                 {
-                    std::cerr << "stparser Internal error: Scope object is empty '"
+                    std::cerr << "stparser error: Scope object is empty '"
                         << strName << "'\n";
                     ret = -EFAULT;
                     break;
