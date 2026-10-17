@@ -61,6 +61,13 @@ options { tokenVocab=stlexer; }
     { m_bPass2 = bPass2; }
 }
 
+@parser::context {
+#include "rpc.h"
+#include "astnodes.h"
+#include "stsymtab.h"
+using namespace rpcf;
+}
+
 // ============================================================
 // Start Point
 // ============================================================
@@ -109,8 +116,58 @@ namespace_name
     ;
 
 namespace_decl
-    : TOK_NAMESPACE opt_internal namespace_name ( TOK_DOT namespace_name )*
-    using_directive_list? namespace_elements TOK_END_NAMESPACE
+    : TOK_NAMESPACE opt_internal
+        first=namespace_name ( TOK_DOT rest+=namespace_name )*
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto ret = pCtx->DeclareNamespace(
+                $first.text, $rest );
+            if( ERROR( ret ) )
+            {
+                pCtx->LogError( $first.start,
+                    "Declare namespace failed:'%s'(%d).",
+                    $first.text.c_str(), ret );
+            }
+        }}
+        (uds = using_directive_list
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            std::string strNsName;
+            if( $rest.size() )
+                strNsName = $rest.back()->getText();
+            else
+                strNsName = $first.text;
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            if( pSym->m_strName != strNsName )
+            {
+                pCtx->LogError( $first.start,
+                    "wrong scope name:'%s'",
+                    $first.text.c_str() );
+            }
+            else
+            {
+                CStNamespaceDecl* pnsd =
+                    pSym->m_pDeclNode;
+                pnsd->m_vecUsings = $uds.vecUsings;
+            }
+        }})?
+        namespace_elements
+        TOK_END_NAMESPACE
+        {{ 
+            int lineno = 
+                $TOK_END_NAMESPACE->getLine();
+            DebugPrint( 0, "Current line %d", lineno);
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            CStNamespaceDecl* pnsd = pSym->m_pDeclNode;
+            pnsd->ResolveUsingNs( pCtx );
+            pCtx->LeaveNamespace( $first.text, $rest );
+        }}
     ;
 
 namespace_global_name
@@ -648,13 +705,60 @@ fb_name
 
 std_fb_name: identifier;
 
-using_directive_list
-    : using_directive+
+using_directive_list returns [ std::vector<ObjPtr> vecUsings ]
+    : ( ud = using_directive
+        {
+            if( !$ud.pNode.IsEmpty() )
+                $vecUsings.push_back( $ud.pNode );
+        }
+    )+
     ;
 
-using_directive
-    : TOK_USING instance_path (TOK_COMMA instance_path)* semicolons
-    ;
+using_directive returns [rpcf::ObjPtr pNode]
+    : TOK_USING first = namespace_hierarchy (TOK_COMMA rest+=namespace_hierarchy)* semicolons
+      {
+          int lineno = $first.start->getLine();
+          DebugPrint( 0, "Current line %d", lineno);
+
+          std::string strPath = $first.ctx->getText();
+
+          rpcf::ObjPtr pObj;
+          pObj.NewObj( clsid( CStUsingDirective ) );
+          CStUsingDirective* pud = pObj;
+          if( !pud->AddNamespace( strPath, ObjPtr() ) )
+          {
+            auto pParser =
+                static_cast<CStParser*>(this);
+              CStParseContext* pCtx =
+                pParser->GetParseContext();
+              pCtx->LogError( $first.start,
+                  "Duplicate path in USING directive:'%s'",
+                  strPath.c_str() );
+              $pNode = ObjPtr();
+          }
+          else
+              $pNode = pObj;
+
+          // Skip processing if initial path failed
+          if (!$rest.empty()) 
+          {
+              CStUsingDirective* pud = $pNode;
+              auto pCurCtx = $rest.back();
+              std::string strPath = pCurCtx->getText();
+              if( !pud->AddNamespace(
+                  strPath, ObjPtr()))
+              {
+                  auto pParser = 
+                      static_cast<CStParser*>(this);
+                  CStParseContext* pCtx =
+                    pParser->GetParseContext();
+                  pCtx->LogError( pCurCtx->start, 
+                      "Duplicate path in USING directive '%s'.",
+                      strPath.c_str());
+              }
+          }
+      }
+      ;
 
 extends_clause
     :TOK_EXTENDS instance_path
@@ -1908,10 +2012,6 @@ var_member_init
 
 keywords
     : TOK_SINGLE | TOK_INTERVAL | TOK_PRIORITY 
-    | TOK_USING | TOK_INCLUDE | TOK_OVERLAP
-    | TOK_REGION | TOK_NAMESPACE 
-    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
-    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     | TOK_EXTERNAL
     ;
 
@@ -1943,5 +2043,9 @@ keywords1
     | TOK_END_REGION | TOK_END_NAMESPACE
     | TOK_TRUE | TOK_FALSE | TOK_RETURN | TOK_CONTINUE | TOK_EXIT
     | TOK_LWORD
+    | TOK_USING | TOK_NAMESPACE 
+    | TOK_REGION | TOK_INCLUDE | TOK_OVERLAP
+    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
+    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     ;
     

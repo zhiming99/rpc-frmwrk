@@ -31,8 +31,12 @@
 #include "stlexer.h"
 #include "stparser.h"
 #include "pragma.h"
+#include "defines.h"
 #include "parse_context.h"
 #include "pragma_expr/pragma_exprLexer.h"
+
+namespace rpcf
+{
 
 std::string CStIncludeManager::ResolveIncludePath(
     const std::string& strPath ) const
@@ -171,8 +175,7 @@ bool CStTokenPipeline::InjectIncludeStream(
     if( m_pIncludeMgr->IsCyclicInclude(
         strFilePath, iFileIdx ) )
     {
-        std::cerr << "CSt Compiler Error: Cyclic "
-            << "include detected on file: " 
+        std::cerr << "stparsr error: Cyclic include detected on file: " 
             << strFilePath << "\n";
         return false;
     }
@@ -189,8 +192,7 @@ bool CStTokenPipeline::InjectIncludeStream(
         std::ifstream>( strFilePath );
     if( !pFileStream->is_open() )
     {
-        std::cerr << "stparser Error: Unable "
-            << "to open file stream: "
+        std::cerr << "stparser error: Unable to open file stream: "
             << strFilePath << "\n";
         m_pIncludeMgr->PopFile();
         return false;
@@ -419,9 +421,7 @@ bool CStPragmaFilteringTokenStream::EvaluateInclude(
     }
     catch (const std::bad_any_cast& e)
     {
-        std::cerr << "Error: 'include' "
-            << "directive did not compile. "
-            << "Default to false\n";
+        std::cerr << "stparser error: 'include' directive did not compile. Default to false\n";
         return false;
     }
     return false;
@@ -720,7 +720,6 @@ std::string CStPragmaFilteringTokenStream::getText(
     antlr4::Token* stop )
 {
     if( start == nullptr ||
-        stop == nullptr ||
         m_pPipeline == nullptr )
     {
         return std::string( "" );
@@ -729,12 +728,12 @@ std::string CStPragmaFilteringTokenStream::getText(
     // Resolve the true absolute vector locations
     ssize_t sstStartIdx =
         FindMasterVectorIndex( start );
-    ssize_t sstStopIdx =
-        FindMasterVectorIndex( stop );
+    ssize_t sstStopIdx = ( stop != nullptr ?
+        FindMasterVectorIndex( stop ): -1 );
 
     if( sstStartIdx == -1 ||
-        sstStopIdx == -1 ||
-        sstStartIdx > sstStopIdx )
+        ( sstStartIdx > sstStopIdx && 
+          sstStopIdx >= 0 ) )
     {
         return std::string( "" );
     }
@@ -753,6 +752,9 @@ std::string CStPragmaFilteringTokenStream::getText(
             return oCStTok.m_strMarkerPath;
         }
     }
+
+    if( sstStopIdx == -1 )
+        sstStopIdx = sstStartIdx;
 
     std::string strResult = "";
     for( ssize_t i = sstStartIdx;
@@ -823,3 +825,102 @@ std::string CStPragmaFilteringTokenStream::
     return strDefault;
 }
 
+gint32 CStParseContext::DeclareNamespace(
+    const std::string& strFirst,
+    const std::vector<stparser::Namespace_nameContext*>& rest) 
+{
+    gint32 ret = 0;
+    do{
+        // Construct the complete trailing path
+        std::vector< std::string > vecComps;
+        vecComps.push_back( strFirst );
+        for( size_t i = 0; i < rest.size(); i++ )
+            vecComps.push_back( rest[i]->getText() );
+
+        bool bCreate = false;
+        for( auto strName : vecComps )
+        {
+            SymVector sv;
+            m_oSymTab.FindByKind( symNamespace, sv );
+            stdstr strDup;
+            if( sv.size() )
+            {
+                auto it = std::find_if(
+                    sv.begin(), sv.end(),
+                    [ strName ](const SymPtr& pSym) {
+                        return pSym->m_strName == strName;
+                    });
+                if( it != sv.end() )
+                {
+                    SymPtr pDup = *it;
+                    sv.clear();
+                    sv.push_back( pDup );
+                }
+                else
+                {
+                    sv.clear();
+                }
+            }
+
+            if( sv.empty() )
+            {
+                ObjPtr pObj;
+                ret = pObj.NewObj(
+                    clsid( CStNamespaceDecl ) );
+                if( ERROR( ret ) )
+                    break;
+                auto pnsd = ( CStNamespaceDecl* )pObj;
+                bCreate = true;
+                auto pSym = m_oSymTab.DeclareScopeOwner(
+                    symNamespace,
+                    scopeNamespace,
+                    strName, pObj );
+                if( !pSym.IsEmpty() )
+                {
+                    pnsd->m_pSymbol = pSym;
+                    auto pScope =
+                        m_oSymTab.GetCurrentScope();
+                    pScope->m_pSymbol = pSym;
+                }
+                continue;
+            }
+            else if( !sv.empty() && bCreate )
+            {
+                std::cerr << "stparser error: Duplicated namespace name'"
+                    << strName << "'\n";
+                ret = -EEXIST;
+                break;
+            }
+            else
+            {
+                SymPtr pSym = sv[0];
+                if( pSym.IsEmpty() )
+                {
+                    std::cerr << "stparser error: Scope object is empty '"
+                        << strName << "'\n";
+                    ret = -EFAULT;
+                    break;
+                }
+                ScopePtr pScope( pSym->m_pDefScope );
+                m_oSymTab.PushScope( pScope );
+            }
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+void CStParseContext::LeaveNamespace(
+    const std::string& strFirst,
+    const std::vector<stparser::Namespace_nameContext*>& rest)
+{
+    // Calculate the total number of layers pushed:
+    // 1 (for strFirst) + number of trailing parts
+    size_t uTotalLayers = 1 + rest.size();
+
+    // Safely unwind the LIFO scope stack layers
+    for (size_t i = 0; i < uTotalLayers; ++i)
+        m_oSymTab.PopScope();
+}
+
+}

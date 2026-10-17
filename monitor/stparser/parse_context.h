@@ -34,7 +34,16 @@
 #include <fstream>
 #include <iostream>
 #include "stlcont.h"
+#include "stsymtab.h"
+#include <string>
+#include <iostream>
+#include <libintl.h> // Standard gettext header
 
+// Macro placeholder for future gettext string scanning
+#define _(String) dgettext("st_compiler", String)
+
+namespace rpcf
+{
 enum class EnumTypeCategory {
     Invalid = -1,
     Unknown = 0,
@@ -57,35 +66,17 @@ enum class EnumSimpleSpecType {
     StringSpec
 };
 
+enum class DiagnosticSeverity {
+    Warning,
+    Error,
+    Fatal
+};
+
 // Simple symbol table entry
 struct TypeEntry {
     std::string name;
     EnumTypeCategory category;
     // Additional type info can be added here
-};
-
-class SymbolTable {
-public:
-    void addType(
-        const std::string& strName,
-        EnumTypeCategory cat)
-    { types[strName] = {strName, cat}; }
-
-    EnumTypeCategory lookup(const std::string& name) const
-    {
-        auto it = types.find(name);
-        if (it != types.end()) {
-            return it->second.category;
-        }
-        return EnumTypeCategory::Unknown;
-    }
-
-    bool isKnown(const std::string& name) const {
-        return types.find(name) != types.end();
-    }
-
-private:
-    std::map<std::string, TypeEntry> types;
 };
 
 struct CStCmdlineMacros
@@ -375,8 +366,8 @@ public:
 
 // Parse context shared between listener and parser
 // predicates
-struct CStParseContext {
-
+struct CStParseContext
+{
     CStParseContext()
     {
         m_pvecIncludePaths.NewObj();
@@ -384,7 +375,7 @@ struct CStParseContext {
     }
     
     // Symbol table for type resolution
-    SymbolTable* m_pSymTab = nullptr;
+    CStSymbolTable m_oSymTab;
 
     CStCmdlineMacros        m_oMacros;
     rpcf::StrVecPtr         m_pvecIncludePaths;
@@ -407,18 +398,17 @@ struct CStParseContext {
     EnumTypeCategory ResolveType(
         const std::string& strName) const
     {
-        if (!m_pSymTab)
-            return EnumTypeCategory::Invalid;
-        return m_pSymTab->lookup(strName);
+        // TODO: add implementation
+        m_oSymTab.Lookup(strName);
+        return EnumTypeCategory::Invalid;
     }
 
     // Check if a type is known in the symbol table
     bool IsTypeKnown(
         const std::string& strName) const
     {
-        if (!m_pSymTab)
-            return false;
-        return m_pSymTab->isKnown( strName );
+        // TODO: add implementation
+        return false;
     }
 
     auto GetMacros() const
@@ -426,6 +416,113 @@ struct CStParseContext {
 
     auto GetMacros()
     { return m_oMacros.m_mapMacros; }
-};
 
+    gint32 DeclareNamespace(
+        const std::string& sFirst,
+        const std::vector<stparser::Namespace_nameContext*>& rest);
+
+    void LeaveNamespace(
+        const std::string& sFirst,
+        const std::vector<stparser::Namespace_nameContext*>& rest);
+
+    template<typename... Args>
+    void LogDiagnostic(
+        DiagnosticSeverity eSeverity,
+        const std::string& strFileName,
+        size_t uLine,
+        size_t uCharPosition,
+        const char* szMsgId,
+        Args... args)
+    {
+        const char* szFormat = _(szMsgId);
+
+        int iSize = std::snprintf(
+            nullptr, 0, szFormat, args...) + 1;
+
+        if (iSize <= 0)
+            return;
+
+        std::vector<char> vecBuf(iSize);
+        std::snprintf(vecBuf.data(),
+            vecBuf.size(), szFormat, args...);
+
+        // Resolve localized severity label
+        const char* szLabel = _("error: ");
+        if (eSeverity == DiagnosticSeverity::Warning) {
+            szLabel = _("warning: ");
+        } else if (eSeverity == DiagnosticSeverity::Fatal) {
+            szLabel = _("fatal error: ");
+        }
+
+        std::cerr << strFileName << ":"
+                  << uLine << ":"
+                  << uCharPosition << ": "
+                  << szLabel
+                  << vecBuf.data() << "\n";
+
+        if (eSeverity == DiagnosticSeverity::Warning) {
+            m_dwWarningCount++;
+        } else {
+            m_dwErrorCount++; // Errors and Fatals halt gen
+        }
+    }
+
+    template<typename... Args>
+    void ForwardDiagnostic(
+        DiagnosticSeverity eSeverity,
+        antlr4::Token* pToken,
+        const char* szMsgId,
+        Args... args)
+    {
+        // Avoid crashing on corrupted lookahead symbols
+        if (!pToken)
+            return;
+
+        // Resolve source file tracking layer
+
+        auto idx = m_pMainStream->
+            FindMasterVectorIndex( pToken );
+        if( idx == -1 )
+            return;
+        auto pTok = m_pMainStream->
+            GetCustomToken( idx );
+        auto pPipeline =
+            m_pMainStream->GetPipeLine();
+        auto pIncMgr =
+            pPipeline->GetIncludeManager();
+
+        auto oFileInfo = 
+            pIncMgr->m_vecFileRegistry[ pTok->m_iFileIdx ];
+
+        std::string strFile;
+        if( oFileInfo.m_strAbsolutePath.size() )
+            strFile = basename(
+                oFileInfo.m_strAbsolutePath.c_str() );
+
+        size_t uLine = pToken->getLine();
+        size_t uCol = pToken->getCharPositionInLine();
+
+        LogDiagnostic(eSeverity, strFile, uLine,
+            uCol, szMsgId, args...);
+    }
+
+    template<typename... Args>
+    void LogWarning(antlr4::Token* pToken, 
+                    const char* szMsgId, Args... args) {
+        ForwardDiagnostic(DiagnosticSeverity::Warning, 
+            pToken, szMsgId, args...);
+    }
+
+    template<typename... Args>
+    void LogError(antlr4::Token* pToken, 
+          const char* szMsgId, Args... args)
+    {
+        ForwardDiagnostic(DiagnosticSeverity::Error, 
+            pToken, szMsgId, args...);
+    }
+
+    guint32 m_dwWarningCount = 0;
+    guint32 m_dwErrorCount = 0;
+};
+}
 #endif // ST_PARSE_CONTEXT_H

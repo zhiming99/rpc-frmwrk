@@ -5,6 +5,9 @@
 #include "parse_context.h"
 #include "clsids.h"
 
+namespace rpcf 
+{
+
 /**
  * Extended parser that adds semantic predicates for type disambiguation.
  * 
@@ -169,4 +172,5 @@ private:
     CStParseContext* m_pContext;
 };
 
+}
 #endif // ST_PARSER_EXT_H

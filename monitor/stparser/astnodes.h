@@ -1186,30 +1186,36 @@ struct CStMethodDecl : public CStPouDeclNode
  * which can be used to explicitly mark the boundary between global
  * declarations and backend-specific constructs.
  */
+struct CStSymbol;
 struct CStNamespaceDecl : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    std::string m_strName;
+    CStSymbol* m_pSymbol;
     std::vector< ObjPtr > m_vecElements;
-    std::vector< ObjPtr > m_vecDeclarations;
+    // std::vector< ObjPtr > m_vecDeclarations;
+    std::vector< ObjPtr > m_vecUsings;
 
     CStNamespaceDecl() : super()
     { SetClassId( clsid( CStNamespaceDecl ) ); }
+
+    gint32 ResolveUsingNs( void* pCtx );
+
+    ObjPtr ResolvePath(
+        const std::vector<std::string>& vecNames,
+        void* pCtx );
 
     /**
      * @brief Check if this is the global scope boundary
      * @return true if m_strName is empty (global scope)
      */
-    bool IsGlobalScope() const 
-    { return m_strName.empty(); }
+    bool IsGlobalScope() const;
 
     /**
      * @brief Check if this is a named namespace
      * @return true if m_strName is not empty
      */
-    bool IsNamedNamespace() const
-    { return !m_strName.empty(); }
+    bool IsNamedNamespace() const;
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -1317,11 +1323,47 @@ struct CStUsingDirective : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    std::string m_strNamespace;
-    std::vector< std::string > m_vecNamespace;
+    using NS_ELEM =
+        std::pair< std::string, ObjPtr >;
+    std::vector< NS_ELEM > m_vecNamespaces;
 
     CStUsingDirective() : super()
     { SetClassId( clsid( CStUsingDirective ) ); }
+
+    bool AddNamespace(
+        const std::string& strns,
+        ObjPtr pSym ) 
+    {
+        if( strns.empty() )
+            return false;
+        auto& vec = m_vecNamespaces;
+        auto itr = std::find_if(
+            vec.begin(), vec.end(),
+            [ strns ]( const NS_ELEM& elem){
+                return elem.first == strns;
+            });
+        if( itr != vec.end() )
+            return false;
+        vec.push_back( {strns, pSym} );
+        return true;
+    }
+    bool UpdateSymbol(
+        const std::string& strns,
+        ObjPtr pSym ) 
+    {
+        if( strns.empty() )
+            return false;
+        auto& vec = m_vecNamespaces;
+        auto itr = std::find_if(
+            vec.begin(), vec.end(),
+            [ strns ]( const NS_ELEM& elem){
+                return elem.first == strns;
+            });
+        if( itr == vec.end() )
+            return false;
+        itr->second = pSym;
+        return true;
+    }
 
     virtual std::string GetNodeInfo() const override;
 };

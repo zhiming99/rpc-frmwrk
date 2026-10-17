@@ -164,6 +164,7 @@ static FactoryPtr InitClassFactory()
 
     // Symbol table
     INIT_MAP_ENTRY( CStSymbol );
+    INIT_MAP_ENTRY( CStScope );
 
     END_FACTORY_MAPS;
 };
@@ -207,12 +208,13 @@ int main(int argc, char* argv[])
     if( ret )
         return ret;
 
+    FactoryPtr pFactory = InitClassFactory();
+    ret = CoAddClassFactory( pFactory );
+    if( ERROR( ret ) )
+        return ret;
+
     CStParseContext oCtx;
     do{
-        FactoryPtr pFactory = InitClassFactory();
-        ret = CoAddClassFactory( pFactory );
-        if( ERROR( ret ) )
-            break;
 
         // Set up the parse context with a symbol table
         while( true ) 
