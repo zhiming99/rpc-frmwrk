@@ -301,15 +301,32 @@ CStSymbolTable::BreakdownQualified(
     const std::string& strFullName)
 {
     std::vector<std::string> vecComponents;
-    size_t posStart = 0;
-    size_t posEnd = strFullName.find('.');
+    if (strFullName.empty())
+        return vecComponents;
 
+    std::string_view svPath(strFullName);
+    size_t posStart = 0;
+
+    // 1. Detect and normalize root escape prefixes
+    if (svPath.substr(0, 2) == "_.")
+    {
+        vecComponents.push_back("_.");
+        posStart = 2;
+    }
+    else if (svPath[0] == '.')
+    {
+        vecComponents.push_back("_.");
+        posStart = 1;
+    }
+
+    // 2. Loop through and extract individual tokens
+    size_t posEnd = strFullName.find('.', posStart);
     while (true) {
         std::string strPart =
-            (posEnd == std::string::npos)
+            ( posEnd == std::string::npos )
             ? strFullName.substr(posStart)
-            : strFullName.substr(posStart,
-                 posEnd - posStart);
+            : strFullName.substr(
+                posStart, posEnd - posStart);
 
         if (!strPart.empty()) {
             vecComponents.push_back(strPart);
@@ -321,9 +338,9 @@ CStSymbolTable::BreakdownQualified(
         posStart = posEnd + 1;
         posEnd = strFullName.find('.', posStart);
     }
-
     return vecComponents;
 }
+
 
 SymPtr CStSymbolTable::LookupQualified(
     const std::string& strFullName,

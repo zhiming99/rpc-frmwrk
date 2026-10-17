@@ -870,7 +870,6 @@ gint32 CStParseContext::DeclareNamespace(
                 if( ERROR( ret ) )
                     break;
                 auto pnsd = ( CStNamespaceDecl* )pObj;
-                
                 bCreate = true;
                 auto pSym = m_oSymTab.DeclareScopeOwner(
                     symNamespace,

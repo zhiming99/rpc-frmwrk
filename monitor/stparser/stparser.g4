@@ -157,6 +157,9 @@ namespace_decl
         namespace_elements
         TOK_END_NAMESPACE
         {{ 
+            int lineno = 
+                $TOK_END_NAMESPACE->getLine();
+            DebugPrint( 0, "Current line %d", lineno);
             auto pParser = static_cast< CStParser* >( this );
             auto pCtx = pParser->GetParseContext();
             auto pScope = pCtx->m_oSymTab.GetCurrentScope();
@@ -712,14 +715,17 @@ using_directive_list returns [ std::vector<ObjPtr> vecUsings ]
     ;
 
 using_directive returns [rpcf::ObjPtr pNode]
-    : TOK_USING
-      first = instance_path
+    : TOK_USING first = namespace_hierarchy (TOK_COMMA rest+=namespace_hierarchy)* semicolons
       {
+          int lineno = $first.start->getLine();
+          DebugPrint( 0, "Current line %d", lineno);
+
+          std::string strPath = $first.ctx->getText();
+
           rpcf::ObjPtr pObj;
           pObj.NewObj( clsid( CStUsingDirective ) );
           CStUsingDirective* pud = pObj;
-          if( !pud->AddNamespace(
-              $first.text, ObjPtr() ) )
+          if( !pud->AddNamespace( strPath, ObjPtr() ) )
           {
             auto pParser =
                 static_cast<CStParser*>(this);
@@ -727,36 +733,32 @@ using_directive returns [rpcf::ObjPtr pNode]
                 pParser->GetParseContext();
               pCtx->LogError( $first.start,
                   "Duplicate path in USING directive:'%s'",
-                  $first.text.c_str() );
+                  strPath.c_str() );
               $pNode = ObjPtr();
           }
           else
               $pNode = pObj;
-      }
-      (TOK_COMMA rest+=instance_path
+
+          // Skip processing if initial path failed
+          if (!$rest.empty()) 
           {
-              // Skip processing if initial path failed
-              if (!$pNode.IsEmpty()) 
+              CStUsingDirective* pud = $pNode;
+              auto pCurCtx = $rest.back();
+              std::string strPath = pCurCtx->getText();
+              if( !pud->AddNamespace(
+                  strPath, ObjPtr()))
               {
-                  CStUsingDirective* pud = $pNode;
-                  auto pCurCtx = $rest.back();
-                  std::string strPath = pCurCtx->getText();
-                  if( !pud->AddNamespace(
-                      strPath, ObjPtr()))
-                  {
-                      auto pParser = 
-                          static_cast<CStParser*>(this);
-                      CStParseContext* pCtx =
-                        pParser->GetParseContext();
-                      pCtx->LogError( pCurCtx->start, 
-                          "Duplicate path in USING directive '%s'.",
-                          strPath.c_str());
-                  }
+                  auto pParser = 
+                      static_cast<CStParser*>(this);
+                  CStParseContext* pCtx =
+                    pParser->GetParseContext();
+                  pCtx->LogError( pCurCtx->start, 
+                      "Duplicate path in USING directive '%s'.",
+                      strPath.c_str());
               }
           }
-      )*
-      semicolons
-    ;
+      }
+      ;
 
 extends_clause
     :TOK_EXTENDS instance_path
@@ -2010,10 +2012,6 @@ var_member_init
 
 keywords
     : TOK_SINGLE | TOK_INTERVAL | TOK_PRIORITY 
-    | TOK_USING | TOK_INCLUDE | TOK_OVERLAP
-    | TOK_REGION | TOK_NAMESPACE 
-    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
-    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     | TOK_EXTERNAL
     ;
 
@@ -2045,5 +2043,9 @@ keywords1
     | TOK_END_REGION | TOK_END_NAMESPACE
     | TOK_TRUE | TOK_FALSE | TOK_RETURN | TOK_CONTINUE | TOK_EXIT
     | TOK_LWORD
+    | TOK_USING | TOK_NAMESPACE 
+    | TOK_REGION | TOK_INCLUDE | TOK_OVERLAP
+    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
+    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     ;
     

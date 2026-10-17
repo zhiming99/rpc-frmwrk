@@ -460,13 +460,14 @@ gint32 CStNamespaceDecl::ResolveUsingNs(
         auto pCtx = reinterpret_cast
             < CStParseContext* >( pctx );
         auto ost = pCtx->m_oSymTab;
+        DebugPrint( ret, "Entering ResolveUsingNs" );
         for( auto pObj : m_vecUsings )
         {
             CStUsingDirective* pud = pObj;
             if( pud == nullptr )
                 continue;
             auto& vecNames = pud->m_vecNamespaces;
-            for( auto elem: vecNames )
+            for( auto& elem: vecNames )
             {
                 if( !elem.second.IsEmpty() )
                     continue;
@@ -477,18 +478,19 @@ gint32 CStNamespaceDecl::ResolveUsingNs(
                 if( vecComps.empty() )
                     continue;
 
-                auto& strPath = vecComps[ 0 ];
-                if( strPath[ 0 ] == '.' ||
-                    std::string_view(strPath).substr(0,2)
-                        == ("_.") ) 
+                auto pSym = ResolvePath( vecComps, pctx );
+                if( !pSym.IsEmpty() )
                 {
-                    ret = ResolveAbsolutePath(
-                        strPath, pctx );
+                    elem.second = SymPtr( pSym );
+                    DebugPrint( 0,
+                    "Resoved namespace reference %s",
+                    elem.first.c_str() );
                 }
                 else
                 {
-                    ret = ResolveRelativePath(
-                        strPath, pctx );
+                    DebugPrint( 0,
+                    "undefined namespace reference %s",
+                    elem.first.c_str() );
                 }
             }
         }
@@ -496,15 +498,81 @@ gint32 CStNamespaceDecl::ResolveUsingNs(
     return ret;
 }
 
-gint32 CStNamespaceDecl::ResolveRelativePath(
-    const stdstr& strName,
-    void* pctx )
-{ return 0; }
 
-gint32 CStNamespaceDecl::ResolveAbsolutePath(
-    const stdstr& strName,
+ObjPtr CStNamespaceDecl::ResolvePath(
+    const std::vector<std::string>& vecNames,
     void* pctx )
-{ return 0; }
+{
+    SymPtr pSym;
+    if( vecNames.empty() || pctx == nullptr )
+        return pSym;
+
+    auto pCtx = reinterpret_cast
+        < CStParseContext* >( pctx );
+    auto ost = pCtx->m_oSymTab;
+
+    CStScope* pScopeStart = ost.GetCurrentScope();
+    CStScope* pCurScope = pScopeStart;
+
+    bool bAbsolute = ( vecNames[0] == "_." );
+    size_t iStartIdx = bAbsolute ? 1 : 0;
+
+    while (pCurScope != nullptr || bAbsolute)
+    {
+        CStScope* pSearchRunner =
+            ( !bAbsolute ? pCurScope
+            : ( CStScope* )ost.GetGlobalScope() );
+
+        bool bChainValid = true;
+
+        for( size_t i = iStartIdx;
+            i < vecNames.size(); ++i )
+        {
+            const std::string& strName = vecNames[i];
+            SymVector vecSyms;
+            ost.FindByKind(symNamespace,
+                vecSyms, pSearchRunner);
+
+            CStScope* pNextScope = nullptr;
+            for( auto& elem : vecSyms )
+            {
+                if( elem->m_strName == strName )
+                {
+                    pNextScope = elem->m_pDefScope;
+                    pSym = elem;
+                    break;
+                }
+            }
+
+            if( pNextScope == nullptr )
+            {
+                bChainValid = false;
+                pSym.Clear();
+                break; // Break component chain loop
+            }
+            pSearchRunner = pNextScope;
+        }
+
+        if (bChainValid)
+            return pSym;
+
+        // If forced absolute or already at root, fail
+        if (bAbsolute ||
+            pCurScope == ost.GetGlobalScope())
+            break;
+
+        // Fall back one level up the lexical tree
+        pSym.Clear(); 
+        pCurScope = pCurScope->m_pParent;
+
+        // Final fallback step: Try the absolute root
+        if (pCurScope == nullptr)
+            bAbsolute = true;
+    }
+
+    return pSym; // Return null if unfound
+}
+
 // ========================================================================
 // Default implementations for AST nodes
 // These use base class dummy implementation via override

@@ -1201,12 +1201,8 @@ struct CStNamespaceDecl : public CStAstNodeBase
 
     gint32 ResolveUsingNs( void* pCtx );
 
-    gint32 ResolveAbsolutePath(
-        const stdstr& strName,
-        void* pCtx );
-
-    gint32 ResolveRelativePath(
-        const stdstr& strName,
+    ObjPtr ResolvePath(
+        const std::vector<std::string>& vecNames,
         void* pCtx );
 
     /**
