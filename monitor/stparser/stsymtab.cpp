@@ -310,12 +310,14 @@ CStSymbolTable::BreakdownQualified(
     // 1. Detect and normalize root escape prefixes
     if (svPath.substr(0, 2) == "_.")
     {
-        vecComponents.push_back("_.");
+        vecComponents.push_back(
+            GLOBAL_SCOPE_MARK );
         posStart = 2;
     }
     else if (svPath[0] == '.')
     {
-        vecComponents.push_back("_.");
+        vecComponents.push_back(
+            GLOBAL_SCOPE_MARK );
         posStart = 1;
     }
 
@@ -408,4 +410,27 @@ std::string CStSymbolTable::Dump()
     DumpScope( m_pGlobal, 0, strOut );
     return strOut;
 }
+
+CStSymbolTable::CStSymbolTable()
+{
+    m_pGlobal = NewScopeInternal(
+        scopeGlobal, GLOBAL_SCOPE_MARK );
+    // the global scope is the bottom of the stack
+    // and is never popped, so plain name lookup
+    // always ends at the globals
+    m_stackScopes.push_back( m_pGlobal );
+
+    SymPtr pSym( true );
+    pSym->m_strName = GLOBAL_SCOPE_MARK;
+    pSym->m_eKind = symNamespace;
+    pSym->m_pScope = m_pGlobal;
+    pSym->m_pDeclNode.NewObj(
+        clsid( CStNamespaceDecl ) );
+    auto& pNode = pSym->m_pDeclNode;
+    auto pnsd =
+        ( CStNamespaceDecl* )pNode;
+    pnsd->m_pSymbol = pSym;
+    m_pGlobal->m_pSymbol = pSym;
+}
+
 }

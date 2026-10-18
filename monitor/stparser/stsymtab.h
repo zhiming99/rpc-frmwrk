@@ -30,6 +30,7 @@
 #include "stast.h"
 #include "astnodes.h"
 
+#define GLOBAL_SCOPE_MARK "@"
 /**
  * @brief What kind of entity a symbol represents
  */
@@ -58,6 +59,7 @@ enum enumSymKind {
  * @brief What kind of lexical scope a CStScope represents
  */
 enum enumScopeKind {
+    scopeInvalid = -1,
     scopeGlobal = 0,  // the root scope, holds globals and top-level decls
     scopeNamespace,   // NAMESPACE...END_NAMESPACE
     scopePou,         // PROGRAM/FUNCTION/FUNCTION_BLOCK/METHOD members
@@ -193,7 +195,7 @@ typedef std::vector< SymPtr > SymVector;
 struct CStScope;
 typedef CAutoPtr< clsid( CStScope ), CStScope > ScopePtr;
 
-struct CStScope : public rpcf::CObjBase
+struct CStScope : public CObjBase
 {
     enumScopeKind m_eKind;
     std::string m_strName;
@@ -201,16 +203,18 @@ struct CStScope : public rpcf::CObjBase
 
     // the symbol representation of this scope;
     SymPtr m_pSymbol;
-    // name -> symbols; a vector per name leaves room for overloaded
-    // functions, which share the same name
+    // name -> symbols; a vector per name leaves room
+    // for overloaded functions, which share the same
+    // name
     std::map< std::string, SymVector > m_mapSymbols;
 
-    // child scopes by name (namespaces, POUs, structs), used by the
-    // qualified lookups; symbols are checked for duplicates at
-    // declare time, which keeps these names unique
+    // child scopes by name (namespaces, POUs,
+    // structs), used by the qualified lookups; symbols
+    // are checked for duplicates at declare time,
+    // which keeps these names unique
     std::map< std::string, ScopePtr > m_mapChildren;
 
-    CStScope() : m_eKind( scopeGlobal ),
+    CStScope() : m_eKind( scopeInvalid ),
         m_pParent( nullptr )
     {}
 
@@ -272,9 +276,10 @@ struct CStScope : public rpcf::CObjBase
 /**
  * @brief The symbol table facade used by the semantic phase
  *
- * Owns all scopes and keeps a stack of the open lexical scopes. The
- * global scope is always the bottom of the stack, so Lookup() walks
- * the full chain: current scope -> ... -> globals.
+ * Owns all scopes and keeps a stack of the open
+ * lexical scopes. The global scope is always the
+ * bottom of the stack, so Lookup() walks the full
+ * chain: current scope -> ... -> globals.
  *
  * Typical use while walking the AST:
  *
@@ -289,9 +294,10 @@ struct CStScope : public rpcf::CObjBase
  *     // ... and later, from anywhere:
  *     oTab.FindByDataType( "Counter", vec );   // all FB instances
  *
- * Note on namespaces: 'using' directives are applied by the semantic
- * phase, either by temporarily pushing the referenced namespace
- * scopes around a POU body, or by calling LookupQualified().
+ * Note on namespaces: 'using' directives are applied
+ * by the semantic phase, either by temporarily pushing
+ * the referenced namespace scopes around a POU body,
+ * or by calling LookupQualified().
  */
 class CStSymbolTable
 {
@@ -299,7 +305,8 @@ public:
     typedef std::vector< ScopePtr > ScopeStack;
 
 private:
-    // all scopes live here; deque keeps addresses stable on growth
+    // all scopes live here; deque keeps addresses
+    // stable on growth
     std::deque< ScopePtr > m_dequeScopes;
     ScopePtr m_pGlobal;
     ScopeStack m_stackScopes;
@@ -324,13 +331,7 @@ private:
         gint32 iDepth, std::string& strOut );
 
 public:
-    CStSymbolTable() : m_pGlobal( nullptr )
-    {
-        m_pGlobal = NewScopeInternal( scopeGlobal, "" );
-        // the global scope is the bottom of the stack and is never
-        // popped, so plain name lookup always ends at the globals
-        m_stackScopes.push_back( m_pGlobal );
-    }
+    CStSymbolTable();
 
     ScopePtr GetGlobalScope()
     { return m_pGlobal; }
@@ -475,5 +476,6 @@ public:
     //! indented scope tree listing, for debugging the semantic phase
     std::string Dump();
 };
+
 }
 

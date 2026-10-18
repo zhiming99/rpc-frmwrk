@@ -514,7 +514,8 @@ ObjPtr CStNamespaceDecl::ResolvePath(
     CStScope* pScopeStart = ost.GetCurrentScope();
     CStScope* pCurScope = pScopeStart;
 
-    bool bAbsolute = ( vecNames[0] == "_." );
+    bool bAbsolute =
+        ( vecNames[0] == GLOBAL_SCOPE_MARK );
     size_t iStartIdx = bAbsolute ? 1 : 0;
 
     while (pCurScope != nullptr || bAbsolute)

@@ -88,7 +88,32 @@ decl_set
     : namespace_element
     | config_decl
     | access_decl
-    | using_directive
+    | ( ud = using_directive 
+        {
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto ost = pCtx->m_oSymTab;
+            auto pGlobal = ost.GetGlobalScope();
+            auto pSym = pGlobal->m_pSymbol;
+            auto pNode = pSym->m_pDeclNode;
+            auto pnsd = ( CStNamespaceDecl* )pNode;
+            if( pnsd )
+            {
+                pnsd->m_vecUsings.push_back( $ud.pNode );
+                std::string strFullPath =
+                    GetReconstructedText(
+                        $ud.ctx, _input, 1, 1 );
+                DebugPrint( $ud.start->getLine(),
+                "haha, added namespaces references to "
+                "global namespace: %s",
+                strFullPath.c_str() );
+                pnsd->ResolveUsingNs( pCtx );
+            }
+            // TODO add resolving namespace reference
+            // code if the namespace is not declared
+            // yet.
+        })
     | TOK_PRAGMA
     ;
 
@@ -721,6 +746,8 @@ using_directive returns [rpcf::ObjPtr pNode]
           DebugPrint( 0, "Current line %d", lineno);
 
           std::string strPath = $first.ctx->getText();
+          auto& pctx = $first.ctx;
+          pctx->stop->getText();
 
           rpcf::ObjPtr pObj;
           pObj.NewObj( clsid( CStUsingDirective ) );

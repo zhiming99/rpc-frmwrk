@@ -330,11 +330,14 @@ GetNextTokenOnChannel(
 
         // Verify token sits on the
         // DEFAULT_CHANNEL (usually 0)
-        if( pTok != nullptr &&
-            pTok->getChannel() ==
-                antlr4::Token::DEFAULT_CHANNEL )
+        if( pTok != nullptr )
         {
-            return sstCurr;
+            if( pTok->getType() == antlr4::Token::EOF )
+                return sstCurr;
+
+            if( pTok->getChannel() ==
+                    antlr4::Token::DEFAULT_CHANNEL )
+                return sstCurr;
         }
 
         sstCurr += sstDirection;
@@ -355,11 +358,13 @@ CStPragmaFilteringTokenStream::LT(
         return nullptr;
     }
 
+    ssize_t direction = 1;
     if( k < 0 )
     {
         // Handle negative lookback
         // if needed by reversing search
-        return nullptr;
+        direction = -1;
+        k = -k;
     }
 
     ssize_t sstCurrIdx = static_cast<ssize_t>
@@ -370,16 +375,23 @@ CStPragmaFilteringTokenStream::LT(
 
     // Advance k times across matching
     // channel tokens
+    if( direction < 0 )
+        sstCurrIdx--;
     while( sstCount < k )
     {
         sstFoundIdx = GetNextTokenOnChannel(
-                sstCurrIdx, 1 );
+                sstCurrIdx, direction );
 
         if( sstFoundIdx == -1 )
-            return m_pPipeline-> m_pEofToken.get();
+        {
+            if( direction > 0 )
+                return m_pPipeline-> m_pEofToken.get();
+            else
+                return nullptr;
+        }
 
         sstCount++;
-        sstCurrIdx = sstFoundIdx + 1;
+        sstCurrIdx = sstFoundIdx + direction;
     }
 
     return m_pPipeline->
@@ -914,13 +926,53 @@ void CStParseContext::LeaveNamespace(
     const std::string& strFirst,
     const std::vector<stparser::Namespace_nameContext*>& rest)
 {
-    // Calculate the total number of layers pushed:
-    // 1 (for strFirst) + number of trailing parts
+    // Calculate the total number of layers pushed: 1
+    // (for strFirst) + number of trailing parts
     size_t uTotalLayers = 1 + rest.size();
 
     // Safely unwind the LIFO scope stack layers
     for (size_t i = 0; i < uTotalLayers; ++i)
         m_oSymTab.PopScope();
+}
+
+std::string GetReconstructedText(
+    antlr4::ParserRuleContext* pCtx,
+    antlr4::TokenStream* pTokens,
+    size_t offset,
+    size_t roffset )
+{
+    if (!pCtx || !pTokens ||
+        !pCtx->start || !pCtx->stop) {
+        return "";
+    }
+
+    std::string strResult = "";
+    size_t uStartIdx =
+        pCtx->start->getTokenIndex() + offset;
+    size_t uStopIdx =
+        pCtx->stop->getTokenIndex() - roffset;
+
+    // Loop through the token pipeline indices
+    // sequentially
+    for (size_t i = uStartIdx; i <= uStopIdx; ++i) {
+        antlr4::Token* pTok = pTokens->get(i);
+        if (!pTok ||
+            ( pTok->getType() == antlr4::Token::EOF ) ||
+            ( pTok->getChannel() !=
+                antlr4::Token::DEFAULT_CHANNEL ) )
+            continue;
+
+        std::string strTokText = pTok->getText();
+        if (strTokText.empty())
+            continue;
+
+        if (!strResult.empty()) {
+            strResult += ",";
+        }
+        strResult += strTokText;
+    }
+
+    return strResult;
 }
 
 }

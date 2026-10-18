@@ -524,5 +524,11 @@ struct CStParseContext
     guint32 m_dwWarningCount = 0;
     guint32 m_dwErrorCount = 0;
 };
+
+std::string GetReconstructedText(
+    antlr4::ParserRuleContext* pCtx,
+    antlr4::TokenStream* pTokens,
+    size_t offset = 0,
+    size_t roffset = 0 );
 }
 #endif // ST_PARSE_CONTEXT_H
