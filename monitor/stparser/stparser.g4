@@ -1621,7 +1621,7 @@ global_var_name
     ;
 
 global_var_spec
-    : global_var_name ( TOK_SEMICOLON global_var_name )*
+    : global_var_name ( TOK_COMMA global_var_name )*
     | global_var_name locate_at
     ;
 
