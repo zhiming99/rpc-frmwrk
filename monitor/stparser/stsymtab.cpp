@@ -22,6 +22,7 @@
  * =====================================================================================
  */
 
+#include "antlr4-runtime.h"
 #include "stsymtab.h"
 
 namespace rpcf

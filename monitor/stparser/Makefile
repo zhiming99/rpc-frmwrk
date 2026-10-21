@@ -56,8 +56,11 @@ pragma.o: pragma.cpp $(key_headers)
 st_parse_listener.o: st_parse_listener.cpp $(key_headers)
 parse_context.o: parse_context.cpp $(key_headers)
 st_parser_ext.o: st_parser_ext.cpp $(key_headers)
+astnodes.o: astnodes.cpp $(key_headers)
+stsymtab.o: stsymtab.cpp $(key_headers)
+st_main.o: st_main.cpp $(key_headers)
 
-$(pragma_auto_gen) : pragma_expr.g4
+$(pragma_auto_gen) $(pragma_auto_headers) &: pragma_expr.g4
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o ./pragma_expr pragma_expr.g4
 
 # Clean

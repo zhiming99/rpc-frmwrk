@@ -214,16 +214,11 @@ config_name
 
 config_decl
     : TOK_CONFIGURATION config_name
-      opt_global_var_decls
+      global_var_decls?
       resource_decl
       opt_access_decls
       opt_config_init
       TOK_END_CONFIGURATION
-    ;
-
-opt_global_var_decls
-    : /* empty */
-    | global_var_decls
     ;
 
 resource_decl
@@ -237,7 +232,7 @@ resource_decl_list
 
 resource_declaration
     : TOK_RESOURCE identifier TOK_ON identifier
-      opt_global_var_decls
+      global_var_decls?
       single_resource_decl
       TOK_END_RESOURCE
     ;
@@ -413,7 +408,7 @@ subscript_list
     ;
 
 expr_list
-    : full_expression ( TOK_COMMA full_expression )*
+    : expression ( TOK_COMMA expression )*
     ;
 
 this_notation
@@ -437,7 +432,7 @@ global_name_space
 // Expression
 // ============================================================
 
-full_expression
+expression returns [ ObjPtr pExpr]
     : xor_expr (TOK_OR xor_expr)*
     ;
 
@@ -480,7 +475,7 @@ primary_expr
     | namedval_value
     | func_call
     | ref_value
-    | TOK_LPAREN full_expression TOK_RPAREN
+    | TOK_LPAREN expression TOK_RPAREN
     ;
 
 variable_access
@@ -668,10 +663,6 @@ repeat_statement
     : TOK_REPEAT stmt_list
       TOK_UNTIL expression
       TOK_END_REPEAT
-    ;
-
-expression
-    : full_expression
     ;
 
 ref_assign:
@@ -1048,18 +1039,53 @@ func_body
 // ============================================================
 
 data_type_decl
-    : TOK_TYPE opt_override using_directive_list? type_decls TOK_END_TYPE
+    : TOK_TYPE
+    {
+        auto pParser =
+            static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        auto ost = pCtx->m_oSymTab;
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStDataTypeDeclNode ) );
+        auto pdtd = ( CStDataTypeDeclNode* )pObj;
+        pdtd->m_pScope = ost.GetCurrentScope();
+
+    }
+    opt_internal
+    (uds = using_directive_list
+    {{
+        pdtd->m_vecUsings = $uds.vecUsings;
+        pdtd->ResolveUsingNs( pCtx );
+    }})?
+    type_decls
+    {
+    }
+    TOK_END_TYPE
     ;
 
-type_decls
-    : type_decl ( semicolons type_decl )* opt_semicolons
+type_decls returns [ std::vector< ObjPtr > vecTypeDecls ]
+    : first=type_decl
+    {
+        if (!$first.pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back($first.pTypeDecl);
+    }
+    ( semicolons rest+=type_decl 
+    {
+        auto* pCtx = $rest.back();
+        if (pCtx != nullptr && !pCtx->pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back(pCtx->pTypeDecl);
+    })*
+    opt_semicolons
     ;
 
-type_decl
-    : simple_type_decl
+type_decl returns [ ObjPtr pTypeDecl ]
+    : st = simple_type_decl
+    {
+        $pTypeDecl = $st.pTypeDecl;
+    }
     | subrange_type_decl
     | enum_type_decl
-    | namedval_spec_init
+    | namedval_type_decl
     | array_type_decl
     | struct_type_decl
     | string_type_decl
@@ -1067,17 +1093,80 @@ type_decl
     | ambiguous_type_decl
     ;
 
-simple_type_decl
-    : simple_type_name TOK_COLON simple_spec_init
+simple_type_decl returns [ ObjPtr pTypeDecl ]
+    : st=simple_type_name TOK_COLON si=simple_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto ost = pCtx->m_oSymTab;
+
+            auto& initInfo = $si.triplet;
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            pTypeInit = std::get<2>( initInfo );
+            if( !std::get<1>( initInfo ) &&
+                pTypeInit.IsEmpty() )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else
+            {
+                ret = pNode.NewObj(
+                    clsid( CStSimpTypeDeclNode ) );
+            }
+            if( ERROR( ret ) )
+                break;
+            CStAmbiguousTypeDeclNode* ptd = pNode;
+            ptd->m_pTypeInit = pTypeInit;
+            stdstr strType = std::get<0>( initInfo );
+            ptd->m_oTypeRef = { strType, nullptr };
+            
+            auto pSym = ost.Declare( strType,
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $st.start, $st.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-simple_spec_init
-    : simple_spec ( TOK_ASSIGN expression )?
+simple_spec_init returns [ std::tuple< std::string, bool, ObjPtr > triplet ]
+    : spec=simple_spec ( TOK_ASSIGN expr=expression )?
+    {
+          std::string strName = $spec.namePair.first;
+          bool bIsElemType    = $spec.namePair.second;
+          
+          ObjPtr pExprNode;
+          if( $expr.ctx != nullptr )
+              pExprNode = $expr.pExpr;
+          else
+              pExprNode = ObjPtr();
+          
+          $triplet = std::make_tuple(
+              strName, bIsElemType, pExprNode );
+    }
     ;
 
-simple_spec
-    : elem_type_name
-    | simple_type_access
+simple_spec returns [ std::pair< std::string, bool > namePair ]
+    : etn = elem_type_name
+    { 
+        $namePair.first = $etn.ctx->getText();
+        $namePair.first = true;
+    }
+    | sta = simple_type_access
+    { 
+        $namePair.first = $sta.ctx->getText();
+        $namePair.first = false;
+    }
     ;
 
 date_type_name

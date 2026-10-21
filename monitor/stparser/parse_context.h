@@ -169,52 +169,6 @@ struct CStIncludeManager
         const std::string& strPath ) const;
 };
 
-// Token classification types for tracking your structural markers
-enum class ECStVirtualTokenType
-{
-    None,
-    EndIncludeMarker
-};
-
-struct CStToken
-{
-    // Pointer to the raw underlying ANTLR token
-    // generated during the lexer pass
-    antlr4::Token*       m_pOriginalToken = nullptr;
-
-    // The exact file index inside the include file
-    // stack. -1 represents the root source file to
-    // parse.
-    gint32               m_iFileIdx       = -1;
-
-    // Continuous adjusted global line counter across
-    // all included files
-    size_t               m_stVirtualLine  = 0;
-
-    // The true, real physical line number inside its
-    // original source file
-    size_t               m_stOrigLine     = 0;
-
-    // The physical column character offset position
-    // inside its original source file
-    size_t               m_stCharPos      = 0;
-
-    // Identifies if this is an injected structural
-    // marker rather than standard source code
-    ECStVirtualTokenType m_eVirtualType   =
-        ECStVirtualTokenType::None;
-
-    // Stores custom rewritten pragma payload text
-    // (e.g., "{endincl 'path/to/file.st'}")
-    std::string          m_strMarkerPath;
-
-    std::shared_ptr<antlr4::CommonToken> m_pBackup;
-
-    CStToken()
-    {}
-
-};
-
 struct CStTokenPipeline
 {
     CStIncludeManager*    m_pIncludeMgr = nullptr;
@@ -530,5 +484,80 @@ std::string GetReconstructedText(
     antlr4::TokenStream* pTokens,
     size_t offset = 0,
     size_t roffset = 0 );
+
+/**
+ * @brief Why ResolveNsPrefix() stopped
+ */
+enum enumPathStop
+{
+    //! the whole path was resolved
+    pathStopResolved = 0,
+    //! the next component exists, but it is not a namespace,
+    //! e.g. a variable, an FB instance or a struct
+    pathStopNonNamespace,
+    //! the next component is not declared (yet); for a using
+    //! directive this is a forward reference to retry later
+    pathStopUnresolved,
+};
+
+/**
+ * @brief Resolve a namespace path and report where it stopped
+ *
+ * Same lookup rules as ResolvePath(), but it resolves only the
+ * namespace prefix of a qualified name and reports how far it
+ * got:
+ *
+ * - success: the resolved CStSymbol is returned and iPos is the
+ *   index of the last component in vecNames;
+ * - failure: the CStNamespaceDecl of the innermost namespace is
+ *   returned and iPos is the index of that namespace's name in
+ *   vecNames.  vecNames[iPos + 1] is therefore the component
+ *   that stopped the walk.
+ *
+ * A stop has two different meanings, reported through eStop:
+ *
+ * - pathStopNonNamespace: the namespace part ended and
+ *   vecNames[iPos + 1] names a variable, an FB instance, a
+ *   struct or another non-namespace symbol.  The caller resolves
+ *   the rest in the scope of the returned node.
+ * - pathStopUnresolved: vecNames[iPos + 1] is not declared yet.
+ *   For a using directive this is a forward reference: keep the
+ *   (namespace, iPos) anchor and retry once the unit has been
+ *   fully declared.
+ *
+ * The first (innermost) lexical level that binds vecNames[0]
+ * decides the anchor: once that level's namespace chain ends, no
+ * outer level is consulted, so a local binding is never shadowed
+ * by a longer namespace path further out.
+ *
+ * When not even the first component resolves as a namespace,
+ * iPos is set to (size_t)-1 and the returned node is the
+ * namespace enclosing the starting scope.  For an absolute path
+ * the global namespace is reported instead, with iPos == 0.
+ *
+ * @param vecNames the path components as produced by
+ *                 BreakdownQualified(), e.g. {"@","A","B"}.
+ *                 '@' (GLOBAL_SCOPE_MARK) is the internal id of
+ *                 the global scope, standing for the leading '_'
+ *                 of an ST qualified name.  It is kept distinct
+ *                 from '_' so that a path whose leading component
+ *                 really is the identifier '_' (e.g. '_._.B')
+ *                 cannot be mistaken for the global root.
+ * @param pCtx     the CStParseContext carrying the symbol table
+ * @param iPos     [out] index of the last resolved component
+ * @param eStop    [out] why the walk stopped, see enumPathStop
+ * @return the resolved symbol on success, otherwise the innermost
+ *         CStNamespaceDecl reached
+ */
+ObjPtr ResolveNsPrefix(
+    const std::vector<std::string>& vecNames,
+    void* pCtx,
+    size_t& iPos,
+    enumPathStop& eStop );
+
+gint32 ResolveUsingNs(
+    void* pctx, ObjPtr pHostNode );
+
 }
+
 #endif // ST_PARSE_CONTEXT_H

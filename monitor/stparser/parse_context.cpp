@@ -975,4 +975,220 @@ std::string GetReconstructedText(
     return strResult;
 }
 
+ObjPtr ResolveNsPrefix(
+    const std::vector<std::string>& vecNames,
+    void* pctx,
+    size_t& iPos,
+    enumPathStop& eStop )
+{
+    ObjPtr pResult;
+    iPos = ( size_t )-1;
+    eStop = pathStopUnresolved;
+
+    if( vecNames.empty() || pctx == nullptr )
+        return pResult;
+
+    auto pCtx = reinterpret_cast
+        < CStParseContext* >( pctx );
+    auto& ost = pCtx->m_oSymTab;
+
+    CStScope* pCurScope = ost.GetCurrentScope();
+
+    bool bAbsolute =
+        ( vecNames[0] == GLOBAL_SCOPE_MARK );
+    size_t iStartIdx = bAbsolute ? 1 : 0;
+
+    while( pCurScope != nullptr || bAbsolute )
+    {
+        CStScope* pSearchRunner =
+            ( !bAbsolute ? pCurScope
+            : ( CStScope* )ost.GetGlobalScope() );
+
+        SymPtr pLastNs;
+        size_t iLastIdx = ( size_t )-1;
+        bool bChainValid = true;
+
+        for( size_t i = iStartIdx;
+            i < vecNames.size(); ++i )
+        {
+            const std::string& strName = vecNames[i];
+            SymVector vecSyms;
+            ost.FindByKind(symNamespace,
+                vecSyms, pSearchRunner);
+
+            CStScope* pNextScope = nullptr;
+            SymPtr pNextNs;
+            for( auto& elem : vecSyms )
+            {
+                if( elem->m_strName == strName )
+                {
+                    pNextScope = elem->m_pDefScope;
+                    pNextNs = elem;
+                    break;
+                }
+            }
+
+            if( pNextScope == nullptr )
+            {
+                bChainValid = false;
+                break; // Break component chain loop
+            }
+
+            pLastNs = pNextNs;
+            iLastIdx = i;
+            pSearchRunner = pNextScope;
+        }
+
+        if (bChainValid)
+        {
+            if( iLastIdx == ( size_t )-1 )
+            {
+                // only the absolute root marker was
+                // given
+                iPos = 0;
+                ScopePtr pGlobal = ost.GetGlobalScope();
+                if( pGlobal.IsEmpty() ||
+                    pGlobal->m_pSymbol.IsEmpty() )
+                    return pResult;
+                eStop = pathStopResolved;
+                return ObjPtr( pGlobal->m_pSymbol );
+            }
+            iPos = iLastIdx;
+            eStop = pathStopResolved;
+            return ObjPtr( pLastNs );
+        }
+
+        // The namespace prefix ends at this level.  Do
+        // not fall back to outer scopes, or they would
+        // shadow the locally bound first component.
+        // Tell the two possible stops apart: a
+        // non-namespace symbol means the caller
+        // continues in pLastNs's scope, while a
+        // missing symbol means the name is not
+        // declared yet (a using directive may retry it
+        // later).
+        if( iLastIdx != ( size_t )-1 )
+        {
+            iPos = iLastIdx;
+            if( iLastIdx + 1 < vecNames.size() )
+            {
+                SymPtr pNextSym = pSearchRunner->LookupLocal(
+                    vecNames[ iLastIdx + 1 ] );
+                if( !pNextSym.IsEmpty() &&
+                    pNextSym->m_eKind != symNamespace )
+                    eStop = pathStopNonNamespace;
+            }
+            return pLastNs->m_pDeclNode;
+        }
+
+        // If forced absolute or already at root, fail
+        if (bAbsolute ||
+            pCurScope == ost.GetGlobalScope())
+            break;
+
+        // Fall back one level up the lexical tree
+        pCurScope = pCurScope->m_pParent;
+
+        // Final fallback step: Try the absolute root
+        if (pCurScope == nullptr)
+            bAbsolute = true;
+    }
+
+    // Nothing matched at all: anchor at the global
+    // namespace for an absolute path, otherwise at the
+    // namespace enclosing the scope resolution started
+    // from.
+    if( bAbsolute )
+    {
+        iPos = 0;
+        ScopePtr pGlobal = ost.GetGlobalScope();
+        if( pGlobal.IsEmpty() ||
+            pGlobal->m_pSymbol.IsEmpty() )
+            return pResult;
+        return pGlobal->m_pSymbol->m_pDeclNode;
+    }
+
+    CStScope* pScope = ost.GetCurrentScope();
+    while( pScope != nullptr )
+    {
+        if( ( pScope->m_eKind == scopeNamespace ||
+              pScope->m_eKind == scopeGlobal ) &&
+            !pScope->m_pSymbol.IsEmpty() )
+            return pScope->m_pSymbol->m_pDeclNode;
+        pScope = pScope->m_pParent;
+    }
+
+    return pResult; // Return null if unfound
+}
+
+static std::vector< ObjPtr >
+GetUsingNs( ObjPtr& pObj )
+{
+    CStNamespaceDecl* pnsd = pObj;
+    if( pnsd != nullptr )
+        return pnsd->m_vecUsings;
+    CStDataTypeDeclNode* pdtd = pObj;
+    if( pdtd != nullptr )
+        return pdtd->m_vecUsings;
+    return std::vector< ObjPtr >();
+}
+
+gint32 ResolveUsingNs(
+    void* pctx, ObjPtr pHostNode )
+{
+    gint32 ret = 0;
+    do{
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto ost = pCtx->m_oSymTab;
+        DebugPrint( ret, "Entering ResolveUsingNs" );
+        bool bUnresolved = false;
+        auto vecUsings = GetUsingNs( pHostNode );
+        for( auto pObj : vecUsings )
+        {
+            CStUsingDirective* pud = pObj;
+            if( pud == nullptr )
+                continue;
+            auto& vecNames = pud->m_vecNamespaces;
+            for( auto& elem: vecNames )
+            {
+                if( !elem.second.IsEmpty() )
+                    continue;
+
+                auto vecComps = 
+                    ost.BreakdownQualified( elem.first );
+
+                if( vecComps.empty() )
+                    continue;
+
+                auto pSym = CStNamespaceDecl::ResolvePath(
+                    vecComps, pctx );
+                if( !pSym.IsEmpty() )
+                {
+                    elem.second = SymPtr( pSym );
+                    DebugPrint( 0,
+                    "Resoved namespace reference %s",
+                    elem.first.c_str() );
+                }
+                else
+                {
+                    DebugPrint( 0,
+                    "undefined namespace reference %s",
+                    elem.first.c_str() );
+                    bUnresolved = true;
+                }
+            }
+        }
+        if( bUnresolved )
+        {
+            ost.AddUnsolved( pHostNode,
+                ([]( ObjPtr& pObj, void* pctx )->gint32
+                {
+                    return ResolveUsingNs( pctx, pObj );
+                }));
+        }
+    }while( 0 );
+    return ret;
+}
+
 }

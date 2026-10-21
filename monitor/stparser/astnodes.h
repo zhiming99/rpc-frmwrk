@@ -40,6 +40,8 @@ class CStStmtNode;
 struct CStExprNode;
 class CStTypeNode;
 class CStVarDeclNode;
+class CStSymbol;
+class CStScope;
 
 // ============================================================================
 // Expression Nodes
@@ -644,6 +646,7 @@ struct CStEnumValueListNode : public CStAstNodeBase
     virtual std::string GetNodeInfo() const override;
 };
 
+struct CStTypeDeclNode;
 /**
  * @brief Data type specification wrapper node
  *
@@ -651,35 +654,120 @@ struct CStEnumValueListNode : public CStAstNodeBase
  * into a uniform node for use in type_spec. This allows type_spec to have a
  * consistent child type instead of handling multiple node type variants.
  */
-struct CStDataTypeSpecNode : public CStAstNodeBase
+struct CStDataTypeDeclNode : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    ObjPtr m_pTypeSpec;  // Can be CStBasicTypeNode, CStEnumTypeNode, etc.
+    CStScope* m_pScope;
+    std::vector< ObjPtr > m_vecUsings;
+    std::vector< CStTypeDeclNode* > m_vecTypeDecls;
 
-    CStDataTypeSpecNode() : super()
-    { SetClassId( clsid( CStDataTypeSpecNode ) ); }
+    CStDataTypeDeclNode() : super()
+    { SetClassId( clsid( CStDataTypeDeclNode ) ); }
 
+    gint32 ResolveUsingNs( void* pCtx );
     virtual std::string GetNodeInfo() const override;
 };
 
 /**
- * @brief Type spec wrapper node
+ * @brief type_decl wrapper node
  *
- * Wraps all type_spec alternatives (data_type_spec, array_type,
- * reference_type, pointer_type, derived_type) into a uniform node type.
+ * base type declaration 
  * This allows the parent rules to handle a consistent node type.
  */
-struct CStTypeSpecNode : public CStAstNodeBase
+struct CStTypeDeclNode : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
+    CStSymbol* m_pSymbol;
 
-    ObjPtr m_pType;  // Can be CStDataTypeSpecNode, CStArrayTypeNode, CStReferenceTypeNode, etc.
+    using TYPE_REF =
+        std::pair< std::string, CStSymbol* >;
+    TYPE_REF m_oTypeRef; 
+    ObjPtr m_pTypeInit;
 
-    CStTypeSpecNode() : super()
-    { SetClassId( clsid( CStTypeSpecNode ) ); }
+    CStTypeDeclNode() : super()
+    { SetClassId( clsid( CStTypeDeclNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
+};
+struct CStAmbiguousTypeDeclNode : public CStTypeDeclNode
+{
+    typedef CStTypeDeclNode super;
+
+    CStAmbiguousTypeDeclNode() : super()
+    { SetClassId( clsid( CStAmbiguousTypeDeclNode ) ); }
+};
+/**
+ * @brief Type spec wrapper node
+ *
+ * Wraps all simple_type_decl 
+ * This allows the parent rules to handle a consistent node type.
+ */
+struct CStSimpTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStSimpTypeDeclNode() : super()
+    { SetClassId( clsid( CStSimpTypeDeclNode ) ); }
+};
+
+struct CStSubrangeTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStSubrangeTypeDeclNode() : super()
+    { SetClassId( clsid( CStSubrangeTypeDeclNode ) ); }
+};
+
+struct CStEnumTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStEnumTypeNode* m_pEnumType;
+
+    CStEnumTypeDeclNode() : super(),
+        m_pEnumType(nullptr)
+    { SetClassId( clsid( CStEnumTypeDeclNode ) ); }
+};
+
+struct CStArrayTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStArrayTypeDeclNode() : super()
+    { SetClassId( clsid( CStArrayTypeDeclNode ) ); }
+};
+
+struct CStStructTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStStructTypeDeclNode() : super()
+    { SetClassId( clsid( CStStructTypeDeclNode ) ); }
+};
+
+struct CStStringTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStStringTypeDeclNode() : super()
+    { SetClassId( clsid( CStStringTypeDeclNode ) ); }
+};
+
+struct CStRefTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStRefTypeDeclNode() : super()
+    { SetClassId( clsid( CStRefTypeDeclNode ) ); }
+};
+
+struct CStNamedvalTypeDeclNode : public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    CStNamedvalTypeDeclNode() : super()
+    { SetClassId( clsid( CStNamedvalTypeDeclNode ) ); }
 };
 
 /**
@@ -1187,6 +1275,8 @@ struct CStMethodDecl : public CStPouDeclNode
  * declarations and backend-specific constructs.
  */
 struct CStSymbol;
+
+
 struct CStNamespaceDecl : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
@@ -1201,7 +1291,7 @@ struct CStNamespaceDecl : public CStAstNodeBase
 
     gint32 ResolveUsingNs( void* pCtx );
 
-    ObjPtr ResolvePath(
+    static ObjPtr ResolvePath(
         const std::vector<std::string>& vecNames,
         void* pCtx );
 
@@ -1356,7 +1446,7 @@ struct CStUsingDirective : public CStAstNodeBase
         auto& vec = m_vecNamespaces;
         auto itr = std::find_if(
             vec.begin(), vec.end(),
-            [ strns ]( const NS_ELEM& elem){
+            [ strns, pSym ]( const NS_ELEM& elem){
                 return elem.first == strns;
             });
         if( itr == vec.end() )
@@ -1951,8 +2041,8 @@ REGISTER_AST_NODE( CStStructTypeNode );
 REGISTER_AST_NODE( CStEnumTypeNode );
 REGISTER_AST_NODE( CStEnumValueNode );
 REGISTER_AST_NODE( CStEnumValueListNode );
-REGISTER_AST_NODE( CStDataTypeSpecNode );
-REGISTER_AST_NODE( CStTypeSpecNode );
+REGISTER_AST_NODE( CStDataTypeDeclNode );
+REGISTER_AST_NODE( CStTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDefinitionBlockNode );
 REGISTER_AST_NODE( CStPointerTypeNode );
 REGISTER_AST_NODE( CStReferenceTypeNode );

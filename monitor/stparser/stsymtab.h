@@ -26,6 +26,7 @@
 
 #include <map>
 #include <deque>
+#include <unordered_map>
 #include "rpc.h"
 #include "stast.h"
 #include "astnodes.h"
@@ -69,6 +70,53 @@ enum enumScopeKind {
 
 struct CStScope;
 
+// Token classification types for tracking your structural markers
+enum class ECStVirtualTokenType
+{
+    None,
+    EndIncludeMarker
+};
+
+struct CStToken
+{
+    // Pointer to the raw underlying ANTLR token
+    // generated during the lexer pass
+    antlr4::Token*       m_pOriginalToken = nullptr;
+
+    // The exact file index inside the include file
+    // stack. -1 represents the root source file to
+    // parse.
+    gint32               m_iFileIdx       = -1;
+
+    // Continuous adjusted global line counter across
+    // all included files
+    size_t               m_stVirtualLine  = 0;
+
+    // The true, real physical line number inside its
+    // original source file
+    size_t               m_stOrigLine     = 0;
+
+    // The physical column character offset position
+    // inside its original source file
+    size_t               m_stCharPos      = 0;
+
+    // Identifies if this is an injected structural
+    // marker rather than standard source code
+    ECStVirtualTokenType m_eVirtualType   =
+        ECStVirtualTokenType::None;
+
+    // Stores custom rewritten pragma payload text
+    // (e.g., "{endincl 'path/to/file.st'}")
+    std::string          m_strMarkerPath;
+
+    std::shared_ptr<antlr4::CommonToken> m_pBackup;
+
+    CStToken()
+    {}
+
+};
+
+
 /**
  * @brief One declared entity, e.g. a variable, a data type or a POU
  *
@@ -107,6 +155,9 @@ class CStSymbol : public rpcf::CObjBase
     // member access like 'fbInst.count' or 'Pump.Start' can resolve
     // through the symbol. Null otherwise.
     CStScope* m_pDefScope;
+
+    antlr4::Token* m_pStart = nullptr;
+    antlr4::Token* m_pStop = nullptr;
 
     bool m_bResolved = false;
 
@@ -174,6 +225,17 @@ class CStSymbol : public rpcf::CObjBase
             strInfo += " : " + m_strTypeName;
         return strInfo;
     }
+
+    inline void SetTokens(
+        antlr4::Token* pStart,
+        antlr4::Token* pStop )
+    { m_pStart = pStart, m_pStop = pStop; }
+
+    antlr4::Token* Start()
+    { return m_pStart; }
+
+    antlr4::Token* Stop()
+    { return m_pStop; }
 
     inline void SetResolved()
     { m_bResolved = true; }
@@ -299,6 +361,7 @@ struct CStScope : public CObjBase
  * the referenced namespace scopes around a POU body,
  * or by calling LookupQualified().
  */
+using RESOLVE_FUNC = gint32 ( * )( ObjPtr& pObj, void* pctx );
 class CStSymbolTable
 {
 public:
@@ -310,6 +373,7 @@ private:
     std::deque< ScopePtr > m_dequeScopes;
     ScopePtr m_pGlobal;
     ScopeStack m_stackScopes;
+    std::unordered_map< ObjPtr, RESOLVE_FUNC  > m_mapUnresolved;
 
     ScopePtr NewScopeInternal(
         enumScopeKind eKind,
@@ -475,6 +539,9 @@ public:
 
     //! indented scope tree listing, for debugging the semantic phase
     std::string Dump();
+    void AddUnsolved( ObjPtr pNode,
+        RESOLVE_FUNC resolve )
+    { m_mapUnresolved.insert( { pNode, resolve } ); }
 };
 
 }
