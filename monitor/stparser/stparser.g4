@@ -1057,8 +1057,9 @@ data_type_decl
         pdtd->m_vecUsings = $uds.vecUsings;
         pdtd->ResolveUsingNs( pCtx );
     }})?
-    type_decls
+    tds = type_decls
     {
+        auto vecDecls = $tds.vecTypeDecls;
     }
     TOK_END_TYPE
     ;
@@ -1087,7 +1088,7 @@ type_decl returns [ ObjPtr pTypeDecl ]
     | enum_type_decl
     | namedval_type_decl
     | array_type_decl
-    | struct_type_decl
+    | struct_type_decl_init
     | string_type_decl
     | ref_type_decl
     | ambiguous_type_decl
@@ -1107,7 +1108,7 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             ObjPtr pNode;
             ObjPtr pTypeInit;
             pTypeInit = std::get<2>( initInfo );
-            if( !std::get<1>( initInfo ) &&
+            if( std::get<1>( initInfo ) != TOK_ID &&
                 pTypeInit.IsEmpty() )
             {
                 ret = pNode.NewObj(
@@ -1139,11 +1140,11 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
     }
     ;
 
-simple_spec_init returns [ std::tuple< std::string, bool, ObjPtr > triplet ]
+simple_spec_init returns [ std::tuple< std::string, int, ObjPtr > triplet ]
     : spec=simple_spec ( TOK_ASSIGN expr=expression )?
     {
           std::string strName = $spec.namePair.first;
-          bool bIsElemType    = $spec.namePair.second;
+          int typeId    = $spec.namePair.second;
           
           ObjPtr pExprNode;
           if( $expr.ctx != nullptr )
@@ -1152,20 +1153,20 @@ simple_spec_init returns [ std::tuple< std::string, bool, ObjPtr > triplet ]
               pExprNode = ObjPtr();
           
           $triplet = std::make_tuple(
-              strName, bIsElemType, pExprNode );
+              strName, typeId, pExprNode );
     }
     ;
 
-simple_spec returns [ std::pair< std::string, bool > namePair ]
+simple_spec returns [ std::pair< std::string, int > namePair ]
     : etn = elem_type_name
     { 
         $namePair.first = $etn.ctx->getText();
-        $namePair.first = true;
+        $namePair.second = $etn.start->getType();
     }
     | sta = simple_type_access
     { 
         $namePair.first = $sta.ctx->getText();
-        $namePair.first = false;
+        $namePair.second = $sta.stop->getType();
     }
     ;
 
