@@ -98,8 +98,17 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStEnumTypeNode );
     INIT_MAP_ENTRY( CStEnumValueNode );
     INIT_MAP_ENTRY( CStEnumValueListNode );
-    INIT_MAP_ENTRY( CStDataTypeSpecNode );
-    INIT_MAP_ENTRY( CStTypeSpecNode );
+    INIT_MAP_ENTRY( CStDataTypeDeclNode );
+    INIT_MAP_ENTRY( CStTypeDeclNode );
+    INIT_MAP_ENTRY( CStAmbiguousTypeDeclNode );
+    INIT_MAP_ENTRY( CStSimpleTypeDeclNode );
+    INIT_MAP_ENTRY( CStSubrangeTypeDeclNode );
+    INIT_MAP_ENTRY( CStArrayTypeDeclNode );
+    INIT_MAP_ENTRY( CStStructTypeDeclNode );
+    INIT_MAP_ENTRY( CStStringTypeDeclNode );
+    INIT_MAP_ENTRY( CStNamedvalTypeDeclNode );
+    INIT_MAP_ENTRY( CStEnumTypeDeclNode );
+    INIT_MAP_ENTRY( CStRefTypeDeclNode );
     INIT_MAP_ENTRY( CStTypeDefinitionBlockNode );
     INIT_MAP_ENTRY( CStPointerTypeNode );
     INIT_MAP_ENTRY( CStReferenceTypeNode );
@@ -164,6 +173,7 @@ static FactoryPtr InitClassFactory()
 
     // Symbol table
     INIT_MAP_ENTRY( CStSymbol );
+    INIT_MAP_ENTRY( CStScope );
 
     END_FACTORY_MAPS;
 };
@@ -207,12 +217,13 @@ int main(int argc, char* argv[])
     if( ret )
         return ret;
 
+    FactoryPtr pFactory = InitClassFactory();
+    ret = CoAddClassFactory( pFactory );
+    if( ERROR( ret ) )
+        return ret;
+
     CStParseContext oCtx;
     do{
-        FactoryPtr pFactory = InitClassFactory();
-        ret = CoAddClassFactory( pFactory );
-        if( ERROR( ret ) )
-            break;
 
         // Set up the parse context with a symbol table
         while( true ) 

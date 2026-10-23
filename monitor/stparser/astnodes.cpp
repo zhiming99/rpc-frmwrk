@@ -26,6 +26,9 @@
 #include "stclsids.h"
 #include "astnodes.h"
 #include <sstream>
+#include <string_view>
+#include "stsymtab.h"
+#include "st_parser_ext.h"
 
 namespace rpcf
 {
@@ -109,35 +112,61 @@ std::string CStEnumValueListNode::GetNodeInfo() const
 }
 
 // ========================================================================
-// CStDataTypeSpecNode Implementation
+// CStDataTypeDeclNode Implementation
 // ========================================================================
 
-std::string CStDataTypeSpecNode::GetNodeInfo() const
+std::string CStDataTypeDeclNode::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "DataTypeSpec{ ";
-    if( !m_pTypeSpec.IsEmpty() )
-        oss << "type_spec set";
+    oss << "DataTypeDecl{ ";
+    if( !m_vecTypeDecls.empty() )
+        oss << "type_decls set";
     else
-        oss << "no type_spec";
+        oss << "no type_decls";
     oss << " }";
     return oss.str();
 }
 
+gint32 CStDataTypeDeclNode::ResolveUsingNs(
+    void* pctx )
+{
+    return rpcf::ResolveUsingNs(
+        pctx, ObjPtr( this ) );
+}
+
+gint32 CStDataTypeDeclNode::ResolveType(
+    void* pctx,
+    CStTypeDeclNode* ptd )
+{
+    gint32 ret = 0;
+    do{
+
+    }while( 0 );
+    return ret;
+}
 // ========================================================================
-// CStTypeSpecNode Implementation
+// CStTypeDeclNode Implementation
 // ========================================================================
 
-std::string CStTypeSpecNode::GetNodeInfo() const
+std::string CStTypeDeclNode::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "TypeSpec{ ";
-    if( !m_pType.IsEmpty() )
-        oss << "type set";
+    oss << "TypeRef{ ";
+    if( m_oTypeRef.first.size() )
+        oss << "type is derived from '"
+            << m_oTypeRef.first << "'";
     else
         oss << "no type";
     oss << " }";
     return oss.str();
+}
+
+bool CStSimpleTypeDeclNode::IsTypeResolved() const
+{
+    if( this->m_iTokid == stparser::TOK_ID &&
+        this->m_oTypeRef.second == nullptr )
+        return false;
+    return true;
 }
 
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const
@@ -443,6 +472,33 @@ std::string CStArrayRepeatNode::GetNodeInfo() const
     return oss.str();
 }
 
+bool CStNamespaceDecl::IsGlobalScope() const 
+{ return m_pSymbol->m_strName.empty(); }
+
+bool CStNamespaceDecl::IsNamedNamespace() const
+{ return !m_pSymbol->m_strName.empty(); }
+
+gint32 CStNamespaceDecl::ResolveUsingNs( void* pctx )
+{
+    return rpcf::ResolveUsingNs(
+        pctx, ObjPtr( this ) );
+}
+
+
+ObjPtr CStNamespaceDecl::ResolvePath(
+    const std::vector<std::string>& vecNames,
+    void* pctx )
+{
+    size_t iPos;
+    enumPathStop eReason = pathStopResolved;
+    auto pSym = ResolveNsPrefix(
+        vecNames, pctx, iPos, eReason );
+    if( pSym.IsEmpty() ) 
+        return pSym;
+    if( eReason != pathStopResolved )
+        return ObjPtr();
+    return pSym;
+}
 // ========================================================================
 // Default implementations for AST nodes
 // These use base class dummy implementation via override
@@ -484,8 +540,8 @@ IMPL_GETNODEINFO( CStBasicTypeNode )
 IMPL_GETNODEINFO( CStArrayTypeNode )
 IMPL_GETNODEINFO( CStStructTypeNode )
 IMPL_GETNODEINFO( CStEnumTypeNode )
-// CStDataTypeSpecNode has explicit implementation
-// CStTypeSpecNode has explicit implementation
+// CStDataTypeDeclNode has explicit implementation
+// CStTypeDeclNode has explicit implementation
 IMPL_GETNODEINFO( CStPointerTypeNode )
 IMPL_GETNODEINFO( CStReferenceTypeNode )
 IMPL_GETNODEINFO( CStDerivedTypeNode )

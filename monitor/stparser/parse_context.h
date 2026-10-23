@@ -34,7 +34,16 @@
 #include <fstream>
 #include <iostream>
 #include "stlcont.h"
+#include "stsymtab.h"
+#include <string>
+#include <iostream>
+#include <libintl.h> // Standard gettext header
 
+// Macro placeholder for future gettext string scanning
+#define _(String) dgettext("st_compiler", String)
+
+namespace rpcf
+{
 enum class EnumTypeCategory {
     Invalid = -1,
     Unknown = 0,
@@ -57,35 +66,17 @@ enum class EnumSimpleSpecType {
     StringSpec
 };
 
+enum class DiagnosticSeverity {
+    Warning,
+    Error,
+    Fatal
+};
+
 // Simple symbol table entry
 struct TypeEntry {
     std::string name;
     EnumTypeCategory category;
     // Additional type info can be added here
-};
-
-class SymbolTable {
-public:
-    void addType(
-        const std::string& strName,
-        EnumTypeCategory cat)
-    { types[strName] = {strName, cat}; }
-
-    EnumTypeCategory lookup(const std::string& name) const
-    {
-        auto it = types.find(name);
-        if (it != types.end()) {
-            return it->second.category;
-        }
-        return EnumTypeCategory::Unknown;
-    }
-
-    bool isKnown(const std::string& name) const {
-        return types.find(name) != types.end();
-    }
-
-private:
-    std::map<std::string, TypeEntry> types;
 };
 
 struct CStCmdlineMacros
@@ -176,52 +167,6 @@ struct CStIncludeManager
 
     std::string ResolveIncludePath(
         const std::string& strPath ) const;
-};
-
-// Token classification types for tracking your structural markers
-enum class ECStVirtualTokenType
-{
-    None,
-    EndIncludeMarker
-};
-
-struct CStToken
-{
-    // Pointer to the raw underlying ANTLR token
-    // generated during the lexer pass
-    antlr4::Token*       m_pOriginalToken = nullptr;
-
-    // The exact file index inside the include file
-    // stack. -1 represents the root source file to
-    // parse.
-    gint32               m_iFileIdx       = -1;
-
-    // Continuous adjusted global line counter across
-    // all included files
-    size_t               m_stVirtualLine  = 0;
-
-    // The true, real physical line number inside its
-    // original source file
-    size_t               m_stOrigLine     = 0;
-
-    // The physical column character offset position
-    // inside its original source file
-    size_t               m_stCharPos      = 0;
-
-    // Identifies if this is an injected structural
-    // marker rather than standard source code
-    ECStVirtualTokenType m_eVirtualType   =
-        ECStVirtualTokenType::None;
-
-    // Stores custom rewritten pragma payload text
-    // (e.g., "{endincl 'path/to/file.st'}")
-    std::string          m_strMarkerPath;
-
-    std::shared_ptr<antlr4::CommonToken> m_pBackup;
-
-    CStToken()
-    {}
-
 };
 
 struct CStTokenPipeline
@@ -375,8 +320,8 @@ public:
 
 // Parse context shared between listener and parser
 // predicates
-struct CStParseContext {
-
+struct CStParseContext
+{
     CStParseContext()
     {
         m_pvecIncludePaths.NewObj();
@@ -384,7 +329,7 @@ struct CStParseContext {
     }
     
     // Symbol table for type resolution
-    SymbolTable* m_pSymTab = nullptr;
+    CStSymbolTable m_oSymTab;
 
     CStCmdlineMacros        m_oMacros;
     rpcf::StrVecPtr         m_pvecIncludePaths;
@@ -407,18 +352,17 @@ struct CStParseContext {
     EnumTypeCategory ResolveType(
         const std::string& strName) const
     {
-        if (!m_pSymTab)
-            return EnumTypeCategory::Invalid;
-        return m_pSymTab->lookup(strName);
+        // TODO: add implementation
+        m_oSymTab.Lookup(strName);
+        return EnumTypeCategory::Invalid;
     }
 
     // Check if a type is known in the symbol table
     bool IsTypeKnown(
         const std::string& strName) const
     {
-        if (!m_pSymTab)
-            return false;
-        return m_pSymTab->isKnown( strName );
+        // TODO: add implementation
+        return false;
     }
 
     auto GetMacros() const
@@ -426,6 +370,200 @@ struct CStParseContext {
 
     auto GetMacros()
     { return m_oMacros.m_mapMacros; }
+
+    gint32 DeclareNamespace(
+        const std::string& sFirst,
+        const std::vector<stparser::Namespace_nameContext*>& rest);
+
+    void LeaveNamespace(
+        const std::string& sFirst,
+        const std::vector<stparser::Namespace_nameContext*>& rest);
+
+    template<typename... Args>
+    void LogDiagnostic(
+        DiagnosticSeverity eSeverity,
+        const std::string& strFileName,
+        size_t uLine,
+        size_t uCharPosition,
+        const char* szMsgId,
+        Args... args)
+    {
+        const char* szFormat = _(szMsgId);
+
+        int iSize = std::snprintf(
+            nullptr, 0, szFormat, args...) + 1;
+
+        if (iSize <= 0)
+            return;
+
+        std::vector<char> vecBuf(iSize);
+        std::snprintf(vecBuf.data(),
+            vecBuf.size(), szFormat, args...);
+
+        // Resolve localized severity label
+        const char* szLabel = _("error: ");
+        if (eSeverity == DiagnosticSeverity::Warning) {
+            szLabel = _("warning: ");
+        } else if (eSeverity == DiagnosticSeverity::Fatal) {
+            szLabel = _("fatal error: ");
+        }
+
+        std::cerr << strFileName << ":"
+                  << uLine << ":"
+                  << uCharPosition << ": "
+                  << szLabel
+                  << vecBuf.data() << "\n";
+
+        if (eSeverity == DiagnosticSeverity::Warning) {
+            m_dwWarningCount++;
+        } else {
+            m_dwErrorCount++; // Errors and Fatals halt gen
+        }
+    }
+
+    template<typename... Args>
+    void ForwardDiagnostic(
+        DiagnosticSeverity eSeverity,
+        antlr4::Token* pToken,
+        const char* szMsgId,
+        Args... args)
+    {
+        // Avoid crashing on corrupted lookahead symbols
+        if (!pToken)
+            return;
+
+        // Resolve source file tracking layer
+
+        auto idx = m_pMainStream->
+            FindMasterVectorIndex( pToken );
+        if( idx == -1 )
+            return;
+        auto pTok = m_pMainStream->
+            GetCustomToken( idx );
+        auto pPipeline =
+            m_pMainStream->GetPipeLine();
+        auto pIncMgr =
+            pPipeline->GetIncludeManager();
+
+        auto oFileInfo = 
+            pIncMgr->m_vecFileRegistry[ pTok->m_iFileIdx ];
+
+        std::string strFile;
+        if( oFileInfo.m_strAbsolutePath.size() )
+            strFile = basename(
+                oFileInfo.m_strAbsolutePath.c_str() );
+
+        size_t uLine = pToken->getLine();
+        size_t uCol = pToken->getCharPositionInLine();
+
+        LogDiagnostic(eSeverity, strFile, uLine,
+            uCol, szMsgId, args...);
+    }
+
+    template<typename... Args>
+    void LogWarning(antlr4::Token* pToken, 
+                    const char* szMsgId, Args... args) {
+        ForwardDiagnostic(DiagnosticSeverity::Warning, 
+            pToken, szMsgId, args...);
+    }
+
+    template<typename... Args>
+    void LogError(antlr4::Token* pToken, 
+          const char* szMsgId, Args... args)
+    {
+        ForwardDiagnostic(DiagnosticSeverity::Error, 
+            pToken, szMsgId, args...);
+    }
+
+    guint32 m_dwWarningCount = 0;
+    guint32 m_dwErrorCount = 0;
 };
+
+std::string GetReconstructedText(
+    antlr4::ParserRuleContext* pCtx,
+    antlr4::TokenStream* pTokens,
+    size_t offset = 0,
+    size_t roffset = 0 );
+
+/**
+ * @brief Why ResolveNsPrefix() stopped
+ */
+enum enumPathStop
+{
+    //! the whole path was resolved
+    pathStopResolved = 0,
+    //! the next component exists, but it is not a namespace,
+    //! e.g. a variable, an FB instance or a struct
+    pathStopNonNamespace,
+    //! the next component is not declared (yet); for a using
+    //! directive this is a forward reference to retry later
+    pathStopUnresolved,
+};
+
+/**
+ * @brief Resolve a namespace path and report where it stopped
+ *
+ * Same lookup rules as ResolvePath(), but it resolves only the
+ * namespace prefix of a qualified name and reports how far it
+ * got:
+ *
+ * - success: the resolved CStSymbol is returned and iPos is the
+ *   index of the last component in vecNames;
+ * - failure: the CStNamespaceDecl of the innermost namespace is
+ *   returned and iPos is the index of that namespace's name in
+ *   vecNames.  vecNames[iPos + 1] is therefore the component
+ *   that stopped the walk.
+ *
+ * A stop has two different meanings, reported through eStop:
+ *
+ * - pathStopNonNamespace: the namespace part ended and
+ *   vecNames[iPos + 1] names a variable, an FB instance, a
+ *   struct or another non-namespace symbol.  The caller resolves
+ *   the rest in the scope of the returned node.
+ * - pathStopUnresolved: vecNames[iPos + 1] is not declared yet.
+ *   For a using directive this is a forward reference: keep the
+ *   (namespace, iPos) anchor and retry once the unit has been
+ *   fully declared.
+ *
+ * The first (innermost) lexical level that binds vecNames[0]
+ * decides the anchor: once that level's namespace chain ends, no
+ * outer level is consulted, so a local binding is never shadowed
+ * by a longer namespace path further out.
+ *
+ * When not even the first component resolves as a namespace,
+ * iPos is set to (size_t)-1 and the returned node is the
+ * namespace enclosing the starting scope.  For an absolute path
+ * the global namespace is reported instead, with iPos == 0.
+ *
+ * @param vecNames the path components as produced by
+ *                 BreakdownQualified(), e.g. {"@","A","B"}.
+ *                 '@' (GLOBAL_SCOPE_MARK) is the internal id of
+ *                 the global scope, standing for the leading '_'
+ *                 of an ST qualified name.  It is kept distinct
+ *                 from '_' so that a path whose leading component
+ *                 really is the identifier '_' (e.g. '_._.B')
+ *                 cannot be mistaken for the global root.
+ * @param pCtx     the CStParseContext carrying the symbol table
+ * @param iPos     [out] index of the last resolved component
+ * @param eStop    [out] why the walk stopped, see enumPathStop
+ * @return the resolved symbol on success, otherwise the innermost
+ *         CStNamespaceDecl reached
+ */
+ObjPtr ResolveNsPrefix(
+    const std::vector<std::string>& vecNames,
+    void* pCtx,
+    size_t& iPos,
+    enumPathStop& eStop );
+
+gint32 ResolveUsingNs(
+    void* pctx, ObjPtr pHostNode );
+
+gint32 ResolveRef( CStParseContext* pctx,
+    const std::vector<std::string>& vecNames,
+    enumSymKind eKind,
+    std::vector< ObjPtr >& vecUsings,
+    SymPtr& pSym );
+
+}
 
 #endif // ST_PARSE_CONTEXT_H

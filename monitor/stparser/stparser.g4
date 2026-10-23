@@ -61,6 +61,13 @@ options { tokenVocab=stlexer; }
     { m_bPass2 = bPass2; }
 }
 
+@parser::context {
+#include "rpc.h"
+#include "astnodes.h"
+#include "stsymtab.h"
+using namespace rpcf;
+}
+
 // ============================================================
 // Start Point
 // ============================================================
@@ -81,7 +88,32 @@ decl_set
     : namespace_element
     | config_decl
     | access_decl
-    | using_directive
+    | ( ud = using_directive 
+        {
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+            auto pGlobal = ost.GetGlobalScope();
+            auto pSym = pGlobal->m_pSymbol;
+            auto pNode = pSym->m_pDeclNode;
+            auto pnsd = ( CStNamespaceDecl* )pNode;
+            if( pnsd )
+            {
+                pnsd->m_vecUsings.push_back( $ud.pNode );
+                std::string strFullPath =
+                    GetReconstructedText(
+                        $ud.ctx, _input, 1, 1 );
+                DebugPrint( $ud.start->getLine(),
+                "haha, added namespaces references to "
+                "global namespace: %s",
+                strFullPath.c_str() );
+                pnsd->ResolveUsingNs( pCtx );
+            }
+            // TODO add resolving namespace reference
+            // code if the namespace is not declared
+            // yet.
+        })
     | TOK_PRAGMA
     ;
 
@@ -109,8 +141,58 @@ namespace_name
     ;
 
 namespace_decl
-    : TOK_NAMESPACE opt_internal namespace_name ( TOK_DOT namespace_name )*
-    using_directive_list? namespace_elements TOK_END_NAMESPACE
+    : TOK_NAMESPACE opt_internal
+        first=namespace_name ( TOK_DOT rest+=namespace_name )*
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto ret = pCtx->DeclareNamespace(
+                $first.text, $rest );
+            if( ERROR( ret ) )
+            {
+                pCtx->LogError( $first.start,
+                    "Declare namespace failed:'%s'(%d).",
+                    $first.text.c_str(), ret );
+            }
+        }}
+        (uds = using_directive_list
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            std::string strNsName;
+            if( $rest.size() )
+                strNsName = $rest.back()->getText();
+            else
+                strNsName = $first.text;
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            if( pSym->m_strName != strNsName )
+            {
+                pCtx->LogError( $first.start,
+                    "wrong scope name:'%s'",
+                    $first.text.c_str() );
+            }
+            else
+            {
+                CStNamespaceDecl* pnsd =
+                    pSym->m_pDeclNode;
+                pnsd->m_vecUsings = $uds.vecUsings;
+            }
+        }})?
+        namespace_elements
+        TOK_END_NAMESPACE
+        {{ 
+            int lineno = 
+                $TOK_END_NAMESPACE->getLine();
+            DebugPrint( 0, "Current line %d", lineno);
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            CStNamespaceDecl* pnsd = pSym->m_pDeclNode;
+            pnsd->ResolveUsingNs( pCtx );
+            pCtx->LeaveNamespace( $first.text, $rest );
+        }}
     ;
 
 namespace_global_name
@@ -132,16 +214,11 @@ config_name
 
 config_decl
     : TOK_CONFIGURATION config_name
-      opt_global_var_decls
+      global_var_decls?
       resource_decl
       opt_access_decls
       opt_config_init
       TOK_END_CONFIGURATION
-    ;
-
-opt_global_var_decls
-    : /* empty */
-    | global_var_decls
     ;
 
 resource_decl
@@ -155,7 +232,7 @@ resource_decl_list
 
 resource_declaration
     : TOK_RESOURCE identifier TOK_ON identifier
-      opt_global_var_decls
+      global_var_decls?
       single_resource_decl
       TOK_END_RESOURCE
     ;
@@ -331,7 +408,7 @@ subscript_list
     ;
 
 expr_list
-    : full_expression ( TOK_COMMA full_expression )*
+    : expression ( TOK_COMMA expression )*
     ;
 
 this_notation
@@ -355,7 +432,7 @@ global_name_space
 // Expression
 // ============================================================
 
-full_expression
+expression returns [ ObjPtr pExpr]
     : xor_expr (TOK_OR xor_expr)*
     ;
 
@@ -398,7 +475,7 @@ primary_expr
     | namedval_value
     | func_call
     | ref_value
-    | TOK_LPAREN full_expression TOK_RPAREN
+    | TOK_LPAREN expression TOK_RPAREN
     ;
 
 variable_access
@@ -588,10 +665,6 @@ repeat_statement
       TOK_END_REPEAT
     ;
 
-expression
-    : full_expression
-    ;
-
 ref_assign:
     ref_name TOK_ASSIGN ( ref_name | ref_value | ref_deref )
     ;
@@ -648,13 +721,62 @@ fb_name
 
 std_fb_name: identifier;
 
-using_directive_list
-    : using_directive+
+using_directive_list returns [ std::vector<ObjPtr> vecUsings ]
+    : ( ud = using_directive
+        {
+            if( !$ud.pNode.IsEmpty() )
+                $vecUsings.push_back( $ud.pNode );
+        }
+    )+
     ;
 
-using_directive
-    : TOK_USING instance_path (TOK_COMMA instance_path)* semicolons
-    ;
+using_directive returns [rpcf::ObjPtr pNode]
+    : TOK_USING first = namespace_hierarchy (TOK_COMMA rest+=namespace_hierarchy)* semicolons
+      {
+          int lineno = $first.start->getLine();
+          DebugPrint( 0, "Current line %d", lineno);
+
+          std::string strPath = $first.ctx->getText();
+          auto& pctx = $first.ctx;
+          pctx->stop->getText();
+
+          rpcf::ObjPtr pObj;
+          pObj.NewObj( clsid( CStUsingDirective ) );
+          CStUsingDirective* pud = pObj;
+          if( !pud->AddNamespace( strPath, ObjPtr() ) )
+          {
+            auto pParser =
+                static_cast<CStParser*>(this);
+              CStParseContext* pCtx =
+                pParser->GetParseContext();
+              pCtx->LogError( $first.start,
+                  "Duplicate path in USING directive:'%s'",
+                  strPath.c_str() );
+              $pNode = ObjPtr();
+          }
+          else
+              $pNode = pObj;
+
+          // Skip processing if initial path failed
+          if (!$rest.empty()) 
+          {
+              CStUsingDirective* pud = $pNode;
+              auto pCurCtx = $rest.back();
+              std::string strPath = pCurCtx->getText();
+              if( !pud->AddNamespace(
+                  strPath, ObjPtr()))
+              {
+                  auto pParser = 
+                      static_cast<CStParser*>(this);
+                  CStParseContext* pCtx =
+                    pParser->GetParseContext();
+                  pCtx->LogError( pCurCtx->start, 
+                      "Duplicate path in USING directive '%s'.",
+                      strPath.c_str());
+              }
+          }
+      }
+      ;
 
 extends_clause
     :TOK_EXTENDS instance_path
@@ -917,36 +1039,169 @@ func_body
 // ============================================================
 
 data_type_decl
-    : TOK_TYPE opt_override using_directive_list? type_decls TOK_END_TYPE
+    : TOK_TYPE
+    {
+        auto pParser =
+            static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        auto& ost = pCtx->m_oSymTab;
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStDataTypeDeclNode ) );
+        auto pdtd = ( CStDataTypeDeclNode* )pObj;
+        pdtd->m_pScope = ost.GetCurrentScope();
+
+    }
+    opt_internal
+    (uds = using_directive_list
+    {{
+        pdtd->m_vecUsings = $uds.vecUsings;
+        pdtd->ResolveUsingNs( pCtx );
+    }})?
+    tds = type_decls
+    {
+        gint32 ret = 0;
+        auto vecDecls = $tds.vecTypeDecls;
+        for( auto& pType : vecDecls )
+        {
+            CStTypeDeclNode* ptd = pType;             
+            if( !ptd || 
+                ptd->IsTypeResolved() )
+                continue;
+
+            ptd->m_pDtd = pObj;
+            auto func =
+            ([]( ObjPtr& pObj, void* pctx )->gint32
+            {
+                CStTypeDeclNode* ptd = pObj;             
+                stdstr strType = ptd->m_oTypeRef.first;
+                auto pCtx = reinterpret_cast
+                    < CStParseContext* >( pctx );
+                auto& ost = pCtx->m_oSymTab;
+                std::vector< stdstr > vecComps =
+                    ost.BreakdownQualified( strType );
+                SymPtr pSym;
+                auto pdtd = ( CStDataTypeDeclNode* )
+                    ptd->m_pDtd;
+                auto ret = ResolveRef( pCtx, vecComps,
+                    symDataType, pdtd->m_vecUsings,
+                    pSym );
+                if( SUCCEEDED( ret ) )
+                    ptd->m_oTypeRef.second = pSym;
+            });
+            ret = func( pType, pCtx );
+            if( ERROR( ret ) )
+                ost.AddUnsolved( pType, func );
+        }
+    }
+    TOK_END_TYPE
     ;
 
-type_decls
-    : type_decl ( semicolons type_decl )* opt_semicolons
+type_decls returns [ std::vector< ObjPtr > vecTypeDecls ]
+    : first=type_decl
+    {
+        if (!$first.pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back($first.pTypeDecl);
+    }
+    ( semicolons rest+=type_decl 
+    {
+        auto* pCtx = $rest.back();
+        if (pCtx != nullptr && !pCtx->pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back(pCtx->pTypeDecl);
+    })*
+    opt_semicolons
     ;
 
-type_decl
-    : simple_type_decl
+type_decl returns [ ObjPtr pTypeDecl ]
+    : st = simple_type_decl
+    {
+        $pTypeDecl = $st.pTypeDecl;
+    }
     | subrange_type_decl
     | enum_type_decl
-    | namedval_spec_init
+    | namedval_type_decl
     | array_type_decl
-    | struct_type_decl
+    | struct_type_decl_init
     | string_type_decl
     | ref_type_decl
     | ambiguous_type_decl
     ;
 
-simple_type_decl
-    : simple_type_name TOK_COLON simple_spec_init
+simple_type_decl returns [ ObjPtr pTypeDecl ]
+    : st=simple_type_name TOK_COLON si=simple_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            auto& initInfo = $si.triplet;
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            pTypeInit = std::get<2>( initInfo );
+            gint32 iTok = std::get<1>( initInfo );
+            if( iTok == TOK_ID &&
+                pTypeInit.IsEmpty() )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else
+            {
+                ret = pNode.NewObj(
+                    clsid( CStSimpleTypeDeclNode ) );
+            }
+            if( ERROR( ret ) )
+                break;
+            CStAmbiguousTypeDeclNode* ptd = pNode;
+            ptd->m_pTypeInit = pTypeInit;
+            stdstr strType = std::get<0>( initInfo );
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTokid = iTok;
+
+            auto pSym = ost.Declare( strType,
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $st.start, $st.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-simple_spec_init
-    : simple_spec ( TOK_ASSIGN expression )?
+simple_spec_init returns [ std::tuple< std::string, int, ObjPtr > triplet ]
+    : spec=simple_spec ( TOK_ASSIGN expr=expression )?
+    {
+          std::string strName = $spec.namePair.first;
+          int typeId    = $spec.namePair.second;
+          
+          ObjPtr pExprNode;
+          if( $expr.ctx != nullptr )
+              pExprNode = $expr.pExpr;
+          else
+              pExprNode = ObjPtr();
+          
+          $triplet = std::make_tuple(
+              strName, typeId, pExprNode );
+    }
     ;
 
-simple_spec
-    : elem_type_name
-    | simple_type_access
+simple_spec returns [ std::pair< std::string, int > namePair ]
+    : etn = elem_type_name
+    { 
+        $namePair.first = $etn.ctx->getText();
+        $namePair.second = $etn.start->getType();
+    }
+    | sta = simple_type_access
+    { 
+        $namePair.first = $sta.ctx->getText();
+        $namePair.second = $sta.stop->getType();
+    }
     ;
 
 date_type_name
@@ -1490,7 +1745,7 @@ global_var_name
     ;
 
 global_var_spec
-    : global_var_name ( TOK_SEMICOLON global_var_name )*
+    : global_var_name ( TOK_COMMA global_var_name )*
     | global_var_name locate_at
     ;
 
@@ -1908,10 +2163,6 @@ var_member_init
 
 keywords
     : TOK_SINGLE | TOK_INTERVAL | TOK_PRIORITY 
-    | TOK_USING | TOK_INCLUDE | TOK_OVERLAP
-    | TOK_REGION | TOK_NAMESPACE 
-    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
-    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     | TOK_EXTERNAL
     ;
 
@@ -1943,5 +2194,9 @@ keywords1
     | TOK_END_REGION | TOK_END_NAMESPACE
     | TOK_TRUE | TOK_FALSE | TOK_RETURN | TOK_CONTINUE | TOK_EXIT
     | TOK_LWORD
+    | TOK_USING | TOK_NAMESPACE 
+    | TOK_REGION | TOK_INCLUDE | TOK_OVERLAP
+    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
+    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     ;
     
