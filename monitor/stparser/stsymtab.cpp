@@ -265,6 +265,19 @@ void CStSymbolTable::LookupAllLocal(
     return;
 }
 
+void CStSymbolTable::LookupAllLocal(
+    const std::string& strName,
+    ScopePtr pScope,
+    SymVector& vecOut ) const
+{
+    if( pScope.IsEmpty() )
+        pScope = GetCurrentScope();
+    if( pScope.IsEmpty() )
+        return;
+    pScope->GetAllLocal( strName, vecOut );
+    return;
+}
+
 SymPtr CStSymbolTable::LookupLocal(
     const std::string& strName,
     ScopePtr pScope ) const

@@ -101,7 +101,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStDataTypeDeclNode );
     INIT_MAP_ENTRY( CStTypeDeclNode );
     INIT_MAP_ENTRY( CStAmbiguousTypeDeclNode );
-    INIT_MAP_ENTRY( CStSimpTypeDeclNode );
+    INIT_MAP_ENTRY( CStSimpleTypeDeclNode );
     INIT_MAP_ENTRY( CStSubrangeTypeDeclNode );
     INIT_MAP_ENTRY( CStArrayTypeDeclNode );
     INIT_MAP_ENTRY( CStStructTypeDeclNode );

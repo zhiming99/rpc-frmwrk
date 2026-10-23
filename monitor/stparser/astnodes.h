@@ -667,6 +667,8 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
 
     gint32 ResolveUsingNs( void* pCtx );
     virtual std::string GetNodeInfo() const override;
+    gint32 ResolveType( void* pCtx,
+        CStTypeDeclNode* ptd );
 };
 
 /**
@@ -684,9 +686,16 @@ struct CStTypeDeclNode : public CStAstNodeBase
         std::pair< std::string, CStSymbol* >;
     TYPE_REF m_oTypeRef; 
     ObjPtr m_pTypeInit;
+    gint32 m_iTokid = -1;
+
+    // node for type resolution
+    ObjPtr m_pDtd; 
 
     CStTypeDeclNode() : super()
     { SetClassId( clsid( CStTypeDeclNode ) ); }
+
+    virtual bool IsTypeResolved() const
+    { return false; }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -703,12 +712,14 @@ struct CStAmbiguousTypeDeclNode : public CStTypeDeclNode
  * Wraps all simple_type_decl 
  * This allows the parent rules to handle a consistent node type.
  */
-struct CStSimpTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStSimpleTypeDeclNode : public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
-    CStSimpTypeDeclNode() : super()
-    { SetClassId( clsid( CStSimpTypeDeclNode ) ); }
+    CStSimpleTypeDeclNode() : super()
+    { SetClassId( clsid( CStSimpleTypeDeclNode ) ); }
+
+    virtual bool IsTypeResolved() const override;
 };
 
 struct CStSubrangeTypeDeclNode : public CStAmbiguousTypeDeclNode

@@ -118,14 +118,16 @@ struct CStToken
 
 
 /**
- * @brief One declared entity, e.g. a variable, a data type or a POU
+ * @brief One declared entity, e.g. a variable, a data
+ * type or a POU
  *
- * The symbol does not duplicate the declaration info: m_pDeclNode
- * points at the AST node (CStVarDeclNode, CStTypeDecl, CStPouDeclNode,
- * CStNamespaceDecl, CStEnumValueNode, ...), which carries the type,
- * the initial value and the source location. The fields below are the
- * lookup keys and the cheap-to-read summary the semantic phase needs
- * on its hot paths.
+ * The symbol does not duplicate the declaration info:
+ * m_pDeclNode points at the AST node (CStVarDeclNode,
+ * CStTypeDecl, CStPouDeclNode, CStNamespaceDecl,
+ * CStEnumValueNode, ...), which carries the type, the
+ * initial value and the source location. The fields
+ * below are the lookup keys and the cheap-to-read
+ * summary the semantic phase needs on its hot paths.
  */
 class CStSymbol : public rpcf::CObjBase
 {
@@ -133,26 +135,31 @@ class CStSymbol : public rpcf::CObjBase
     std::string m_strName;
     enumSymKind m_eKind;
 
-    // for symVariable: copied from CStVarDeclNode::m_eCategory so
-    // callers can filter input/output/inout/external without casting
-    // to the decl node
+    // for symVariable: copied from
+    // CStVarDeclNode::m_eCategory so callers can
+    // filter input/output/inout/external without
+    // casting to the decl node
     CStVarDeclNode::enumVarCategory m_eCategory;
 
-    // declared data type name, e.g. "INT", or "Counter" for an FB
-    // instance declared as 'counter : Counter'. Cached at declare
-    // time so the by-type lookups don't have to walk the type node.
-    // Empty when not applicable, e.g. namespaces.
+    // declared data type name, e.g. "INT", or
+    // "Counter" for an FB instance declared as
+    // 'counter : Counter'. Cached at declare time so
+    // the by-type lookups don't have to walk the type
+    // node.  Empty when not applicable, e.g.
+    // namespaces.
     std::string m_strTypeName;
 
-    // the AST declaration node that introduced this symbol
+    // the AST declaration node that introduced this
+    // symbol
     ObjPtr m_pDeclNode;
 
     // the scope that holds this symbol
     CStScope* m_pScope;
 
-    // for symbols that open a scope of their own (namespace, POU,
-    // struct type, interface): the scope holding their members, so
-    // member access like 'fbInst.count' or 'Pump.Start' can resolve
+    // for symbols that open a scope of their own
+    // (namespace, POU, struct type, interface): the
+    // scope holding their members, so member access
+    // like 'fbInst.count' or 'Pump.Start' can resolve
     // through the symbol. Null otherwise.
     CStScope* m_pDefScope;
 
@@ -460,12 +467,15 @@ public:
             CStVarDeclNode::vcLocal );
 
     /**
-     * @brief Declare a symbol that opens a scope of its own
+     * @brief Declare a symbol that opens a scope of
+     * its own
      *
-     * Use for namespaces, POUs, struct types and interfaces: the
-     * symbol is declared in the current scope and the new scope is
-     * pushed and linked to CStSymbol::m_pDefScope, so qualified and
-     * member lookups can reach the members. PopScope() at scope end.
+     * Use for namespaces, POUs, struct types and
+     * interfaces: the symbol is declared in the
+     * current scope and the new scope is pushed and
+     * linked to CStSymbol::m_pDefScope, so qualified
+     * and member lookups can reach the members.
+     * PopScope() at scope end.
      */
     SymPtr DeclareScopeOwner(
         enumSymKind eKind,
@@ -484,6 +494,11 @@ public:
     //! all candidates of current scope
     void LookupAllLocal(
         const std::string& strName,
+        SymVector& vecOut ) const;
+
+    void LookupAllLocal(
+        const std::string& strName,
+        ScopePtr pScope,
         SymVector& vecOut ) const;
 
     //! lookup in one scope only, no chain walk
@@ -541,7 +556,9 @@ public:
     std::string Dump();
     void AddUnsolved( ObjPtr pNode,
         RESOLVE_FUNC resolve )
-    { m_mapUnresolved.insert( { pNode, resolve } ); }
+    {
+        m_mapUnresolved.insert( std::pair( pNode, resolve ) );
+    }
 };
 
 }

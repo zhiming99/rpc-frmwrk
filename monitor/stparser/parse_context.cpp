@@ -1191,4 +1191,212 @@ gint32 ResolveUsingNs(
     return ret;
 }
 
+gint32 ResolveRef( CStParseContext* pCtx,
+    const std::vector<std::string>& vecNames,
+    enumSymKind eKind,
+    std::vector< ObjPtr >& vecUsings,
+    SymPtr& pSym )
+{
+    pSym.Clear();
+
+    if( vecNames.empty() || pCtx == nullptr )
+        return -EINVAL;
+
+    auto ost = pCtx->m_oSymTab;
+    const std::string& strName = vecNames.back();
+
+    bool bAbsolute = false;
+    if( vecNames[ 0 ] == GLOBAL_SCOPE_MARK )
+        bAbsolute = true;
+
+    if( bAbsolute && vecNames.size() == 1 )
+    {
+        std::cerr << "stparser error: invalid '_'\n"; 
+        return -EINVAL;
+    }
+
+    std::vector<std::string> vecPrefixPath;
+    size_t uStart = bAbsolute ? 1 : 0;
+    if (vecNames.size() > 1)
+        vecPrefixPath.insert(vecPrefixPath.begin(),
+            vecNames.begin() + uStart,
+            vecNames.end() - 1);
+
+    // 2. ABSOLUTE PATH LOOKUP ENGINE
+    if( bAbsolute )
+    {
+        ScopePtr pScope = ost.GetGlobalScope();
+        bool bChainValid = true;
+
+        for( const auto& strPart : vecPrefixPath )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strPart, pScope, vecOut );
+            ScopePtr pNextScope;
+            for( auto elem : vecOut )
+            {
+                if( elem->m_strName == strPart && 
+                    elem->m_eKind == symNamespace )
+                {
+                    pNextScope = elem->m_pDefScope;
+                    break;
+                }
+            }
+            if( pNextScope.IsEmpty() )
+            {
+                bChainValid = false;
+                break;
+            }
+            pScope = pNextScope;
+        }
+
+        if( bChainValid && !pScope.IsEmpty() )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strName, pScope, vecOut );
+            for( auto elem : vecOut )
+            {
+                if( elem->m_eKind == eKind &&
+                    elem->m_strName == strName )
+                {
+                    pSym = elem;
+                    return 0;
+                }
+            }
+        }
+        return -ENOENT;
+    }
+
+    // 3. RELATIVE LEXICAL PASS (No Imports Blended)
+    ScopePtr pStartScope = ost.GetCurrentScope();
+    ScopePtr pCurScope = pStartScope;
+
+    while( !pCurScope.IsEmpty() )
+    {
+        ScopePtr pRunScope = pCurScope;
+        bool bPathOk = true;
+
+        for( const auto& strPart : vecPrefixPath )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strPart, pRunScope, vecOut );
+            ScopePtr pNext;
+            for( auto elem : vecOut )
+            {
+                if( elem->m_strName == strPart &&
+                    elem->m_eKind == symNamespace )
+                {
+                    pNext = elem->m_pDefScope;
+                    break;
+                }
+            }
+            if( pNext.IsEmpty() )
+            {
+                bPathOk = false;
+                break;
+            }
+            pRunScope = pNext;
+        }
+
+        if( bPathOk && !pRunScope.IsEmpty() )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strName, pRunScope, vecOut );
+            for( auto elem : vecOut )
+            {
+                if( elem->m_eKind == eKind &&
+                    elem->m_strName == strName )
+                {
+                    pSym = elem;
+                    return 0;
+                }
+            }
+        }
+        pCurScope = pCurScope->m_pParent;
+    }
+
+    // 4. IMPORTED DIRECTIVES PASS (Evaluate USING)
+    for( auto pObj : vecUsings )
+    {
+        CStUsingDirective* pud = pObj;
+        if( pud == nullptr )
+            continue;
+
+        for( auto& elem : pud->m_vecNamespaces )
+        {
+            if( !elem.second.IsEmpty() )
+                continue;
+
+            auto vecComps = ost.BreakdownQualified(
+                elem.first
+            );
+            if( vecComps.empty() )
+                continue;
+
+            ScopePtr pRunScope;
+            size_t uStartIdx = 0;
+            
+            if( vecComps[ 0 ] == GLOBAL_SCOPE_MARK )
+            {
+                pRunScope = ost.GetGlobalScope();
+                uStartIdx = 1;
+            }
+            else
+                pRunScope = pStartScope;
+
+            vecComps.insert( vecComps.end(),
+                vecPrefixPath.begin(),
+                vecPrefixPath.end() );
+
+            bool bPathOk = true;
+            for( size_t i = uStartIdx;
+                 i < vecComps.size(); ++i )
+            {
+                const auto& strPart = vecComps[ i ];
+                SymVector vecOut;
+                ost.LookupAllLocal( strPart, pRunScope,
+                                    vecOut );
+                ScopePtr pNext;
+                for( auto elem : vecOut )
+                {
+                    if( elem->m_strName == strPart &&
+                        elem->m_eKind == symNamespace )
+                    {
+                        pNext = elem->m_pDefScope;
+                        break;
+                    }
+                }
+                if( pNext.IsEmpty() )
+                {
+                    bPathOk = false;
+                    break;
+                }
+                pRunScope = pNext;
+            }
+
+            if( bPathOk && !pRunScope.IsEmpty() )
+            {
+                SymVector vecOut;
+                ost.LookupAllLocal(
+                    strName, pRunScope, vecOut );
+                for( auto elem : vecOut )
+                {
+                    if( elem->m_eKind == eKind &&
+                        elem->m_strName == strName )
+                    {
+                        pSym = elem;
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+
+    return -ENOENT;
+}
+
 }

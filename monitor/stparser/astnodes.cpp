@@ -134,6 +134,16 @@ gint32 CStDataTypeDeclNode::ResolveUsingNs(
         pctx, ObjPtr( this ) );
 }
 
+gint32 CStDataTypeDeclNode::ResolveType(
+    void* pctx,
+    CStTypeDeclNode* ptd )
+{
+    gint32 ret = 0;
+    do{
+
+    }while( 0 );
+    return ret;
+}
 // ========================================================================
 // CStTypeDeclNode Implementation
 // ========================================================================
@@ -149,6 +159,14 @@ std::string CStTypeDeclNode::GetNodeInfo() const
         oss << "no type";
     oss << " }";
     return oss.str();
+}
+
+bool CStSimpleTypeDeclNode::IsTypeResolved() const
+{
+    if( this->m_iTokid == stparser::TOK_ID &&
+        this->m_oTypeRef.second == nullptr )
+        return false;
+    return true;
 }
 
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const

@@ -65,7 +65,7 @@ typedef enum
     DECL_CLSID( CStDataTypeDeclNode ),
     DECL_CLSID( CStTypeDeclNode ),
     DECL_CLSID( CStAmbiguousTypeDeclNode ),
-    DECL_CLSID( CStSimpTypeDeclNode ),
+    DECL_CLSID( CStSimpleTypeDeclNode ),
     DECL_CLSID( CStSubrangeTypeDeclNode ),
     DECL_CLSID( CStArrayTypeDeclNode ),
     DECL_CLSID( CStStructTypeDeclNode ),

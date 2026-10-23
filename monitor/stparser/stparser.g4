@@ -93,7 +93,7 @@ decl_set
             auto pParser =
                 static_cast< CStParser* >( this );
             auto pCtx = pParser->GetParseContext();
-            auto ost = pCtx->m_oSymTab;
+            auto& ost = pCtx->m_oSymTab;
             auto pGlobal = ost.GetGlobalScope();
             auto pSym = pGlobal->m_pSymbol;
             auto pNode = pSym->m_pDeclNode;
@@ -1044,7 +1044,7 @@ data_type_decl
         auto pParser =
             static_cast< CStParser* >( this );
         auto pCtx = pParser->GetParseContext();
-        auto ost = pCtx->m_oSymTab;
+        auto& ost = pCtx->m_oSymTab;
         ObjPtr pObj;
         pObj.NewObj( clsid( CStDataTypeDeclNode ) );
         auto pdtd = ( CStDataTypeDeclNode* )pObj;
@@ -1059,7 +1059,39 @@ data_type_decl
     }})?
     tds = type_decls
     {
+        gint32 ret = 0;
         auto vecDecls = $tds.vecTypeDecls;
+        for( auto& pType : vecDecls )
+        {
+            CStTypeDeclNode* ptd = pType;             
+            if( !ptd || 
+                ptd->IsTypeResolved() )
+                continue;
+
+            ptd->m_pDtd = pObj;
+            auto func =
+            ([]( ObjPtr& pObj, void* pctx )->gint32
+            {
+                CStTypeDeclNode* ptd = pObj;             
+                stdstr strType = ptd->m_oTypeRef.first;
+                auto pCtx = reinterpret_cast
+                    < CStParseContext* >( pctx );
+                auto& ost = pCtx->m_oSymTab;
+                std::vector< stdstr > vecComps =
+                    ost.BreakdownQualified( strType );
+                SymPtr pSym;
+                auto pdtd = ( CStDataTypeDeclNode* )
+                    ptd->m_pDtd;
+                auto ret = ResolveRef( pCtx, vecComps,
+                    symDataType, pdtd->m_vecUsings,
+                    pSym );
+                if( SUCCEEDED( ret ) )
+                    ptd->m_oTypeRef.second = pSym;
+            });
+            ret = func( pType, pCtx );
+            if( ERROR( ret ) )
+                ost.AddUnsolved( pType, func );
+        }
     }
     TOK_END_TYPE
     ;
@@ -1102,13 +1134,14 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             auto pParser =
                 static_cast< CStParser* >( this );
             auto pCtx = pParser->GetParseContext();
-            auto ost = pCtx->m_oSymTab;
+            auto& ost = pCtx->m_oSymTab;
 
             auto& initInfo = $si.triplet;
             ObjPtr pNode;
             ObjPtr pTypeInit;
             pTypeInit = std::get<2>( initInfo );
-            if( std::get<1>( initInfo ) != TOK_ID &&
+            gint32 iTok = std::get<1>( initInfo );
+            if( iTok == TOK_ID &&
                 pTypeInit.IsEmpty() )
             {
                 ret = pNode.NewObj(
@@ -1117,7 +1150,7 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             else
             {
                 ret = pNode.NewObj(
-                    clsid( CStSimpTypeDeclNode ) );
+                    clsid( CStSimpleTypeDeclNode ) );
             }
             if( ERROR( ret ) )
                 break;
@@ -1125,7 +1158,8 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             ptd->m_pTypeInit = pTypeInit;
             stdstr strType = std::get<0>( initInfo );
             ptd->m_oTypeRef = { strType, nullptr };
-            
+            ptd->m_iTokid = iTok;
+
             auto pSym = ost.Declare( strType,
                 symDataType, pNode, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );

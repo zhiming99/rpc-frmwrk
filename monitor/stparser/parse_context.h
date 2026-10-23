@@ -558,6 +558,12 @@ ObjPtr ResolveNsPrefix(
 gint32 ResolveUsingNs(
     void* pctx, ObjPtr pHostNode );
 
+gint32 ResolveRef( CStParseContext* pctx,
+    const std::vector<std::string>& vecNames,
+    enumSymKind eKind,
+    std::vector< ObjPtr >& vecUsings,
+    SymPtr& pSym );
+
 }
 
 #endif // ST_PARSE_CONTEXT_H
