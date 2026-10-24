@@ -1064,8 +1064,7 @@ data_type_decl
         for( auto& pType : vecDecls )
         {
             CStTypeDeclNode* ptd = pType;             
-            if( !ptd || 
-                ptd->IsTypeResolved() )
+            if( !ptd || ptd->IsTypeResolved() )
                 continue;
 
             ptd->m_pDtd = pObj;
@@ -1082,11 +1081,17 @@ data_type_decl
                 SymPtr pSym;
                 auto pdtd = ( CStDataTypeDeclNode* )
                     ptd->m_pDtd;
-                auto ret = ResolveRef( pCtx, vecComps,
-                    symDataType, pdtd->m_vecUsings,
-                    pSym );
+                auto ret = ResolveTypeRef(
+                    pCtx, vecComps, symDataType,
+                    pdtd->m_vecUsings,
+                    ost.GetCurrentScope(), pSym );
+                stdstr& strName = vecComps.back();
                 if( SUCCEEDED( ret ) )
+                {
                     ptd->m_oTypeRef.second = pSym;
+                    ptd->m_oTypeRef.first = strName;
+                }
+                return ret;
             });
             ret = func( pType, pCtx );
             if( ERROR( ret ) )
@@ -1141,22 +1146,29 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             ObjPtr pTypeInit;
             pTypeInit = std::get<2>( initInfo );
             gint32 iTok = std::get<1>( initInfo );
-            if( iTok == TOK_ID &&
-                pTypeInit.IsEmpty() )
+            stdstr strType = std::get<0>( initInfo );
+            if( iTok == RuleDerived_type_access )
             {
                 ret = pNode.NewObj(
                     clsid( CStAmbiguousTypeDeclNode ) );
             }
-            else
+            else if( pParser->IsElementaryType( iTok ) )
             {
                 ret = pNode.NewObj(
                     clsid( CStSimpleTypeDeclNode ) );
+            }
+            else
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->getText().c_str(),
+                    ret );
             }
             if( ERROR( ret ) )
                 break;
             CStAmbiguousTypeDeclNode* ptd = pNode;
             ptd->m_pTypeInit = pTypeInit;
-            stdstr strType = std::get<0>( initInfo );
             ptd->m_oTypeRef = { strType, nullptr };
             ptd->m_iTokid = iTok;
 
@@ -1200,7 +1212,7 @@ simple_spec returns [ std::pair< std::string, int > namePair ]
     | sta = simple_type_access
     { 
         $namePair.first = $sta.ctx->getText();
-        $namePair.second = $sta.stop->getType();
+        $namePair.second = RuleDerived_type_access;
     }
     ;
 
@@ -1468,8 +1480,12 @@ spec_type_accesses
 // Class Declaration
 // ============================================================
 
+class_type_name
+    : identifier
+    ;
+
 class_decl
-    : TOK_CLASS class_modifier identifier
+    : TOK_CLASS opt_internal class_modifier class_type_name
       extends_clause?
       implements_clause?
       class_var_decls_list?
@@ -1774,8 +1790,8 @@ class_method_or_property_decl
 
 // Method decl
 method_decl
-    : TOK_METHOD identifier
-        opt_data_type_access
+    : TOK_METHOD access_spec? opt_fb_modifier opt_override
+        method_name opt_data_type_access
         using_directive_list?
         method_var_decls*
         func_body
@@ -1914,8 +1930,7 @@ opt_fb_inst_or_class_inst
 // Optional FB modifier
 opt_fb_modifier
     : /* empty */
-    | TOK_ABSTRACT
-    | TOK_FINAL
+    | fb_modifier
     ;
 
 // Optional in-out var decl list

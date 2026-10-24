@@ -558,10 +558,22 @@ ObjPtr ResolveNsPrefix(
 gint32 ResolveUsingNs(
     void* pctx, ObjPtr pHostNode );
 
-gint32 ResolveRef( CStParseContext* pctx,
+gint32 ResolveTypeRef( CStParseContext* pctx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     std::vector< ObjPtr >& vecUsings,
+    CStScope* pCurScope,
+    SymPtr& pSym );
+
+bool IsBaseType( gint32 iType );
+bool IsCompoundType( gint32 iType );
+
+gint32 ResolveTypeToBaseType(
+    CStParseContext* pctx,
+    const std::vector<std::string>& vecNames,
+    enumSymKind eKind,
+    std::vector< ObjPtr >& vecUsings,
+    CStScope* pCurScope,
     SymPtr& pSym );
 
 }

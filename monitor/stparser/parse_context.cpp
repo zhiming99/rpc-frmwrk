@@ -1191,10 +1191,11 @@ gint32 ResolveUsingNs(
     return ret;
 }
 
-gint32 ResolveRef( CStParseContext* pCtx,
+gint32 ResolveTypeRef( CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     std::vector< ObjPtr >& vecUsings,
+    CStScope* pTopScope,
     SymPtr& pSym )
 {
     pSym.Clear();
@@ -1270,7 +1271,10 @@ gint32 ResolveRef( CStParseContext* pCtx,
     }
 
     // 3. RELATIVE LEXICAL PASS (No Imports Blended)
-    ScopePtr pStartScope = ost.GetCurrentScope();
+    ScopePtr pStartScope = (
+        pTopScope == nullptr ?
+        ost.GetCurrentScope():
+        ScopePtr( pTopScope ) );
     ScopePtr pCurScope = pStartScope;
 
     while( !pCurScope.IsEmpty() )
@@ -1397,6 +1401,87 @@ gint32 ResolveRef( CStParseContext* pCtx,
     }
 
     return -ENOENT;
+}
+
+bool IsCompositeType( gint32 iType )
+{
+    static gint32 arrTypes[] = {
+        stparser::TOK_RANGE, stparser::TOK_ARRAY,
+        stparser::TOK_STRUCT,
+        stparser::TOK_STRING_TYPE,
+        stparser::TOK_REF, stparser::TOK_CLASS,
+        stparser::TOK_INTERFACE,
+        stparser::TOK_FUNCTION,
+        stparser::TOK_FUNCTION_BLOCK,
+        stparser::TOK_NAMESPACE, stparser::TOK_PROGRAM,
+        stparser::TOK_PROPERTY, stparser::TOK_RESOURCE,
+        stparser::TOK_TASK,
+    };
+    constexpr size_t iSize =
+        sizeof( arrTypes )/sizeof( gint32 );
+    for( size_t i = 0; i < iSize; i++ )
+    {
+        if( iType == arrTypes[ i ] )
+            return true;
+    }
+    return false;
+}
+
+bool IsGrammarType( gint32 iType )
+{
+    if( CStParser::IsElementaryType( iType ) ||
+        IsCompositeType( iType ) )
+        return true;
+    return false;
+}
+
+gint32 ResolveTypeToBaseType(
+    CStParseContext* pCtx,
+    const std::vector<std::string>& vecNames,
+    enumSymKind eKind,
+    std::vector< ObjPtr >& vecUsings,
+    CStScope* pTopScope,
+    int& iType )
+{
+    gint32 ret = 0;
+    do{
+        iType = -1;
+        SymPtr pSym;
+        ret = ResolveTypeRef( pCtx,
+            vecNames, eKind, vecUsings,
+            pTopScope, pSym );
+        if( ERROR( ret ) )
+            break;
+LBL_RETRY:
+        ObjPtr pNode = pSym->m_pDeclNode;
+        if( pNode.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        CStTypeDeclNode* ptd = pNode;
+        if( ptd == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( IsGrammarType( ptd->m_iTokid ) )
+            iType = ptd->m_iTokid;
+
+        if( iType != -1 )
+            break;
+
+        if( ptd->m_oTypeRef.second != nullptr )
+        {
+            pSym = ptd->m_oTypeRef.second;
+            goto LBL_RETRY;
+        }
+        ret = -ENOENT;
+        break;
+
+    }while( 0 );
+    return ret;
 }
 
 }

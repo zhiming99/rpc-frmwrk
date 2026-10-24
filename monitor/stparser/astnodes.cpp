@@ -148,6 +148,23 @@ gint32 CStDataTypeDeclNode::ResolveType(
 // CStTypeDeclNode Implementation
 // ========================================================================
 
+CStTypeDeclNode& CStTypeDeclNode::operator=(
+    const CStTypeDeclNode& rhs )
+{
+    m_pSymbol = rhs.m_pSymbol;
+
+    m_oTypeRef = rhs.m_oTypeRef; 
+    m_pTypeInit = rhs.m_pTypeInit;
+    m_iTokid = rhs.m_iTokid;
+
+    // set the symbol's declare node to this one
+    m_pSymbol->m_pDeclNode = ObjPtr( this );
+
+    // node for type resolution
+    m_pDtd = rhs.m_pDtd; 
+    return *this;
+}
+
 std::string CStTypeDeclNode::GetNodeInfo() const
 {
     std::ostringstream oss;
@@ -163,16 +180,22 @@ std::string CStTypeDeclNode::GetNodeInfo() const
 
 bool CStSimpleTypeDeclNode::IsTypeResolved() const
 {
-    if( this->m_iTokid == stparser::TOK_ID &&
-        this->m_oTypeRef.second == nullptr )
-        return false;
-    return true;
+    if( CStParser::IsElementaryType( this->m_iTokid ) )
+        return true;
+    constexpr int iDerived =
+        stparser::RuleDerived_type_access;
+    if( this->m_iTokid == iDerived &&
+        this->m_oTypeRef.second != nullptr )
+        return true;
+    return false;
 }
 
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "TypeDefinitionBlock{ " << m_vecTypeDecls.size() << " declarations }";
+    oss << "TypeDefinitionBlock{ "
+        << m_vecTypeDecls.size()
+        << " declarations }";
     return oss.str();
 }
 

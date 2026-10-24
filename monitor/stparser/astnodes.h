@@ -677,7 +677,8 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
  * base type declaration 
  * This allows the parent rules to handle a consistent node type.
  */
-struct CStTypeDeclNode : public CStAstNodeBase
+struct CStTypeDeclNode :
+    public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
     CStSymbol* m_pSymbol;
@@ -692,37 +693,44 @@ struct CStTypeDeclNode : public CStAstNodeBase
     ObjPtr m_pDtd; 
 
     CStTypeDeclNode() : super()
-    { SetClassId( clsid( CStTypeDeclNode ) ); }
+    {}
+
+    virtual CStTypeDeclNode& operator=(
+        const CStTypeDeclNode& rhs );
 
     virtual bool IsTypeResolved() const
     { return false; }
 
     virtual std::string GetNodeInfo() const override;
 };
-struct CStAmbiguousTypeDeclNode : public CStTypeDeclNode
+
+struct CStAmbiguousTypeDeclNode :
+    public CStTypeDeclNode
 {
     typedef CStTypeDeclNode super;
 
     CStAmbiguousTypeDeclNode() : super()
-    { SetClassId( clsid( CStAmbiguousTypeDeclNode ) ); }
+    {
+        SetClassId( clsid(
+            CStAmbiguousTypeDeclNode ) );
+    }
 };
-/**
- * @brief Type spec wrapper node
- *
- * Wraps all simple_type_decl 
- * This allows the parent rules to handle a consistent node type.
- */
-struct CStSimpleTypeDeclNode : public CStAmbiguousTypeDeclNode
+
+struct CStSimpleTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
     CStSimpleTypeDeclNode() : super()
-    { SetClassId( clsid( CStSimpleTypeDeclNode ) ); }
-
+    {
+        SetClassId( clsid(
+            CStSimpleTypeDeclNode ) );
+    }
     virtual bool IsTypeResolved() const override;
 };
 
-struct CStSubrangeTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStSubrangeTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
