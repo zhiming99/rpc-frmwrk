@@ -1406,15 +1406,18 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
 bool IsCompositeType( gint32 iType )
 {
     static gint32 arrTypes[] = {
-        stparser::TOK_RANGE, stparser::TOK_ARRAY,
+        stparser::TOK_RANGE,
+        stparser::TOK_ARRAY,
         stparser::TOK_STRUCT,
         stparser::TOK_STRING_TYPE,
-        stparser::TOK_REF, stparser::TOK_CLASS,
+        stparser::TOK_CLASS,
         stparser::TOK_INTERFACE,
         stparser::TOK_FUNCTION,
         stparser::TOK_FUNCTION_BLOCK,
-        stparser::TOK_NAMESPACE, stparser::TOK_PROGRAM,
-        stparser::TOK_PROPERTY, stparser::TOK_RESOURCE,
+        stparser::TOK_NAMESPACE,
+        stparser::TOK_PROGRAM,
+        stparser::TOK_PROPERTY,
+        stparser::TOK_RESOURCE,
         stparser::TOK_TASK,
     };
     constexpr size_t iSize =
@@ -1427,26 +1430,34 @@ bool IsCompositeType( gint32 iType )
     return false;
 }
 
-bool IsGrammarType( gint32 iType )
+bool IsElementaryType( gint32 iType )
 {
-    if( CStParser::IsElementaryType( iType ) ||
+    return CStParser::IsElementaryType(
+        iType );
+}
+
+bool IsDirectType( gint32 iType )
+{
+    if( IsElementaryType( iType ) ||
         IsCompositeType( iType ) )
         return true;
     return false;
 }
 
-gint32 ResolveTypeToBaseType(
+bool IsRefType( gint32 iType )
+{ return iType == stparser::TOK_REF_TO; }
+
+gint32 ResolveTypeToDirectType(
     CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     std::vector< ObjPtr >& vecUsings,
     CStScope* pTopScope,
-    int& iType )
+    SymPtr& pSym, gint32& iType )
 {
     gint32 ret = 0;
     do{
         iType = -1;
-        SymPtr pSym;
         ret = ResolveTypeRef( pCtx,
             vecNames, eKind, vecUsings,
             pTopScope, pSym );
@@ -1466,8 +1477,11 @@ LBL_RETRY:
             break;
         }
 
-        if( IsGrammarType( ptd->m_iTokid ) )
-            iType = ptd->m_iTokid;
+        if( IsDirectType( ptd->m_iTypeId ) )
+            iType = ptd->m_iTypeId;
+        else if( IsRefType( ptd->m_iTypeId ) )
+        {
+        }
 
         if( iType != -1 )
             break;

@@ -155,7 +155,7 @@ CStTypeDeclNode& CStTypeDeclNode::operator=(
 
     m_oTypeRef = rhs.m_oTypeRef; 
     m_pTypeInit = rhs.m_pTypeInit;
-    m_iTokid = rhs.m_iTokid;
+    m_iTypeId = rhs.m_iTypeId;
 
     // set the symbol's declare node to this one
     m_pSymbol->m_pDeclNode = ObjPtr( this );
@@ -176,18 +176,6 @@ std::string CStTypeDeclNode::GetNodeInfo() const
         oss << "no type";
     oss << " }";
     return oss.str();
-}
-
-bool CStSimpleTypeDeclNode::IsTypeResolved() const
-{
-    if( CStParser::IsElementaryType( this->m_iTokid ) )
-        return true;
-    constexpr int iDerived =
-        stparser::RuleDerived_type_access;
-    if( this->m_iTokid == iDerived &&
-        this->m_oTypeRef.second != nullptr )
-        return true;
-    return false;
 }
 
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const

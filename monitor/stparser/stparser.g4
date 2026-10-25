@@ -1078,18 +1078,21 @@ data_type_decl
                 auto& ost = pCtx->m_oSymTab;
                 std::vector< stdstr > vecComps =
                     ost.BreakdownQualified( strType );
+
                 SymPtr pSym;
+                gint32 iType;
+
                 auto pdtd = ( CStDataTypeDeclNode* )
                     ptd->m_pDtd;
-                auto ret = ResolveTypeRef(
+                auto ret = ResolveTypeToDirectType(
                     pCtx, vecComps, symDataType,
                     pdtd->m_vecUsings,
-                    ost.GetCurrentScope(), pSym );
-                stdstr& strName = vecComps.back();
+                    ost.GetCurrentScope(),
+                    pSym, iType );
                 if( SUCCEEDED( ret ) )
                 {
                     ptd->m_oTypeRef.second = pSym;
-                    ptd->m_oTypeRef.first = strName;
+                    ptd->m_iDirectType = iType;
                 }
                 return ret;
             });
@@ -1145,14 +1148,14 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             ObjPtr pNode;
             ObjPtr pTypeInit;
             pTypeInit = std::get<2>( initInfo );
-            gint32 iTok = std::get<1>( initInfo );
+            gint32 iType = std::get<1>( initInfo );
             stdstr strType = std::get<0>( initInfo );
-            if( iTok == RuleDerived_type_access )
+            if( iType == RuleDerived_type_access )
             {
                 ret = pNode.NewObj(
                     clsid( CStAmbiguousTypeDeclNode ) );
             }
-            else if( pParser->IsElementaryType( iTok ) )
+            else if( IsElementaryType( iType ) )
             {
                 ret = pNode.NewObj(
                     clsid( CStSimpleTypeDeclNode ) );
@@ -1170,7 +1173,9 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             CStAmbiguousTypeDeclNode* ptd = pNode;
             ptd->m_pTypeInit = pTypeInit;
             ptd->m_oTypeRef = { strType, nullptr };
-            ptd->m_iTokid = iTok;
+            ptd->m_iTypeId = iType;
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
 
             auto pSym = ost.Declare( strType,
                 symDataType, pNode, strType,

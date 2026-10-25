@@ -565,16 +565,18 @@ gint32 ResolveTypeRef( CStParseContext* pctx,
     CStScope* pCurScope,
     SymPtr& pSym );
 
-bool IsBaseType( gint32 iType );
-bool IsCompoundType( gint32 iType );
+bool IsElementaryType( gint32 iType );
 
-gint32 ResolveTypeToBaseType(
+bool IsCompoundType( gint32 iType );
+bool IsDirectType( gint32 iType );
+
+gint32 ResolveTypeToDirectType(
     CStParseContext* pctx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     std::vector< ObjPtr >& vecUsings,
     CStScope* pCurScope,
-    SymPtr& pSym );
+    SymPtr& pSym, gint32& iType );
 
 }
 

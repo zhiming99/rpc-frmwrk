@@ -687,7 +687,12 @@ struct CStTypeDeclNode :
         std::pair< std::string, CStSymbol* >;
     TYPE_REF m_oTypeRef; 
     ObjPtr m_pTypeInit;
-    gint32 m_iTokid = -1;
+    using TypePair = std::pair< gint32, gint32 >;
+    // std::vector< TypePair > m_vecTypes { {-1,-1} };
+    gint32 m_iTypeId = -1;
+    gint32 m_iDirectType = -1;
+    gint32 m_iRefCount = 0;
+
 
     // node for type resolution
     ObjPtr m_pDtd; 
@@ -699,7 +704,7 @@ struct CStTypeDeclNode :
         const CStTypeDeclNode& rhs );
 
     virtual bool IsTypeResolved() const
-    { return false; }
+    { return ( this->m_iDirectType != -1  ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -726,7 +731,6 @@ struct CStSimpleTypeDeclNode :
         SetClassId( clsid(
             CStSimpleTypeDeclNode ) );
     }
-    virtual bool IsTypeResolved() const override;
 };
 
 struct CStSubrangeTypeDeclNode :
