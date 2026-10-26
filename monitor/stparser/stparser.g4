@@ -1080,20 +1080,27 @@ data_type_decl
                     ost.BreakdownQualified( strType );
 
                 SymPtr pSym;
-                gint32 iType;
+                gint32 iType = -1;
 
                 auto pdtd = ( CStDataTypeDeclNode* )
                     ptd->m_pDtd;
+
                 auto ret = ResolveTypeToDirectType(
                     pCtx, vecComps, symDataType,
                     pdtd->m_vecUsings,
                     ost.GetCurrentScope(),
                     pSym, iType );
-                if( SUCCEEDED( ret ) )
-                {
+
+                if( !pSym.IsEmpty() )
                     ptd->m_oTypeRef.second = pSym;
+
+                if( iType >= 0 )
                     ptd->m_iDirectType = iType;
-                }
+
+                if( SUCCEEDED( ret ) && ptd->GetClsid() ==
+                    clsid( CStAmbiguousTypeDeclNode ) )
+                    ReplaceAmbiguousNode( pCtx, pObj, iType );
+
                 return ret;
             });
             ret = func( pType, pCtx );
@@ -1234,7 +1241,7 @@ time_type_name
 elem_type_name
     : numeric_type_name
     | bit_str_type_name
-    | string_simple_type
+    | string_type_name
     | date_type_name
     | time_type_name
     ;

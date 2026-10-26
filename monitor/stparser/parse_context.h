@@ -578,6 +578,11 @@ gint32 ResolveTypeToDirectType(
     CStScope* pCurScope,
     SymPtr& pSym, gint32& iType );
 
+gint32 ReplaceAmbiguousNode(
+    CStParseContext* pCtx,
+    CStAmbiguousTypeDeclNode* ptd,
+    gint32 iDirectType,
+    ObjPtr& pNode );
 }
 
 #endif // ST_PARSE_CONTEXT_H

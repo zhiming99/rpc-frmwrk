@@ -1406,10 +1406,10 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
 bool IsCompositeType( gint32 iType )
 {
     static gint32 arrTypes[] = {
-        stparser::TOK_RANGE,
+        stparser::RuleSubrange_type_decl,
         stparser::TOK_ARRAY,
         stparser::TOK_STRUCT,
-        stparser::TOK_STRING_TYPE,
+        stparser::RuleString_simple_type,
         stparser::TOK_CLASS,
         stparser::TOK_INTERFACE,
         stparser::TOK_FUNCTION,
@@ -1419,6 +1419,7 @@ bool IsCompositeType( gint32 iType )
         stparser::TOK_PROPERTY,
         stparser::TOK_RESOURCE,
         stparser::TOK_TASK,
+        stparser::RuleEnum_type_decl,
     };
     constexpr size_t iSize =
         sizeof( arrTypes )/sizeof( gint32 );
@@ -1447,6 +1448,12 @@ bool IsDirectType( gint32 iType )
 bool IsRefType( gint32 iType )
 { return iType == stparser::TOK_REF_TO; }
 
+bool IsDerivedType( gint32 iType )
+{
+    return iType ==
+        stparser::RuleDerived_type_access;
+}
+
 gint32 ResolveTypeToDirectType(
     CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
@@ -1457,14 +1464,17 @@ gint32 ResolveTypeToDirectType(
 {
     gint32 ret = 0;
     do{
+        SymPtr pCurSym;
+        CStTypeDeclNode* ptd1 = nullptr;
         iType = -1;
+
         ret = ResolveTypeRef( pCtx,
             vecNames, eKind, vecUsings,
-            pTopScope, pSym );
+            pTopScope, pCurSym );
         if( ERROR( ret ) )
             break;
 LBL_RETRY:
-        ObjPtr pNode = pSym->m_pDeclNode;
+        ObjPtr pNode = pCurSym->m_pDeclNode;
         if( pNode.IsEmpty() )
         {
             ret = -ENOENT;
@@ -1477,22 +1487,120 @@ LBL_RETRY:
             break;
         }
 
-        if( IsDirectType( ptd->m_iTypeId ) )
-            iType = ptd->m_iTypeId;
+        
+        if( pSym.IsEmpty() )
+            pSym = pCurSym;
+
+        // declared from a direct type
+        if( ptd->IsTypeResolved() )
+        {
+            iType = ptd->m_iDirectType;
+            break;
+        }
+
+        // declared from a derived type W/O direct
+        // type initialization
+        if( IsDerivedType( ptd->m_iTypeId ) &&
+            ptd->m_oTypeRef.second != nullptr )
+        {
+            pCurSym = ptd->m_oTypeRef.second;
+            ret = 0;
+            goto LBL_RETRY;
+        }
         else if( IsRefType( ptd->m_iTypeId ) )
         {
+            if( ptd->m_oTypeRef.second == nullptr )
+                break;
+            pCurSym = ptd->m_oTypeRef.second;
+            if( ptd1 == nullptr )
+            {
+                ptd1 = ptd;
+                ptd1->m_iRefRank = 1;
+            }
+            else
+            {
+                ptd1->m_iRefRank++;
+            }
+            goto LBL_RETRY;
         }
 
         if( iType != -1 )
             break;
 
-        if( ptd->m_oTypeRef.second != nullptr )
-        {
-            pSym = ptd->m_oTypeRef.second;
-            goto LBL_RETRY;
-        }
         ret = -ENOENT;
         break;
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 ReplaceAmbiguousNode(
+    CStParseContext* pCtx,
+    CStAmbiguousTypeDeclNode* patd,
+    gint32 iDirectType,
+    ObjPtr& pNode )
+{
+    gint32 ret = 0;
+    if( pCtx == nullptr || patd == nullptr )
+        return -EINVAL;
+    do{
+        EnumClsid iClsid = clsid( Invalid );
+        if( IsElementaryType( iDirectType ) )
+        {
+            iClsid = 
+                clsid( CStSimpleTypeDeclNode);
+        }
+        else if( iDirectType ==
+            stparser::RuleSubrange_type_decl )
+        {
+            iClsid = 
+                clsid( CStSubrangeListNode);
+        }
+        else if( iDirectType ==
+            stparser::RuleEnum_type_decl )
+        {
+            iClsid = 
+                clsid( CStEnumTypeDeclNode );
+        }
+        else if( iDirectType == stparser::TOK_STRUCT )
+        {
+            iClsid = 
+                clsid( CStStructTypeDeclNode );
+        }
+        else if( iDirectType == stparser::TOK_ARRAY )
+        {
+            iClsid = 
+                clsid( CStArrayTypeDeclNode );
+        }
+        else if( iDirectType ==
+            stparser::TOK_STRING_TYPE ) 
+        {
+            iClsid = 
+                clsid( CStStringTypeDeclNode );
+        }
+        else if( iDirectType ==
+            stparser::RuleNamedval_type_decl ) 
+        {
+            iClsid = 
+                clsid( CStNamedvalTypeDeclNode );
+        }
+        else if( iDirectType ==
+            stparser::TOK_REF_TO ) 
+        {
+            iClsid = 
+                clsid( CStReferenceTypeNode );
+        }
+        else
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        pNode.NewObj( iClsid );
+        auto ptd = ( CStTypeDeclNode* )pNode;
+        ( *ptd ) = *patd;
+        if( ptd->IsTypeResolved() )
+            ptd->m_pDtd.Clear();
 
     }while( 0 );
     return ret;

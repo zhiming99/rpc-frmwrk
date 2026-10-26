@@ -691,7 +691,7 @@ struct CStTypeDeclNode :
     // std::vector< TypePair > m_vecTypes { {-1,-1} };
     gint32 m_iTypeId = -1;
     gint32 m_iDirectType = -1;
-    gint32 m_iRefCount = 0;
+    gint32 m_iRefRank = 0;
 
 
     // node for type resolution
