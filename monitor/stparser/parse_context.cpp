@@ -1362,8 +1362,8 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
             {
                 const auto& strPart = vecComps[ i ];
                 SymVector vecOut;
-                ost.LookupAllLocal( strPart, pRunScope,
-                                    vecOut );
+                ost.LookupAllLocal(
+                    strPart, pRunScope, vecOut );
                 ScopePtr pNext;
                 for( auto elem : vecOut )
                 {
@@ -1407,19 +1407,17 @@ bool IsCompositeType( gint32 iType )
 {
     static gint32 arrTypes[] = {
         stparser::RuleSubrange_type_decl,
-        stparser::TOK_ARRAY,
+        stparser::RuleEnum_type_decl,
+        stparser::RuleString_type_decl,
         stparser::TOK_STRUCT,
-        stparser::RuleString_simple_type,
         stparser::TOK_CLASS,
         stparser::TOK_INTERFACE,
         stparser::TOK_FUNCTION,
         stparser::TOK_FUNCTION_BLOCK,
-        stparser::TOK_NAMESPACE,
         stparser::TOK_PROGRAM,
         stparser::TOK_PROPERTY,
         stparser::TOK_RESOURCE,
         stparser::TOK_TASK,
-        stparser::RuleEnum_type_decl,
     };
     constexpr size_t iSize =
         sizeof( arrTypes )/sizeof( gint32 );
@@ -1448,6 +1446,9 @@ bool IsDirectType( gint32 iType )
 bool IsRefType( gint32 iType )
 { return iType == stparser::TOK_REF_TO; }
 
+bool IsArrayType( gint32 iType )
+{ return iType == stparser::TOK_ARRAY; }
+
 bool IsDerivedType( gint32 iType )
 {
     return iType ==
@@ -1473,7 +1474,7 @@ gint32 ResolveTypeToDirectType(
             pTopScope, pCurSym );
         if( ERROR( ret ) )
             break;
-LBL_RETRY:
+LBL_RESOLVE_SYMBOL:
         ObjPtr pNode = pCurSym->m_pDeclNode;
         if( pNode.IsEmpty() )
         {
@@ -1486,7 +1487,6 @@ LBL_RETRY:
             ret = -EFAULT;
             break;
         }
-
         
         if( pSym.IsEmpty() )
             pSym = pCurSym;
@@ -1505,7 +1505,7 @@ LBL_RETRY:
         {
             pCurSym = ptd->m_oTypeRef.second;
             ret = 0;
-            goto LBL_RETRY;
+            goto LBL_RESOLVE_SYMBOL;
         }
         else if( IsRefType( ptd->m_iTypeId ) )
         {
@@ -1521,7 +1521,14 @@ LBL_RETRY:
             {
                 ptd1->m_iRefRank++;
             }
-            goto LBL_RETRY;
+            goto LBL_RESOLVE_SYMBOL;
+        }
+        else if( IsArrayType( ptd->m_iTypeId ) )
+        {
+            if( ptd->m_oTypeRef.second == nullptr )
+                break;
+            pCurSym = ptd->m_oTypeRef.second;
+            goto LBL_RESOLVE_SYMBOL;
         }
 
         if( iType != -1 )

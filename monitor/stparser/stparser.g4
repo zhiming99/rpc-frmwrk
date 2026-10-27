@@ -1088,7 +1088,7 @@ data_type_decl
                 auto ret = ResolveTypeToDirectType(
                     pCtx, vecComps, symDataType,
                     pdtd->m_vecUsings,
-                    ost.GetCurrentScope(),
+                    pdtd->m_pScope,
                     pSym, iType );
 
                 if( !pSym.IsEmpty() )
@@ -1099,7 +1099,11 @@ data_type_decl
 
                 if( SUCCEEDED( ret ) && ptd->GetClsid() ==
                     clsid( CStAmbiguousTypeDeclNode ) )
-                    ReplaceAmbiguousNode( pCtx, pObj, iType );
+                {
+                    ObjPtr pNewNode;
+                    ReplaceAmbiguousNode(
+                        pCtx, pObj, iType, pNewNode );
+                }
 
                 return ret;
             });
@@ -1128,17 +1132,23 @@ type_decls returns [ std::vector< ObjPtr > vecTypeDecls ]
 
 type_decl returns [ ObjPtr pTypeDecl ]
     : st = simple_type_decl
-    {
-        $pTypeDecl = $st.pTypeDecl;
-    }
-    | subrange_type_decl
-    | enum_type_decl
-    | namedval_type_decl
-    | array_type_decl
-    | struct_type_decl_init
-    | string_type_decl
-    | ref_type_decl
-    | ambiguous_type_decl
+    { $pTypeDecl = $st.pTypeDecl; }
+    | subt = subrange_type_decl
+    { $pTypeDecl = $subt.pTypeDecl; }
+    | et = enum_type_decl
+    { $pTypeDecl = $et.pTypeDecl; }
+    | nt = namedval_type_decl
+    { $pTypeDecl = $nt.pTypeDecl; }
+    | at = array_type_decl
+    { $pTypeDecl = $at.pTypeDecl; }
+    | stru = struct_type_decl_init
+    { $pTypeDecl = $stru.pTypeDecl; }
+    | str = string_type_decl
+    { $pTypeDecl = $str.pTypeDecl; }
+    | rt = ref_type_decl
+    { $pTypeDecl = $rt.pTypeDecl; }
+    | ambt = ambiguous_type_decl
+    { $pTypeDecl = $ambt.pTypeDecl; }
     ;
 
 simple_type_decl returns [ ObjPtr pTypeDecl ]
@@ -1157,7 +1167,8 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             pTypeInit = std::get<2>( initInfo );
             gint32 iType = std::get<1>( initInfo );
             stdstr strType = std::get<0>( initInfo );
-            if( iType == RuleDerived_type_access )
+            if( iType == RuleDerived_type_access &&
+                pTypeInit.IsEmpty() )
             {
                 ret = pNode.NewObj(
                     clsid( CStAmbiguousTypeDeclNode ) );
@@ -1184,7 +1195,7 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             if( IsDirectType( iType ) )
                 ptd->m_iDirectType = iType;
 
-            auto pSym = ost.Declare( strType,
+            auto pSym = ost.Declare( $st.ctx->getText(),
                 symDataType, pNode, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( pSym.IsEmpty() )
@@ -1241,7 +1252,7 @@ time_type_name
 elem_type_name
     : numeric_type_name
     | bit_str_type_name
-    | string_type_name
+    | string_spec
     | date_type_name
     | time_type_name
     ;
@@ -1263,7 +1274,7 @@ simple_type_access
     : instance_path
     ;
 
-subrange_type_decl
+subrange_type_decl returns [ ObjPtr pTypeDecl ]
     : subrange_type_name TOK_COLON subrange_spec_init
     ;
 
@@ -1297,7 +1308,7 @@ enum_type_name
     : identifier
     ;
 
-enum_type_decl
+enum_type_decl returns [ ObjPtr pTypeDecl ]
     : enum_type_name TOK_COLON enum_spec_init
     ;
 
@@ -1318,7 +1329,7 @@ namedval_type_name
     : identifier
     ;
 
-namedval_type_decl
+namedval_type_decl returns [ ObjPtr pTypeDecl ]
     : namedval_type_name TOK_COLON namedval_type namedval_spec_init
     ;
 
@@ -1347,7 +1358,7 @@ namedval_type_access
     : instance_path
     ;
     
-array_type_decl
+array_type_decl returns [ ObjPtr pTypeDecl ]
     : array_type_name TOK_COLON array_spec_init
     ;
 
@@ -1396,8 +1407,8 @@ struct_type_decl
     : struct_type_name TOK_COLON struct_decl
     ;
 
-struct_type_decl_init
-    : struct_spec
+struct_type_decl_init returns [ ObjPtr pTypeDecl ]
+    : struct_type_name TOK_COLON struct_spec
     ;
 
 struct_spec_init
@@ -1420,7 +1431,7 @@ struct_elem_init
     | struct_elem_name TOK_ASSIGN ref_value
     ;
 
-string_type_decl
+string_type_decl returns [ ObjPtr pTypeDecl ]
     : string_type_name TOK_COLON string_spec_init
     ;
 
@@ -1440,7 +1451,7 @@ ref_type_name
     : identifier
     ;
 
-ref_type_decl
+ref_type_decl returns [ ObjPtr pTypeDecl ]
     : ref_type_name TOK_COLON ref_spec_init TOK_SEMICOLON
     ;
 
@@ -1479,8 +1490,8 @@ caret_list
     : TOK_CARET (TOK_CARET)*
     ;
 
-ambiguous_type_decl
-    : variable_list TOK_COLON instance_path (TOK_ASSIGN spec_type_accesses)?
+ambiguous_type_decl returns [ ObjPtr pTypeDecl ]
+    : identifier TOK_COLON instance_path
     ;
 
 spec_type_accesses
