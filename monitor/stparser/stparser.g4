@@ -432,6 +432,15 @@ global_name_space
 // Expression
 // ============================================================
 
+const_expr returns [ ObjPtr pExpr ]
+    : expression
+    {
+        // TODO: evaluate the expression to obtain the
+        // value and value type.
+        $pExpr = $expression.pExpr;
+    }
+    ;
+
 expression returns [ ObjPtr pExpr]
     : xor_expr (TOK_OR xor_expr)*
     ;
@@ -631,7 +640,7 @@ case_list
 
 case_list_elem
     : subrange
-    | expression
+    | const_expr
     ;
 
 iteration_statement
@@ -918,11 +927,15 @@ other_var_decls
     ;
 
 retain_var_decls
-    : TOK_VAR TOK_RETAIN access_spec? var_decls TOK_END_VAR
+    : TOK_VAR TOK_RETAIN access_spec? 
+    ( var_decls_init_set semicolons )*
+    TOK_END_VAR
     ;
 
 no_retain_var_decls
-    : TOK_VAR TOK_NON_RETAIN access_spec? var_decls TOK_END_VAR
+    : TOK_VAR TOK_NON_RETAIN access_spec?
+    ( var_decls_init_set semicolons )*
+    TOK_END_VAR
     ;
 
 retain
@@ -1060,7 +1073,7 @@ data_type_decl
     tds = type_decls
     {
         gint32 ret = 0;
-        auto vecDecls = $tds.vecTypeDecls;
+        auto& vecDecls = $tds.vecTypeDecls;
         for( auto& pType : vecDecls )
         {
             CStTypeDeclNode* ptd = pType;             
@@ -1209,11 +1222,15 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
     }
     ;
 
-simple_spec_init returns [ std::tuple< std::string, int, ObjPtr > triplet ]
-    : spec=simple_spec ( TOK_ASSIGN expr=expression )?
+simple_spec_init returns [ std::tuple< std::string, int, ObjPtr, ObjPtr > triplet ]
+    : spec=simple_spec ( TOK_ASSIGN expr=const_expr )?
     {
-          std::string strName = $spec.namePair.first;
-          int typeId    = $spec.namePair.second;
+          std::string strName =
+            std::get<0>( $spec.nameInfo );
+          int typeId = 
+            std::get<1>( $spec.nameInfo );
+          ObjPtr pTypeData =
+            std::get<2>( $spec.nameInfo );
           
           ObjPtr pExprNode;
           if( $expr.ctx != nullptr )
@@ -1222,20 +1239,24 @@ simple_spec_init returns [ std::tuple< std::string, int, ObjPtr > triplet ]
               pExprNode = ObjPtr();
           
           $triplet = std::make_tuple(
-              strName, typeId, pExprNode );
+              strName, typeId, pExprNode, pTypeData );
     }
     ;
 
-simple_spec returns [ std::pair< std::string, int > namePair ]
+simple_spec returns [ std::tuple< std::string, int, ObjPtr > nameInfo ]
     : etn = elem_type_name
     { 
-        $namePair.first = $etn.ctx->getText();
-        $namePair.second = $etn.start->getType();
+         $nameInfo = std::make_tuple(
+              $etn.ctx->getText(),
+              $etn.start->getType(),
+              $etn.pTypeData );
     }
     | sta = simple_type_access
     { 
-        $namePair.first = $sta.ctx->getText();
-        $namePair.second = RuleDerived_type_access;
+         $nameInfo = std::make_tuple(
+              $sta.ctx->getText(),
+              RuleDerived_type_access,
+              ObjPtr() );
     }
     ;
 
@@ -1249,7 +1270,7 @@ time_type_name
     | TOK_LDATE_TYPE
     ;
 
-elem_type_name
+elem_type_name returns [ ObjPtr pTypeData ]
     : numeric_type_name
     | bit_str_type_name
     | string_spec
@@ -1301,7 +1322,7 @@ int_type_name
     ;
 
 subrange
-    : expression TOK_RANGE expression
+    : const_expr TOK_RANGE const_expr
     ;
 
 enum_type_name
@@ -1339,7 +1360,7 @@ namedval_type
     ;
 
 namedval_spec_init
-    : TOK_LPAREN namedval_spec_list TOK_RPAREN ( TOK_ASSIGN expression )?
+    : TOK_LPAREN namedval_spec_list TOK_RPAREN ( TOK_ASSIGN const_expr )?
     ;
 
 namedval_spec_list
@@ -1347,7 +1368,7 @@ namedval_spec_list
     ;
 
 namedval_spec
-    : identifier TOK_ASSIGN expression
+    : identifier TOK_ASSIGN const_expr
     ;
 
 namedval_value
@@ -1397,7 +1418,7 @@ array_elem_init
     ;
 
 array_elem_init_value
-    : expression 
+    : const_expr 
     | enum_value
     | struct_init
     | array_init
@@ -1424,6 +1445,7 @@ struct_elem_init_list
     ;
 struct_elem_init_value
     : array_elem_init_value
+    | ref_value
     ;
 
 struct_elem_init
@@ -1998,7 +2020,7 @@ opt_temp_var_member_list
 // Optional var decls init set
 opt_var_decls_init
     : /* empty */
-    | var_decls_init_set semicolons (var_decls_init_set semicolons)*
+    | (var_decls_init_set semicolons)+
     ;
 
 // Param assignment
@@ -2084,7 +2106,7 @@ string_list
 // String spec
 string_spec
     : ( TOK_STRING_TYPE | TOK_WSTRING_TYPE | TOK_USTRING_TYPE )
-        ( TOK_LBRACKET TOK_INT TOK_RBRACKET )?
+        ( TOK_LBRACKET const_expr TOK_RBRACKET )?
     | TOK_CHAR_TYPE
     | TOK_WCHAR_TYPE
     | TOK_UCHAR_TYPE
