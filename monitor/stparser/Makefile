@@ -43,7 +43,7 @@ $(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parse
 
 # Regenerate parser from grammar
 $(gen_src) &: stparser.g4 stlexer.g4 Makefile
-	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o . stparser.g4 stlexer.g4
+	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -message-format gnu -o . stparser.g4 stlexer.g4
 	@echo "Injecting extension at the tail of stparser.h"
 	@echo '#include "parse_context.h"' >> stparser.h
 	@echo '#include "st_parser_ext.h"' >> stparser.h
@@ -61,7 +61,7 @@ stsymtab.o: stsymtab.cpp $(key_headers)
 st_main.o: st_main.cpp $(key_headers)
 
 $(pragma_auto_gen) $(pragma_auto_headers) &: pragma_expr.g4
-	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -o ./pragma_expr pragma_expr.g4
+	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -message-format gnu -listener -o ./pragma_expr pragma_expr.g4
 
 # Clean
 clean:
