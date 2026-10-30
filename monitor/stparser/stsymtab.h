@@ -167,6 +167,7 @@ class CStSymbol : public rpcf::CObjBase
     antlr4::Token* m_pStop = nullptr;
 
     bool m_bResolved = false;
+    gint32 m_iSeqNo = -1;
 
     typedef CObjBase super;
     CStSymbol() : super(),
@@ -381,6 +382,8 @@ private:
     ScopePtr m_pGlobal;
     ScopeStack m_stackScopes;
     std::unordered_map< ObjPtr, RESOLVE_FUNC  > m_mapUnresolved;
+    gint32 m_iSeqNo = 0;
+    std::vector< CStSymbol* > m_vecSymSeq;
 
     ScopePtr NewScopeInternal(
         enumScopeKind eKind,
@@ -554,11 +557,9 @@ public:
 
     //! indented scope tree listing, for debugging the semantic phase
     std::string Dump();
-    void AddUnsolved( ObjPtr pNode,
-        RESOLVE_FUNC resolve )
-    {
-        m_mapUnresolved.insert( std::pair( pNode, resolve ) );
-    }
+    void AddUnsolved( ObjPtr pCtx,
+        RESOLVE_FUNC resolve,
+        CStSymbol* pSym = nullptr );
 };
 
 }

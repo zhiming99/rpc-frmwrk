@@ -692,7 +692,7 @@ struct CStTypeDeclNode :
     gint32 m_iTypeId = -1;
     gint32 m_iDirectType = -1;
     gint32 m_iRefRank = 0;
-    gint32 m_iElemCount = 0;
+    ObjPtr m_pTypeData;
 
 
     // node for type resolution

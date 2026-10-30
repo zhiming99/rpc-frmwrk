@@ -210,6 +210,8 @@ SymPtr CStSymbolTable::Declare(
     pSym->m_pDeclNode = pDeclNode;
     if( ERROR( pScope->AddSymbol( pSym ) ) )
         return SymPtr();
+    pSym->m_iSeqNo = this->m_iSeqNo++;
+    this->m_vecSymSeq.push_back( pSym );
     return pSym;
 }
 
@@ -227,6 +229,27 @@ SymPtr CStSymbolTable::DeclareScopeOwner(
     pSym->m_pDefScope =
         PushScope( eScopeKind, strName );
     return pSymbol;
+}
+
+void CStSymbolTable::AddUnsolved(
+    ObjPtr pCtx,
+    RESOLVE_FUNC resolve,
+    CStSymbol* pSym )
+{
+    m_mapUnresolved.insert(
+        std::pair( pCtx, resolve ) );
+    if( pSym == nullptr )
+        return;
+    auto itr = m_vecSymSeq.begin();
+    while( itr != m_vecSymSeq.end() )
+    {
+        if( (*itr)->m_iSeqNo == pSym->m_iSeqNo )
+        {
+            m_vecSymSeq.erase( itr );
+            break;
+        }
+        itr++;
+    }
 }
 
 SymPtr CStSymbolTable::Lookup( const std::string& strName ) const

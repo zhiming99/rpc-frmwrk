@@ -1595,7 +1595,7 @@ gint32 ReplaceAmbiguousNode(
             stparser::TOK_REF_TO ) 
         {
             iClsid = 
-                clsid( CStReferenceTypeNode );
+                clsid( CStRefTypeDeclNode );
         }
         else
         {

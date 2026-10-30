@@ -156,6 +156,9 @@ CStTypeDeclNode& CStTypeDeclNode::operator=(
     m_oTypeRef = rhs.m_oTypeRef; 
     m_pTypeInit = rhs.m_pTypeInit;
     m_iTypeId = rhs.m_iTypeId;
+    m_iDirectType = rhs.m_iDirectType;
+    m_iRefRank = rhs.m_iRefRank;
+    m_pTypeData = rhs.m_pTypeData;
 
     // set the symbol's declare node to this one
     m_pSymbol->m_pDeclNode = ObjPtr( this );
