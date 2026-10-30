@@ -191,7 +191,8 @@ def test() :
         respfp.close()
 
     finally :
-        return error
+        pass
+    return error
 
 
 def main() :

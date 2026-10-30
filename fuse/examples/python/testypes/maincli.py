@@ -266,7 +266,8 @@ def test() :
         stmfp.close()
         
     finally :
-        return error
+        pass
+    return error
 
 
 def main() :

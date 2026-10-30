@@ -269,9 +269,9 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "ReferenceTypeNode";
     if( eClsid == clsid( CStDerivedTypeNode ) )
         return "DerivedTypeNode";
-    if( eClsid == clsid( CStDataTypeSpecNode ) )
+    if( eClsid == clsid( CStDataTypeDeclNode ) )
         return "DataTypeSpecNode";
-    if( eClsid == clsid( CStTypeSpecNode ) )
+    if( eClsid == clsid( CStTypeDeclNode ) )
         return "TypeSpecNode";
     if( eClsid == clsid( CStTypeDefinitionBlockNode ) )
         return "TypeDefinitionBlockNode";
@@ -1149,17 +1149,17 @@ void DumpAstTree(
             DumpAstTree( p->m_pTargetType, os, iDepth + 1, strIndent );
         }
     }
-    else if( eClsid == clsid( CStDataTypeSpecNode ) )
+    else if( eClsid == clsid( CStDataTypeDeclNode ) )
     {
-        CStDataTypeSpecNode* p = dynamic_cast< CStDataTypeSpecNode* >( pBase );
+        CStDataTypeDeclNode* p = dynamic_cast< CStDataTypeDeclNode* >( pBase );
         if( p )
         {
             DumpAstTree( p->m_pTypeSpec, os, iDepth + 1, strIndent );
         }
     }
-    else if( eClsid == clsid( CStTypeSpecNode ) )
+    else if( eClsid == clsid( CStTypeDeclNode ) )
     {
-        CStTypeSpecNode* p = dynamic_cast< CStTypeSpecNode* >( pBase );
+        CStTypeDeclNode* p = dynamic_cast< CStTypeDeclNode* >( pBase );
         if( p )
         {
             DumpAstTree( p->m_pType, os, iDepth + 1, strIndent );

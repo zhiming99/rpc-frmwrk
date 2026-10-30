@@ -61,6 +61,13 @@ options { tokenVocab=stlexer; }
     { m_bPass2 = bPass2; }
 }
 
+@parser::context {
+#include "rpc.h"
+#include "astnodes.h"
+#include "stsymtab.h"
+using namespace rpcf;
+}
+
 // ============================================================
 // Start Point
 // ============================================================
@@ -81,7 +88,32 @@ decl_set
     : namespace_element
     | config_decl
     | access_decl
-    | using_directive
+    | ( ud = using_directive 
+        {
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+            auto pGlobal = ost.GetGlobalScope();
+            auto pSym = pGlobal->m_pSymbol;
+            auto pNode = pSym->m_pDeclNode;
+            auto pnsd = ( CStNamespaceDecl* )pNode;
+            if( pnsd )
+            {
+                pnsd->m_vecUsings.push_back( $ud.pNode );
+                std::string strFullPath =
+                    GetReconstructedText(
+                        $ud.ctx, _input, 1, 1 );
+                DebugPrint( $ud.start->getLine(),
+                "haha, added namespaces references to "
+                "global namespace: %s",
+                strFullPath.c_str() );
+                pnsd->ResolveUsingNs( pCtx );
+            }
+            // TODO add resolving namespace reference
+            // code if the namespace is not declared
+            // yet.
+        })
     | TOK_PRAGMA
     ;
 
@@ -109,8 +141,60 @@ namespace_name
     ;
 
 namespace_decl
-    : TOK_NAMESPACE opt_internal namespace_name ( TOK_DOT namespace_name )*
-    using_directive_list? namespace_elements TOK_END_NAMESPACE
+    : TOK_NAMESPACE opt_internal
+        first=namespace_name ( TOK_DOT rest+=namespace_name )*
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto ret = pCtx->DeclareNamespace(
+                $first.text, $rest );
+            if( ERROR( ret ) )
+            {
+                pCtx->LogError( $first.start,
+                    "Declare namespace failed:'%s'(%d).",
+                    $first.text.c_str(), ret );
+            }
+        }}
+        (uds = using_directive_list
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            std::string strNsName;
+            if( $rest.size() )
+                strNsName = $rest.back()->getText();
+            else
+                strNsName = $first.text;
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            if( pSym->m_strName != strNsName )
+            {
+                pCtx->LogError( $first.start,
+                    "wrong scope name:'%s'",
+                    $first.text.c_str() );
+            }
+            else
+            {
+                CStNamespaceDecl* pnsd =
+                    pSym->m_pDeclNode;
+                pnsd->m_vecUsings = $uds.vecUsings;
+            }
+        }})?
+        namespace_elements
+        TOK_END_NAMESPACE
+        {{ 
+            int lineno = 
+                $TOK_END_NAMESPACE->getLine();
+            DebugPrint( 0, "Current line %d", lineno);
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            pSym->SetTokens(
+                $TOK_NAMESPACE, $TOK_END_NAMESPACE );
+            CStNamespaceDecl* pnsd = pSym->m_pDeclNode;
+            pnsd->ResolveUsingNs( pCtx );
+            pCtx->LeaveNamespace( $first.text, $rest );
+        }}
     ;
 
 namespace_global_name
@@ -132,16 +216,11 @@ config_name
 
 config_decl
     : TOK_CONFIGURATION config_name
-      opt_global_var_decls
+      global_var_decls?
       resource_decl
       opt_access_decls
       opt_config_init
       TOK_END_CONFIGURATION
-    ;
-
-opt_global_var_decls
-    : /* empty */
-    | global_var_decls
     ;
 
 resource_decl
@@ -155,7 +234,7 @@ resource_decl_list
 
 resource_declaration
     : TOK_RESOURCE identifier TOK_ON identifier
-      opt_global_var_decls
+      global_var_decls?
       single_resource_decl
       TOK_END_RESOURCE
     ;
@@ -331,7 +410,7 @@ subscript_list
     ;
 
 expr_list
-    : full_expression ( TOK_COMMA full_expression )*
+    : expression ( TOK_COMMA expression )*
     ;
 
 this_notation
@@ -355,7 +434,16 @@ global_name_space
 // Expression
 // ============================================================
 
-full_expression
+const_expr returns [ ObjPtr pExpr ]
+    : expression
+    {
+        // TODO: evaluate the expression to obtain the
+        // value and value type.
+        $pExpr = $expression.pExpr;
+    }
+    ;
+
+expression returns [ ObjPtr pExpr]
     : xor_expr (TOK_OR xor_expr)*
     ;
 
@@ -398,7 +486,7 @@ primary_expr
     | namedval_value
     | func_call
     | ref_value
-    | TOK_LPAREN full_expression TOK_RPAREN
+    | TOK_LPAREN expression TOK_RPAREN
     ;
 
 variable_access
@@ -554,7 +642,7 @@ case_list
 
 case_list_elem
     : subrange
-    | expression
+    | const_expr
     ;
 
 iteration_statement
@@ -586,10 +674,6 @@ repeat_statement
     : TOK_REPEAT stmt_list
       TOK_UNTIL expression
       TOK_END_REPEAT
-    ;
-
-expression
-    : full_expression
     ;
 
 ref_assign:
@@ -648,13 +732,62 @@ fb_name
 
 std_fb_name: identifier;
 
-using_directive_list
-    : using_directive+
+using_directive_list returns [ std::vector<ObjPtr> vecUsings ]
+    : ( ud = using_directive
+        {
+            if( !$ud.pNode.IsEmpty() )
+                $vecUsings.push_back( $ud.pNode );
+        }
+    )+
     ;
 
-using_directive
-    : TOK_USING instance_path (TOK_COMMA instance_path)* semicolons
-    ;
+using_directive returns [rpcf::ObjPtr pNode]
+    : TOK_USING first = namespace_hierarchy (TOK_COMMA rest+=namespace_hierarchy)* semicolons
+      {
+          int lineno = $first.start->getLine();
+          DebugPrint( 0, "Current line %d", lineno);
+
+          std::string strPath = $first.ctx->getText();
+          auto& pctx = $first.ctx;
+          pctx->stop->getText();
+
+          rpcf::ObjPtr pObj;
+          pObj.NewObj( clsid( CStUsingDirective ) );
+          CStUsingDirective* pud = pObj;
+          if( !pud->AddNamespace( strPath, ObjPtr() ) )
+          {
+            auto pParser =
+                static_cast<CStParser*>(this);
+              CStParseContext* pCtx =
+                pParser->GetParseContext();
+              pCtx->LogError( $first.start,
+                  "Duplicate path in USING directive:'%s'",
+                  strPath.c_str() );
+              $pNode = ObjPtr();
+          }
+          else
+              $pNode = pObj;
+
+          // Skip processing if initial path failed
+          if (!$rest.empty()) 
+          {
+              CStUsingDirective* pud = $pNode;
+              auto pCurCtx = $rest.back();
+              std::string strPath = pCurCtx->getText();
+              if( !pud->AddNamespace(
+                  strPath, ObjPtr()))
+              {
+                  auto pParser = 
+                      static_cast<CStParser*>(this);
+                  CStParseContext* pCtx =
+                    pParser->GetParseContext();
+                  pCtx->LogError( pCurCtx->start, 
+                      "Duplicate path in USING directive '%s'.",
+                      strPath.c_str());
+              }
+          }
+      }
+      ;
 
 extends_clause
     :TOK_EXTENDS instance_path
@@ -796,11 +929,15 @@ other_var_decls
     ;
 
 retain_var_decls
-    : TOK_VAR TOK_RETAIN access_spec? var_decls TOK_END_VAR
+    : TOK_VAR TOK_RETAIN access_spec? 
+    ( var_decls_init_set semicolons )*
+    TOK_END_VAR
     ;
 
 no_retain_var_decls
-    : TOK_VAR TOK_NON_RETAIN access_spec? var_decls TOK_END_VAR
+    : TOK_VAR TOK_NON_RETAIN access_spec?
+    ( var_decls_init_set semicolons )*
+    TOK_END_VAR
     ;
 
 retain
@@ -917,36 +1054,232 @@ func_body
 // ============================================================
 
 data_type_decl
-    : TOK_TYPE opt_override using_directive_list? type_decls TOK_END_TYPE
+    : TOK_TYPE
+    {
+        auto pParser =
+            static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        auto& ost = pCtx->m_oSymTab;
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStDataTypeDeclNode ) );
+        auto pdtd = ( CStDataTypeDeclNode* )pObj;
+        pdtd->m_pScope = ost.GetCurrentScope();
+
+    }
+    opt_internal
+    (uds = using_directive_list
+    {{
+        pdtd->m_vecUsings = $uds.vecUsings;
+        pdtd->ResolveUsingNs( pCtx );
+    }})?
+    tds = type_decls
+    {
+        gint32 ret = 0;
+        auto& vecDecls = $tds.vecTypeDecls;
+        for( auto& pType : vecDecls )
+        {
+            CStTypeDeclNode* ptd = pType;             
+            if( !ptd || ptd->IsTypeResolved() )
+                continue;
+
+            ptd->m_pDtd = pObj;
+            auto func =
+            ([]( ObjPtr& pObj, void* pctx )->gint32
+            {
+                CStTypeDeclNode* ptd = pObj;             
+                stdstr strType = ptd->m_oTypeRef.first;
+                auto pCtx = reinterpret_cast
+                    < CStParseContext* >( pctx );
+                auto& ost = pCtx->m_oSymTab;
+                std::vector< stdstr > vecComps =
+                    ost.BreakdownQualified( strType );
+
+                SymPtr pSym;
+                gint32 iType = -1;
+
+                auto pdtd = ( CStDataTypeDeclNode* )
+                    ptd->m_pDtd;
+
+                auto ret = ResolveTypeToDirectType(
+                    pCtx, vecComps, symDataType,
+                    pdtd->m_vecUsings,
+                    pdtd->m_pScope,
+                    pSym, iType );
+
+                if( !pSym.IsEmpty() )
+                    ptd->m_oTypeRef.second = pSym;
+
+                if( iType >= 0 )
+                    ptd->m_iDirectType = iType;
+
+                if( SUCCEEDED( ret ) && ptd->GetClsid() ==
+                    clsid( CStAmbiguousTypeDeclNode ) )
+                {
+                    ObjPtr pNewNode;
+                    ReplaceAmbiguousNode(
+                        pCtx, pObj, iType, pNewNode );
+                }
+
+                return ret;
+            });
+            ret = func( pType, pCtx );
+            if( ERROR( ret ) )
+            {
+                CStTypeDeclNode* ptd = pType;             
+                auto pSym = ptd->m_pSymbol;
+                ost.AddUnsolved(
+                    pType, func, pSym );
+            }
+        }
+    }
+    TOK_END_TYPE
     ;
 
-type_decls
-    : type_decl ( semicolons type_decl )* opt_semicolons
+type_decls returns [ std::vector< ObjPtr > vecTypeDecls ]
+    : first=type_decl
+    {
+        if (!$first.pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back($first.pTypeDecl);
+    }
+    ( semicolons rest+=type_decl 
+    {
+        auto* pCtx = $rest.back();
+        if (pCtx != nullptr && !pCtx->pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back(pCtx->pTypeDecl);
+    })*
+    opt_semicolons
     ;
 
-type_decl
-    : simple_type_decl
-    | subrange_type_decl
-    | enum_type_decl
-    | namedval_spec_init
-    | array_type_decl
-    | struct_type_decl
-    | string_type_decl
-    | ref_type_decl
-    | ambiguous_type_decl
+type_decl returns [ ObjPtr pTypeDecl ]
+    : st = simple_type_decl
+    { $pTypeDecl = $st.pTypeDecl; }
+    | subt = subrange_type_decl
+    { $pTypeDecl = $subt.pTypeDecl; }
+    | et = enum_type_decl
+    { $pTypeDecl = $et.pTypeDecl; }
+    | nt = namedval_type_decl
+    { $pTypeDecl = $nt.pTypeDecl; }
+    | at = array_type_decl
+    { $pTypeDecl = $at.pTypeDecl; }
+    | stru = struct_type_decl_init
+    { $pTypeDecl = $stru.pTypeDecl; }
+    | str = string_type_decl
+    { $pTypeDecl = $str.pTypeDecl; }
+    | rt = ref_type_decl
+    { $pTypeDecl = $rt.pTypeDecl; }
+    | ambt = ambiguous_type_decl
+    { $pTypeDecl = $ambt.pTypeDecl; }
     ;
 
-simple_type_decl
-    : simple_type_name TOK_COLON simple_spec_init
+simple_type_decl returns [ ObjPtr pTypeDecl ]
+    : st=simple_type_name TOK_COLON si=simple_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$si.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+
+            initInfo.GetObjPtr( 2, pTypeInit );
+            initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr( 999, pTypeData );
+
+            if( iType == RuleDerived_type_access )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else if( IsElementaryType( iType ) )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStSimpleTypeDeclNode ) );
+            }
+            else
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->spec->getText().c_str(),
+                    ret );
+            }
+            if( ERROR( ret ) )
+                break;
+            CStTypeDeclNode* ptd = pNode;
+            ptd->m_pTypeInit = pTypeInit;
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = iType;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare( $st.ctx->getText(),
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $st.start, $si.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-simple_spec_init
-    : simple_spec ( TOK_ASSIGN expression )?
+simple_spec_init returns [ ObjPtr pTypeInfo ]
+    : spec=simple_spec ( TOK_ASSIGN expr=const_expr )?
+    {
+        
+        $pTypeInfo = $spec.pTypeInfo;
+        CParamList oParams(
+            ( IConfigDb* )$pTypeInfo );
+        if( $expr.ctx != nullptr )
+            oParams.Push( $expr.pExpr );
+        else
+            oParams.Push( ObjPtr() );
+    }
     ;
 
-simple_spec
-    : elem_type_name
-    | simple_type_access
+simple_spec returns [ ObjPtr pTypeInfo ]
+    : etn = elem_type_name
+    {{ 
+        CParamList oParams;
+        oParams.Push( $etn.ctx->getText() );
+        oParams.Push(
+            ( guint32 )$etn.start->getType() );
+
+        if( !$etn.pTypeInfo.IsEmpty() )
+            oParams.SetObjPtr( 999, $etn.pTypeInfo );
+
+        oParams.SetIntProp(
+            1000, RuleElem_type_name );
+        $pTypeInfo = oParams.GetCfg();
+    }}
+    | sta = simple_type_access
+    {{ 
+        CParamList oParams;
+        oParams.Push( $sta.ctx->getText() );
+        oParams.Push(
+            ( guint32 )RuleDerived_type_access );
+        oParams.SetIntProp(
+            1000, RuleSimple_type_access );
+        $pTypeInfo = oParams.GetCfg();
+    }}
     ;
 
 date_type_name
@@ -959,10 +1292,11 @@ time_type_name
     | TOK_LDATE_TYPE
     ;
 
-elem_type_name
+elem_type_name returns [ ObjPtr pTypeInfo ]
     : numeric_type_name
     | bit_str_type_name
-    | string_simple_type
+    | string_spec
+    { $pTypeInfo = $string_spec.pTypeInfo; }
     | date_type_name
     | time_type_name
     ;
@@ -984,7 +1318,7 @@ simple_type_access
     : instance_path
     ;
 
-subrange_type_decl
+subrange_type_decl returns [ ObjPtr pTypeDecl ]
     : subrange_type_name TOK_COLON subrange_spec_init
     ;
 
@@ -1011,14 +1345,14 @@ int_type_name
     ;
 
 subrange
-    : expression TOK_RANGE expression
+    : const_expr TOK_RANGE const_expr
     ;
 
 enum_type_name
     : identifier
     ;
 
-enum_type_decl
+enum_type_decl returns [ ObjPtr pTypeDecl ]
     : enum_type_name TOK_COLON enum_spec_init
     ;
 
@@ -1039,7 +1373,7 @@ namedval_type_name
     : identifier
     ;
 
-namedval_type_decl
+namedval_type_decl returns [ ObjPtr pTypeDecl ]
     : namedval_type_name TOK_COLON namedval_type namedval_spec_init
     ;
 
@@ -1049,7 +1383,7 @@ namedval_type
     ;
 
 namedval_spec_init
-    : TOK_LPAREN namedval_spec_list TOK_RPAREN ( TOK_ASSIGN expression )?
+    : TOK_LPAREN namedval_spec_list TOK_RPAREN ( TOK_ASSIGN const_expr )?
     ;
 
 namedval_spec_list
@@ -1057,7 +1391,7 @@ namedval_spec_list
     ;
 
 namedval_spec
-    : identifier TOK_ASSIGN expression
+    : identifier TOK_ASSIGN const_expr
     ;
 
 namedval_value
@@ -1068,7 +1402,7 @@ namedval_type_access
     : instance_path
     ;
     
-array_type_decl
+array_type_decl returns [ ObjPtr pTypeDecl ]
     : array_type_name TOK_COLON array_spec_init
     ;
 
@@ -1107,7 +1441,7 @@ array_elem_init
     ;
 
 array_elem_init_value
-    : expression 
+    : const_expr 
     | enum_value
     | struct_init
     | array_init
@@ -1117,8 +1451,8 @@ struct_type_decl
     : struct_type_name TOK_COLON struct_decl
     ;
 
-struct_type_decl_init
-    : struct_spec
+struct_type_decl_init returns [ ObjPtr pTypeDecl ]
+    : struct_type_name TOK_COLON struct_spec
     ;
 
 struct_spec_init
@@ -1134,6 +1468,7 @@ struct_elem_init_list
     ;
 struct_elem_init_value
     : array_elem_init_value
+    | ref_value
     ;
 
 struct_elem_init
@@ -1141,12 +1476,81 @@ struct_elem_init
     | struct_elem_name TOK_ASSIGN ref_value
     ;
 
-string_type_decl
-    : string_type_name TOK_COLON string_spec_init
-    ;
+string_type_decl returns [ ObjPtr pTypeDecl ]
+    : stn=string_type_name TOK_COLON si=string_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
 
-string_spec_init
-    : string_spec (TOK_ASSIGN string_literal)?
+            CParamList initInfo(
+                ( IConfigDb* )$si.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+
+            initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr( 999, pTypeData );
+
+            if( IsElementaryType( iType ) )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStStringTypeDeclNode ) );
+            }
+            else
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->getText().c_str(),
+                    ret );
+            }
+            if( ERROR( ret ) )
+                break;
+            CStAmbiguousTypeDeclNode* ptd = pNode;
+            CParamList oTypeInit;
+            ret = oTypeInit.CopyProp(
+                997, 2, $si.pTypeInfo );
+            if( SUCCEEDED( ret ) )
+                ptd->m_pTypeInit = oTypeInit.GetCfg();
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = iType;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare( $stn.ctx->getText(),
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $stn.start, $si.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }    ;
+
+string_spec_init returns [ ObjPtr pTypeInfo ]
+    : sp=string_spec (TOK_ASSIGN sl=string_literal)?
+    {
+        CParamList oParams(
+            ( IConfigDb* ) $sp.pTypeInfo );
+        if( $sl.ctx )
+            oParams.Push( $sl.ctx->getText() );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 string_type_name
@@ -1161,30 +1565,113 @@ ref_type_name
     : identifier
     ;
 
-ref_type_decl
-    : ref_type_name TOK_COLON ref_spec_init TOK_SEMICOLON
+ref_type_decl returns [ ObjPtr pTypeDecl ]
+    : rtn=ref_type_name TOK_COLON rsi=ref_spec_init 
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$rsi.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+
+            initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+
+            ret = pNode.NewObj(
+                clsid( CStRefTypeDeclNode ) );
+            if( ERROR( ret ) )
+                break;
+
+            CStRefTypeDeclNode* ptd = pNode;
+            CParamList oTypeInit;
+            ret = oTypeInit.CopyProp(
+                997, ( IConfigDb* )$rsi.pTypeInfo );
+            if( SUCCEEDED( ret ) )
+                ptd->m_pTypeInit = oTypeInit.GetCfg();
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = TOK_REF_TO;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            gint32 iRank = 0;
+            ret = initInfo.GetIntProp(
+                998, ( guint32& )iRank );
+            if( SUCCEEDED( ret ) )
+                ptd->m_iRefRank = iRank;
+
+            auto pSym = ost.Declare(
+                $rtn.text, symDataType,
+                pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $rtn.start, $rsi.stop );
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-ref_spec_init
-    : ref_spec (TOK_ASSIGN ref_value)?
+ref_spec_init returns [ ObjPtr pTypeInfo ]
+    : rs=ref_spec (TOK_ASSIGN v=ref_value)?
+    {
+        CParamList oParams(
+            ( IConfigDb* )$rs.pTypeInfo );
+        if( $v.ctx )
+        {
+            oParams.SetStrProp(
+                997, $v.ctx->getText() );
+        }
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
-ref_spec
-    : TOK_REF_TO+ data_type_access
+ref_spec returns [ ObjPtr pTypeInfo ]
+    : (tok+=TOK_REF_TO)+ dta=data_type_access
+    {
+        CParamList oParams;
+        oParams.Push( $dta.typePair.first );
+        oParams.Push( $dta.typePair.second );
+        oParams.SetIntProp( 998, $tok.size() );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 ref_type_access:
     instance_path
     ;
 
-ref_value
+ref_value returns [ stdstr strVal ]
     : ref_addr
+    { $strVal = $ref_addr.strVal; }
     | TOK_NULL
+    { $strVal = "NULL"; }
     ;
 
-ref_addr
+ref_addr returns [ stdstr strVal ]
     : TOK_REF TOK_LPAREN
-    ( symbolic_variable | fb_instance_name | class_instance_name )
+    ( sv=symbolic_variable | fb=fb_instance_name | cls=class_instance_name )
+    {
+        if( $sv.ctx )
+            $strVal = $sv.ctx->getText();
+        else if( $fb.ctx )
+            $strVal = $fb.ctx->getText();
+        else if( $cls.ctx )
+            $strVal = $cls.ctx->getText();
+    }
     TOK_RPAREN
     ;
 
@@ -1200,8 +1687,8 @@ caret_list
     : TOK_CARET (TOK_CARET)*
     ;
 
-ambiguous_type_decl
-    : variable_list TOK_COLON instance_path (TOK_ASSIGN spec_type_accesses)?
+ambiguous_type_decl returns [ ObjPtr pTypeDecl ]
+    : identifier TOK_COLON instance_path
     ;
 
 spec_type_accesses
@@ -1213,8 +1700,12 @@ spec_type_accesses
 // Class Declaration
 // ============================================================
 
+class_type_name
+    : identifier
+    ;
+
 class_decl
-    : TOK_CLASS class_modifier identifier
+    : TOK_CLASS opt_internal class_modifier class_type_name
       extends_clause?
       implements_clause?
       class_var_decls_list?
@@ -1283,9 +1774,11 @@ property_prototype
 // Data Type Access
 // ============================================================
 
-data_type_access
-    : elem_type_name
-    | derived_type_access
+data_type_access returns [ std::pair< stdstr, int > typePair ]
+    : etn=elem_type_name
+    { $typePair = {$etn.start->getText(), $etn.start->getType()};}
+    | dta=derived_type_access
+    { $typePair = {$dta.ctx->getText(), RuleDerived_type_access};}
     ;
 
 derived_type_access
@@ -1490,7 +1983,7 @@ global_var_name
     ;
 
 global_var_spec
-    : global_var_name ( TOK_SEMICOLON global_var_name )*
+    : global_var_name ( TOK_COMMA global_var_name )*
     | global_var_name locate_at
     ;
 
@@ -1519,8 +2012,8 @@ class_method_or_property_decl
 
 // Method decl
 method_decl
-    : TOK_METHOD identifier
-        opt_data_type_access
+    : TOK_METHOD access_spec? opt_fb_modifier opt_override
+        method_name opt_data_type_access
         using_directive_list?
         method_var_decls*
         func_body
@@ -1659,8 +2152,7 @@ opt_fb_inst_or_class_inst
 // Optional FB modifier
 opt_fb_modifier
     : /* empty */
-    | TOK_ABSTRACT
-    | TOK_FINAL
+    | fb_modifier
     ;
 
 // Optional in-out var decl list
@@ -1705,7 +2197,7 @@ opt_temp_var_member_list
 // Optional var decls init set
 opt_var_decls_init
     : /* empty */
-    | var_decls_init_set semicolons (var_decls_init_set semicolons)*
+    | (var_decls_init_set semicolons)+
     ;
 
 // Param assignment
@@ -1789,12 +2281,55 @@ string_list
     ;
 
 // String spec
-string_spec
-    : ( TOK_STRING_TYPE | TOK_WSTRING_TYPE | TOK_USTRING_TYPE )
-        ( TOK_LBRACKET TOK_INT TOK_RBRACKET )?
-    | TOK_CHAR_TYPE
-    | TOK_WCHAR_TYPE
-    | TOK_UCHAR_TYPE
+string_spec returns [ ObjPtr pTypeInfo ]
+    : ( t1=TOK_STRING_TYPE | t2=TOK_WSTRING_TYPE | t3=TOK_USTRING_TYPE )
+        ( TOK_LBRACKET const_expr TOK_RBRACKET )?
+    {
+        CParamList oParams;
+        if( $t1 )
+        {
+            oParams.Push( $t1.text );
+            oParams.Push( TOK_STRING_TYPE );
+        }
+        else if( $t2 )
+        {
+            oParams.Push( $t2.text );
+            oParams.Push( TOK_WSTRING_TYPE );
+        }
+        else if( $t3 )
+        {
+            oParams.Push( $t3.text );
+            oParams.Push( TOK_USTRING_TYPE );
+        }
+        
+        if( $const_expr.ctx != nullptr )
+        {
+            oParams.SetObjPtr( 999,
+                $const_expr.pExpr );
+        }
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | t4=TOK_CHAR_TYPE
+    {
+        CParamList oParams;
+        oParams.Push( $t4.text );
+        oParams.Push( TOK_CHAR_TYPE );
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | t5=TOK_WCHAR_TYPE
+    {
+        CParamList oParams;
+        oParams.Push( $t5.text );
+        oParams.Push( TOK_WCHAR_TYPE );
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | t6=TOK_UCHAR_TYPE
+    {
+        CParamList oParams;
+        oParams.Push( $t6.text );
+        oParams.Push( TOK_UCHAR_TYPE );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 // Struct decl
@@ -1908,10 +2443,6 @@ var_member_init
 
 keywords
     : TOK_SINGLE | TOK_INTERVAL | TOK_PRIORITY 
-    | TOK_USING | TOK_INCLUDE | TOK_OVERLAP
-    | TOK_REGION | TOK_NAMESPACE 
-    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
-    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     | TOK_EXTERNAL
     ;
 
@@ -1943,5 +2474,9 @@ keywords1
     | TOK_END_REGION | TOK_END_NAMESPACE
     | TOK_TRUE | TOK_FALSE | TOK_RETURN | TOK_CONTINUE | TOK_EXIT
     | TOK_LWORD
+    | TOK_USING | TOK_NAMESPACE 
+    | TOK_REGION | TOK_INCLUDE | TOK_OVERLAP
+    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
+    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     ;
     

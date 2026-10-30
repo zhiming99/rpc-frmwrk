@@ -17,6 +17,9 @@
  */
 #include "st_parser_ext.h"
 
+namespace rpcf
+{
+
 typedef enum : int {
     enumSignedInt = 0,
     enumUnsignedInt,
@@ -295,4 +298,6 @@ void CStParser::PredictVarDeclInit()
             << std::endl;
         break;
     }while(1);
+}
+
 }

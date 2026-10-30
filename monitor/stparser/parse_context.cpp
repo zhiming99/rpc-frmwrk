@@ -31,8 +31,12 @@
 #include "stlexer.h"
 #include "stparser.h"
 #include "pragma.h"
+#include "defines.h"
 #include "parse_context.h"
 #include "pragma_expr/pragma_exprLexer.h"
+
+namespace rpcf
+{
 
 std::string CStIncludeManager::ResolveIncludePath(
     const std::string& strPath ) const
@@ -171,8 +175,7 @@ bool CStTokenPipeline::InjectIncludeStream(
     if( m_pIncludeMgr->IsCyclicInclude(
         strFilePath, iFileIdx ) )
     {
-        std::cerr << "CSt Compiler Error: Cyclic "
-            << "include detected on file: " 
+        std::cerr << "stparsr error: Cyclic include detected on file: " 
             << strFilePath << "\n";
         return false;
     }
@@ -189,8 +192,7 @@ bool CStTokenPipeline::InjectIncludeStream(
         std::ifstream>( strFilePath );
     if( !pFileStream->is_open() )
     {
-        std::cerr << "stparser Error: Unable "
-            << "to open file stream: "
+        std::cerr << "stparser error: Unable to open file stream: "
             << strFilePath << "\n";
         m_pIncludeMgr->PopFile();
         return false;
@@ -328,11 +330,14 @@ GetNextTokenOnChannel(
 
         // Verify token sits on the
         // DEFAULT_CHANNEL (usually 0)
-        if( pTok != nullptr &&
-            pTok->getChannel() ==
-                antlr4::Token::DEFAULT_CHANNEL )
+        if( pTok != nullptr )
         {
-            return sstCurr;
+            if( pTok->getType() == antlr4::Token::EOF )
+                return sstCurr;
+
+            if( pTok->getChannel() ==
+                    antlr4::Token::DEFAULT_CHANNEL )
+                return sstCurr;
         }
 
         sstCurr += sstDirection;
@@ -353,11 +358,13 @@ CStPragmaFilteringTokenStream::LT(
         return nullptr;
     }
 
+    ssize_t direction = 1;
     if( k < 0 )
     {
         // Handle negative lookback
         // if needed by reversing search
-        return nullptr;
+        direction = -1;
+        k = -k;
     }
 
     ssize_t sstCurrIdx = static_cast<ssize_t>
@@ -368,16 +375,23 @@ CStPragmaFilteringTokenStream::LT(
 
     // Advance k times across matching
     // channel tokens
+    if( direction < 0 )
+        sstCurrIdx--;
     while( sstCount < k )
     {
         sstFoundIdx = GetNextTokenOnChannel(
-                sstCurrIdx, 1 );
+                sstCurrIdx, direction );
 
         if( sstFoundIdx == -1 )
-            return m_pPipeline-> m_pEofToken.get();
+        {
+            if( direction > 0 )
+                return m_pPipeline-> m_pEofToken.get();
+            else
+                return nullptr;
+        }
 
         sstCount++;
-        sstCurrIdx = sstFoundIdx + 1;
+        sstCurrIdx = sstFoundIdx + direction;
     }
 
     return m_pPipeline->
@@ -419,9 +433,7 @@ bool CStPragmaFilteringTokenStream::EvaluateInclude(
     }
     catch (const std::bad_any_cast& e)
     {
-        std::cerr << "Error: 'include' "
-            << "directive did not compile. "
-            << "Default to false\n";
+        std::cerr << "stparser error: 'include' directive did not compile. Default to false\n";
         return false;
     }
     return false;
@@ -720,7 +732,6 @@ std::string CStPragmaFilteringTokenStream::getText(
     antlr4::Token* stop )
 {
     if( start == nullptr ||
-        stop == nullptr ||
         m_pPipeline == nullptr )
     {
         return std::string( "" );
@@ -729,12 +740,12 @@ std::string CStPragmaFilteringTokenStream::getText(
     // Resolve the true absolute vector locations
     ssize_t sstStartIdx =
         FindMasterVectorIndex( start );
-    ssize_t sstStopIdx =
-        FindMasterVectorIndex( stop );
+    ssize_t sstStopIdx = ( stop != nullptr ?
+        FindMasterVectorIndex( stop ): -1 );
 
     if( sstStartIdx == -1 ||
-        sstStopIdx == -1 ||
-        sstStartIdx > sstStopIdx )
+        ( sstStartIdx > sstStopIdx && 
+          sstStopIdx >= 0 ) )
     {
         return std::string( "" );
     }
@@ -753,6 +764,9 @@ std::string CStPragmaFilteringTokenStream::getText(
             return oCStTok.m_strMarkerPath;
         }
     }
+
+    if( sstStopIdx == -1 )
+        sstStopIdx = sstStartIdx;
 
     std::string strResult = "";
     for( ssize_t i = sstStartIdx;
@@ -823,3 +837,780 @@ std::string CStPragmaFilteringTokenStream::
     return strDefault;
 }
 
+gint32 CStParseContext::DeclareNamespace(
+    const std::string& strFirst,
+    const std::vector<stparser::Namespace_nameContext*>& rest) 
+{
+    gint32 ret = 0;
+    do{
+        // Construct the complete trailing path
+        std::vector< std::string > vecComps;
+        vecComps.push_back( strFirst );
+        for( size_t i = 0; i < rest.size(); i++ )
+            vecComps.push_back( rest[i]->getText() );
+
+        bool bCreate = false;
+        for( auto strName : vecComps )
+        {
+            SymVector sv;
+            m_oSymTab.FindByKind( symNamespace, sv );
+            stdstr strDup;
+            if( sv.size() )
+            {
+                auto it = std::find_if(
+                    sv.begin(), sv.end(),
+                    [ strName ](const SymPtr& pSym) {
+                        return pSym->m_strName == strName;
+                    });
+                if( it != sv.end() )
+                {
+                    SymPtr pDup = *it;
+                    sv.clear();
+                    sv.push_back( pDup );
+                }
+                else
+                {
+                    sv.clear();
+                }
+            }
+
+            if( sv.empty() )
+            {
+                ObjPtr pObj;
+                ret = pObj.NewObj(
+                    clsid( CStNamespaceDecl ) );
+                if( ERROR( ret ) )
+                    break;
+                auto pnsd = ( CStNamespaceDecl* )pObj;
+                bCreate = true;
+                auto pSym = m_oSymTab.DeclareScopeOwner(
+                    symNamespace,
+                    scopeNamespace,
+                    strName, pObj );
+                if( !pSym.IsEmpty() )
+                {
+                    pnsd->m_pSymbol = pSym;
+                    auto pScope =
+                        m_oSymTab.GetCurrentScope();
+                    pScope->m_pSymbol = pSym;
+                }
+                continue;
+            }
+            else if( !sv.empty() && bCreate )
+            {
+                std::cerr << "stparser error: Duplicated namespace name'"
+                    << strName << "'\n";
+                ret = -EEXIST;
+                break;
+            }
+            else
+            {
+                SymPtr pSym = sv[0];
+                if( pSym.IsEmpty() )
+                {
+                    std::cerr << "stparser error: Scope object is empty '"
+                        << strName << "'\n";
+                    ret = -EFAULT;
+                    break;
+                }
+                ScopePtr pScope( pSym->m_pDefScope );
+                m_oSymTab.PushScope( pScope );
+            }
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+void CStParseContext::LeaveNamespace(
+    const std::string& strFirst,
+    const std::vector<stparser::Namespace_nameContext*>& rest)
+{
+    // Calculate the total number of layers pushed: 1
+    // (for strFirst) + number of trailing parts
+    size_t uTotalLayers = 1 + rest.size();
+
+    // Safely unwind the LIFO scope stack layers
+    for (size_t i = 0; i < uTotalLayers; ++i)
+        m_oSymTab.PopScope();
+}
+
+std::string GetReconstructedText(
+    antlr4::ParserRuleContext* pCtx,
+    antlr4::TokenStream* pTokens,
+    size_t offset,
+    size_t roffset )
+{
+    if (!pCtx || !pTokens ||
+        !pCtx->start || !pCtx->stop) {
+        return "";
+    }
+
+    std::string strResult = "";
+    size_t uStartIdx =
+        pCtx->start->getTokenIndex() + offset;
+    size_t uStopIdx =
+        pCtx->stop->getTokenIndex() - roffset;
+
+    // Loop through the token pipeline indices
+    // sequentially
+    for (size_t i = uStartIdx; i <= uStopIdx; ++i) {
+        antlr4::Token* pTok = pTokens->get(i);
+        if (!pTok ||
+            ( pTok->getType() == antlr4::Token::EOF ) ||
+            ( pTok->getChannel() !=
+                antlr4::Token::DEFAULT_CHANNEL ) )
+            continue;
+
+        std::string strTokText = pTok->getText();
+        if (strTokText.empty())
+            continue;
+
+        if (!strResult.empty()) {
+            strResult += ",";
+        }
+        strResult += strTokText;
+    }
+
+    return strResult;
+}
+
+ObjPtr ResolveNsPrefix(
+    const std::vector<std::string>& vecNames,
+    void* pctx,
+    size_t& iPos,
+    enumPathStop& eStop )
+{
+    ObjPtr pResult;
+    iPos = ( size_t )-1;
+    eStop = pathStopUnresolved;
+
+    if( vecNames.empty() || pctx == nullptr )
+        return pResult;
+
+    auto pCtx = reinterpret_cast
+        < CStParseContext* >( pctx );
+    auto& ost = pCtx->m_oSymTab;
+
+    CStScope* pCurScope = ost.GetCurrentScope();
+
+    bool bAbsolute =
+        ( vecNames[0] == GLOBAL_SCOPE_MARK );
+    size_t iStartIdx = bAbsolute ? 1 : 0;
+
+    while( pCurScope != nullptr || bAbsolute )
+    {
+        CStScope* pSearchRunner =
+            ( !bAbsolute ? pCurScope
+            : ( CStScope* )ost.GetGlobalScope() );
+
+        SymPtr pLastNs;
+        size_t iLastIdx = ( size_t )-1;
+        bool bChainValid = true;
+
+        for( size_t i = iStartIdx;
+            i < vecNames.size(); ++i )
+        {
+            const std::string& strName = vecNames[i];
+            SymVector vecSyms;
+            ost.FindByKind(symNamespace,
+                vecSyms, pSearchRunner);
+
+            CStScope* pNextScope = nullptr;
+            SymPtr pNextNs;
+            for( auto& elem : vecSyms )
+            {
+                if( elem->m_strName == strName )
+                {
+                    pNextScope = elem->m_pDefScope;
+                    pNextNs = elem;
+                    break;
+                }
+            }
+
+            if( pNextScope == nullptr )
+            {
+                bChainValid = false;
+                break; // Break component chain loop
+            }
+
+            pLastNs = pNextNs;
+            iLastIdx = i;
+            pSearchRunner = pNextScope;
+        }
+
+        if (bChainValid)
+        {
+            if( iLastIdx == ( size_t )-1 )
+            {
+                // only the absolute root marker was
+                // given
+                iPos = 0;
+                ScopePtr pGlobal = ost.GetGlobalScope();
+                if( pGlobal.IsEmpty() ||
+                    pGlobal->m_pSymbol.IsEmpty() )
+                    return pResult;
+                eStop = pathStopResolved;
+                return ObjPtr( pGlobal->m_pSymbol );
+            }
+            iPos = iLastIdx;
+            eStop = pathStopResolved;
+            return ObjPtr( pLastNs );
+        }
+
+        // The namespace prefix ends at this level.  Do
+        // not fall back to outer scopes, or they would
+        // shadow the locally bound first component.
+        // Tell the two possible stops apart: a
+        // non-namespace symbol means the caller
+        // continues in pLastNs's scope, while a
+        // missing symbol means the name is not
+        // declared yet (a using directive may retry it
+        // later).
+        if( iLastIdx != ( size_t )-1 )
+        {
+            iPos = iLastIdx;
+            if( iLastIdx + 1 < vecNames.size() )
+            {
+                SymPtr pNextSym = pSearchRunner->LookupLocal(
+                    vecNames[ iLastIdx + 1 ] );
+                if( !pNextSym.IsEmpty() &&
+                    pNextSym->m_eKind != symNamespace )
+                    eStop = pathStopNonNamespace;
+            }
+            return pLastNs->m_pDeclNode;
+        }
+
+        // If forced absolute or already at root, fail
+        if (bAbsolute ||
+            pCurScope == ost.GetGlobalScope())
+            break;
+
+        // Fall back one level up the lexical tree
+        pCurScope = pCurScope->m_pParent;
+
+        // Final fallback step: Try the absolute root
+        if (pCurScope == nullptr)
+            bAbsolute = true;
+    }
+
+    // Nothing matched at all: anchor at the global
+    // namespace for an absolute path, otherwise at the
+    // namespace enclosing the scope resolution started
+    // from.
+    if( bAbsolute )
+    {
+        iPos = 0;
+        ScopePtr pGlobal = ost.GetGlobalScope();
+        if( pGlobal.IsEmpty() ||
+            pGlobal->m_pSymbol.IsEmpty() )
+            return pResult;
+        return pGlobal->m_pSymbol->m_pDeclNode;
+    }
+
+    CStScope* pScope = ost.GetCurrentScope();
+    while( pScope != nullptr )
+    {
+        if( ( pScope->m_eKind == scopeNamespace ||
+              pScope->m_eKind == scopeGlobal ) &&
+            !pScope->m_pSymbol.IsEmpty() )
+            return pScope->m_pSymbol->m_pDeclNode;
+        pScope = pScope->m_pParent;
+    }
+
+    return pResult; // Return null if unfound
+}
+
+static std::vector< ObjPtr >
+GetUsingNs( ObjPtr& pObj )
+{
+    CStNamespaceDecl* pnsd = pObj;
+    if( pnsd != nullptr )
+        return pnsd->m_vecUsings;
+    CStDataTypeDeclNode* pdtd = pObj;
+    if( pdtd != nullptr )
+        return pdtd->m_vecUsings;
+    return std::vector< ObjPtr >();
+}
+
+gint32 ResolveUsingNs(
+    void* pctx, ObjPtr pHostNode )
+{
+    gint32 ret = 0;
+    do{
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto ost = pCtx->m_oSymTab;
+        DebugPrint( ret, "Entering ResolveUsingNs" );
+        bool bUnresolved = false;
+        auto vecUsings = GetUsingNs( pHostNode );
+        for( auto pObj : vecUsings )
+        {
+            CStUsingDirective* pud = pObj;
+            if( pud == nullptr )
+                continue;
+            auto& vecNames = pud->m_vecNamespaces;
+            for( auto& elem: vecNames )
+            {
+                if( !elem.second.IsEmpty() )
+                    continue;
+
+                auto vecComps = 
+                    ost.BreakdownQualified( elem.first );
+
+                if( vecComps.empty() )
+                    continue;
+
+                auto pSym = CStNamespaceDecl::ResolvePath(
+                    vecComps, pctx );
+                if( !pSym.IsEmpty() )
+                {
+                    elem.second = SymPtr( pSym );
+                    DebugPrint( 0,
+                    "Resoved namespace reference %s",
+                    elem.first.c_str() );
+                }
+                else
+                {
+                    DebugPrint( 0,
+                    "undefined namespace reference %s",
+                    elem.first.c_str() );
+                    bUnresolved = true;
+                }
+            }
+        }
+        if( bUnresolved )
+        {
+            ost.AddUnsolved( pHostNode,
+                ([]( ObjPtr& pObj, void* pctx )->gint32
+                {
+                    return ResolveUsingNs( pctx, pObj );
+                }));
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 ResolveTypeRef( CStParseContext* pCtx,
+    const std::vector<std::string>& vecNames,
+    enumSymKind eKind,
+    std::vector< ObjPtr >& vecUsings,
+    CStScope* pTopScope,
+    SymPtr& pSym )
+{
+    pSym.Clear();
+
+    if( vecNames.empty() || pCtx == nullptr )
+        return -EINVAL;
+
+    auto ost = pCtx->m_oSymTab;
+    const std::string& strName = vecNames.back();
+
+    bool bAbsolute = false;
+    if( vecNames[ 0 ] == GLOBAL_SCOPE_MARK )
+        bAbsolute = true;
+
+    if( bAbsolute && vecNames.size() == 1 )
+    {
+        std::cerr << "stparser error: invalid '_'\n"; 
+        return -EINVAL;
+    }
+
+    std::vector<std::string> vecPrefixPath;
+    size_t uStart = bAbsolute ? 1 : 0;
+    if (vecNames.size() > 1)
+        vecPrefixPath.insert(vecPrefixPath.begin(),
+            vecNames.begin() + uStart,
+            vecNames.end() - 1);
+
+    // 2. ABSOLUTE PATH LOOKUP ENGINE
+    if( bAbsolute )
+    {
+        ScopePtr pScope = ost.GetGlobalScope();
+        bool bChainValid = true;
+
+        for( const auto& strPart : vecPrefixPath )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strPart, pScope, vecOut );
+            ScopePtr pNextScope;
+            for( auto elem : vecOut )
+            {
+                if( elem->m_strName == strPart && 
+                    elem->m_eKind == symNamespace )
+                {
+                    pNextScope = elem->m_pDefScope;
+                    break;
+                }
+            }
+            if( pNextScope.IsEmpty() )
+            {
+                bChainValid = false;
+                break;
+            }
+            pScope = pNextScope;
+        }
+
+        if( bChainValid && !pScope.IsEmpty() )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strName, pScope, vecOut );
+            for( auto elem : vecOut )
+            {
+                if( elem->m_eKind == eKind &&
+                    elem->m_strName == strName )
+                {
+                    pSym = elem;
+                    return 0;
+                }
+            }
+        }
+        return -ENOENT;
+    }
+
+    // 3. RELATIVE LEXICAL PASS (No Imports Blended)
+    ScopePtr pStartScope = (
+        pTopScope == nullptr ?
+        ost.GetCurrentScope():
+        ScopePtr( pTopScope ) );
+    ScopePtr pCurScope = pStartScope;
+
+    while( !pCurScope.IsEmpty() )
+    {
+        ScopePtr pRunScope = pCurScope;
+        bool bPathOk = true;
+
+        for( const auto& strPart : vecPrefixPath )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strPart, pRunScope, vecOut );
+            ScopePtr pNext;
+            for( auto elem : vecOut )
+            {
+                if( elem->m_strName == strPart &&
+                    elem->m_eKind == symNamespace )
+                {
+                    pNext = elem->m_pDefScope;
+                    break;
+                }
+            }
+            if( pNext.IsEmpty() )
+            {
+                bPathOk = false;
+                break;
+            }
+            pRunScope = pNext;
+        }
+
+        if( bPathOk && !pRunScope.IsEmpty() )
+        {
+            SymVector vecOut;
+            ost.LookupAllLocal(
+                strName, pRunScope, vecOut );
+            for( auto elem : vecOut )
+            {
+                if( elem->m_eKind == eKind &&
+                    elem->m_strName == strName )
+                {
+                    pSym = elem;
+                    return 0;
+                }
+            }
+        }
+        pCurScope = pCurScope->m_pParent;
+    }
+
+    // 4. IMPORTED DIRECTIVES PASS (Evaluate USING)
+    for( auto pObj : vecUsings )
+    {
+        CStUsingDirective* pud = pObj;
+        if( pud == nullptr )
+            continue;
+
+        for( auto& elem : pud->m_vecNamespaces )
+        {
+            if( !elem.second.IsEmpty() )
+                continue;
+
+            auto vecComps = ost.BreakdownQualified(
+                elem.first
+            );
+            if( vecComps.empty() )
+                continue;
+
+            ScopePtr pRunScope;
+            size_t uStartIdx = 0;
+            
+            if( vecComps[ 0 ] == GLOBAL_SCOPE_MARK )
+            {
+                pRunScope = ost.GetGlobalScope();
+                uStartIdx = 1;
+            }
+            else
+                pRunScope = pStartScope;
+
+            vecComps.insert( vecComps.end(),
+                vecPrefixPath.begin(),
+                vecPrefixPath.end() );
+
+            bool bPathOk = true;
+            for( size_t i = uStartIdx;
+                 i < vecComps.size(); ++i )
+            {
+                const auto& strPart = vecComps[ i ];
+                SymVector vecOut;
+                ost.LookupAllLocal(
+                    strPart, pRunScope, vecOut );
+                ScopePtr pNext;
+                for( auto elem : vecOut )
+                {
+                    if( elem->m_strName == strPart &&
+                        elem->m_eKind == symNamespace )
+                    {
+                        pNext = elem->m_pDefScope;
+                        break;
+                    }
+                }
+                if( pNext.IsEmpty() )
+                {
+                    bPathOk = false;
+                    break;
+                }
+                pRunScope = pNext;
+            }
+
+            if( bPathOk && !pRunScope.IsEmpty() )
+            {
+                SymVector vecOut;
+                ost.LookupAllLocal(
+                    strName, pRunScope, vecOut );
+                for( auto elem : vecOut )
+                {
+                    if( elem->m_eKind == eKind &&
+                        elem->m_strName == strName )
+                    {
+                        pSym = elem;
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+
+    return -ENOENT;
+}
+
+bool IsCompositeType( gint32 iType )
+{
+    static gint32 arrTypes[] = {
+        stparser::RuleSubrange_type_decl,
+        stparser::RuleEnum_type_decl,
+        stparser::RuleString_type_decl,
+        stparser::TOK_STRUCT,
+        stparser::TOK_CLASS,
+        stparser::TOK_INTERFACE,
+        stparser::TOK_FUNCTION,
+        stparser::TOK_FUNCTION_BLOCK,
+        stparser::TOK_PROGRAM,
+        stparser::TOK_PROPERTY,
+        stparser::TOK_RESOURCE,
+        stparser::TOK_TASK,
+    };
+    constexpr size_t iSize =
+        sizeof( arrTypes )/sizeof( gint32 );
+    for( size_t i = 0; i < iSize; i++ )
+    {
+        if( iType == arrTypes[ i ] )
+            return true;
+    }
+    return false;
+}
+
+bool IsElementaryType( gint32 iType )
+{
+    return CStParser::IsElementaryType(
+        iType );
+}
+
+bool IsDirectType( gint32 iType )
+{
+    if( IsElementaryType( iType ) ||
+        IsCompositeType( iType ) )
+        return true;
+    return false;
+}
+
+bool IsRefType( gint32 iType )
+{ return iType == stparser::TOK_REF_TO; }
+
+bool IsArrayType( gint32 iType )
+{ return iType == stparser::TOK_ARRAY; }
+
+bool IsDerivedType( gint32 iType )
+{
+    return iType ==
+        stparser::RuleDerived_type_access;
+}
+
+gint32 ResolveTypeToDirectType(
+    CStParseContext* pCtx,
+    const std::vector<std::string>& vecNames,
+    enumSymKind eKind,
+    std::vector< ObjPtr >& vecUsings,
+    CStScope* pTopScope,
+    SymPtr& pSym, gint32& iType )
+{
+    gint32 ret = 0;
+    do{
+        SymPtr pCurSym;
+        CStTypeDeclNode* ptd1 = nullptr;
+        iType = -1;
+
+        ret = ResolveTypeRef( pCtx,
+            vecNames, eKind, vecUsings,
+            pTopScope, pCurSym );
+        if( ERROR( ret ) )
+            break;
+LBL_RESOLVE_SYMBOL:
+        ObjPtr pNode = pCurSym->m_pDeclNode;
+        if( pNode.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        CStTypeDeclNode* ptd = pNode;
+        if( ptd == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        
+        if( pSym.IsEmpty() )
+            pSym = pCurSym;
+
+        // declared from a direct type
+        if( ptd->IsTypeResolved() )
+        {
+            iType = ptd->m_iDirectType;
+            break;
+        }
+
+        // declared from a derived type W/O direct
+        // type initialization
+        if( IsDerivedType( ptd->m_iTypeId ) &&
+            ptd->m_oTypeRef.second != nullptr )
+        {
+            pCurSym = ptd->m_oTypeRef.second;
+            ret = 0;
+            goto LBL_RESOLVE_SYMBOL;
+        }
+        else if( IsRefType( ptd->m_iTypeId ) )
+        {
+            if( ptd->m_oTypeRef.second == nullptr )
+                break;
+            pCurSym = ptd->m_oTypeRef.second;
+            if( ptd1 == nullptr )
+            {
+                ptd1 = ptd;
+                ptd1->m_iRefRank = 1;
+            }
+            else
+            {
+                ptd1->m_iRefRank++;
+            }
+            goto LBL_RESOLVE_SYMBOL;
+        }
+        else if( IsArrayType( ptd->m_iTypeId ) )
+        {
+            if( ptd->m_oTypeRef.second == nullptr )
+                break;
+            pCurSym = ptd->m_oTypeRef.second;
+            goto LBL_RESOLVE_SYMBOL;
+        }
+
+        if( iType != -1 )
+            break;
+
+        ret = -ENOENT;
+        break;
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 ReplaceAmbiguousNode(
+    CStParseContext* pCtx,
+    CStAmbiguousTypeDeclNode* patd,
+    gint32 iDirectType,
+    ObjPtr& pNode )
+{
+    gint32 ret = 0;
+    if( pCtx == nullptr || patd == nullptr )
+        return -EINVAL;
+    do{
+        EnumClsid iClsid = clsid( Invalid );
+        if( IsElementaryType( iDirectType ) )
+        {
+            iClsid = 
+                clsid( CStSimpleTypeDeclNode);
+        }
+        else if( iDirectType ==
+            stparser::RuleSubrange_type_decl )
+        {
+            iClsid = 
+                clsid( CStSubrangeListNode);
+        }
+        else if( iDirectType ==
+            stparser::RuleEnum_type_decl )
+        {
+            iClsid = 
+                clsid( CStEnumTypeDeclNode );
+        }
+        else if( iDirectType == stparser::TOK_STRUCT )
+        {
+            iClsid = 
+                clsid( CStStructTypeDeclNode );
+        }
+        else if( iDirectType == stparser::TOK_ARRAY )
+        {
+            iClsid = 
+                clsid( CStArrayTypeDeclNode );
+        }
+        else if( iDirectType ==
+            stparser::TOK_STRING_TYPE ) 
+        {
+            iClsid = 
+                clsid( CStStringTypeDeclNode );
+        }
+        else if( iDirectType ==
+            stparser::RuleNamedval_type_decl ) 
+        {
+            iClsid = 
+                clsid( CStNamedvalTypeDeclNode );
+        }
+        else if( iDirectType ==
+            stparser::TOK_REF_TO ) 
+        {
+            iClsid = 
+                clsid( CStRefTypeDeclNode );
+        }
+        else
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        pNode.NewObj( iClsid );
+        auto ptd = ( CStTypeDeclNode* )pNode;
+        ( *ptd ) = *patd;
+        if( ptd->IsTypeResolved() )
+            ptd->m_pDtd.Clear();
+
+    }while( 0 );
+    return ret;
+}
+
+}
