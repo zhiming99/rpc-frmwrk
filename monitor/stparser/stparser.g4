@@ -1344,8 +1344,20 @@ int_type_name
     | unsigned_int_name
     ;
 
-subrange
-    : const_expr TOK_RANGE const_expr
+subrange returns [ ObjPtr pSubrange ]
+    : s=const_expr TOK_RANGE e=const_expr
+    {
+        ObjPtr pNode;
+        gint32 ret = pNode.NewObj(
+            clsid( CStSubrangeNode ) );
+        if( SUCCEEDED( ret ) )
+        {
+            CStSubrangeNode* psr = pNode;
+            psr->m_pStart = $s.pExpr;
+            psr->m_pEnd = $e.pExpr;
+            $pSubrange = pNode;
+        }
+    }
     ;
 
 enum_type_name
@@ -1403,16 +1415,107 @@ namedval_type_access
     ;
     
 array_type_decl returns [ ObjPtr pTypeDecl ]
-    : array_type_name TOK_COLON array_spec_init
+    : atn=array_type_name TOK_COLON asi=array_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$asi.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+            gint32 iSpec = -1;
+
+            initInfo.GetObjPtr( 2, pTypeInit );
+            initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr( 999, pTypeData );
+            initInfo.GetIntProp(
+                1000, ( guint32& )iSpec );
+
+            if( iSpec == RuleArray_spec )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStArrayTypeDeclNode ) );
+            }
+            else
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            if( ERROR( ret ) )
+                break;
+
+            CStTypeDeclNode* ptd = pNode;
+            ptd->m_pTypeInit = pTypeInit;
+            ptd->m_oTypeRef = { strType, nullptr };
+            if( iSpec == RuleArray_spec )
+                ptd->m_iTypeId = TOK_ARRAY;
+            else
+                ptd->m_iTypeId = iType;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare( $atn.text,
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $atn.start, $asi.stop );
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-array_spec_init
-    : array_spec (TOK_ASSIGN array_init)?
+array_spec_init returns [ ObjPtr pTypeInfo ]
+    : spec=array_spec (TOK_ASSIGN array_init)?
+    {
+        $pTypeInfo = $spec.pTypeInfo;
+        CParamList oParams(
+            ( IConfigDb* )$pTypeInfo );
+        // The array initializer is not built yet, keep the
+        // slot consistently as simple_spec_init does.
+        oParams.Push( ObjPtr() );
+    }
     ;
 
-array_spec
-    : TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF data_type_access
-    | array_type_access
+array_spec returns [ ObjPtr pTypeInfo ]
+    : TOK_ARRAY TOK_LBRACKET rl=range_list TOK_RBRACKET
+      TOK_OF dta=data_type_access
+    {
+        CParamList oParams;
+        oParams.Push( $dta.typePair.first );
+        oParams.Push( $dta.typePair.second );
+        if( !$rl.pRangeList.IsEmpty() )
+            oParams.SetObjPtr( 999, $rl.pRangeList );
+        oParams.SetIntProp( 1000, RuleArray_spec );
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | ata=array_type_access
+    {
+        CParamList oParams;
+        oParams.Push( $ata.ctx->getText() );
+        oParams.Push(
+            ( guint32 )RuleDerived_type_access );
+        oParams.SetIntProp(
+            1000, RuleArray_type_access );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 array_type_access
@@ -1423,8 +1526,31 @@ array_var_decl_init
     : variable_list TOK_COLON array_spec_init
     ;
 
-range_list
-    : subrange ( TOK_COMMA subrange )*
+range_list returns [ ObjPtr pRangeList ]
+    : first=subrange ( TOK_COMMA rest+=subrange )*
+    {
+        ObjPtr pList;
+        gint32 ret = pList.NewObj(
+            clsid( CStSubrangeListNode ) );
+        if( SUCCEEDED( ret ) )
+        {
+            CStSubrangeListNode* prl = pList;
+            if( !$first.pSubrange.IsEmpty() )
+                prl->m_vecRanges.push_back(
+                    $first.pSubrange );
+            for( size_t i = 0;
+                i < $rest.size(); i++ )
+            {
+                auto* pCtx = $rest[ i ];
+                if( pCtx == nullptr ||
+                    pCtx->pSubrange.IsEmpty() )
+                    continue;
+                prl->m_vecRanges.push_back(
+                    pCtx->pSubrange );
+            }
+            $pRangeList = pList;
+        }
+    }
     ;
 
 array_init
@@ -1970,7 +2096,7 @@ std_func_name
     ;
 
 func_access
-    : derived_func_name
+    : ( namespace_hierarchy TOK_DOT )? derived_func_name
     ;
 
 // Global var decl
