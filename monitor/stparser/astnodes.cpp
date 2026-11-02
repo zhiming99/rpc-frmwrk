@@ -130,8 +130,7 @@ std::string CStDataTypeDeclNode::GetNodeInfo() const
 gint32 CStDataTypeDeclNode::ResolveUsingNs(
     void* pctx )
 {
-    return rpcf::ResolveUsingNs(
-        pctx, ObjPtr( this ) );
+    return rpcf::ResolveUsingNs( pctx, ObjPtr() );
 }
 
 gint32 CStDataTypeDeclNode::ResolveType(
@@ -494,8 +493,9 @@ bool CStNamespaceDecl::IsNamedNamespace() const
 
 gint32 CStNamespaceDecl::ResolveUsingNs( void* pctx )
 {
+    CStScope* pScope = m_pSymbol->m_pScope;
     return rpcf::ResolveUsingNs(
-        pctx, ObjPtr( this ) );
+        pctx, ObjPtr( pScope ) );
 }
 
 

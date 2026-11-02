@@ -561,7 +561,6 @@ gint32 ResolveUsingNs(
 gint32 ResolveTypeRef( CStParseContext* pctx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
-    std::vector< ObjPtr >& vecUsings,
     CStScope* pCurScope,
     SymPtr& pSym );
 
@@ -574,7 +573,6 @@ gint32 ResolveTypeToDirectType(
     CStParseContext* pctx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
-    std::vector< ObjPtr >& vecUsings,
     CStScope* pCurScope,
     SymPtr& pSym, gint32& iType );
 

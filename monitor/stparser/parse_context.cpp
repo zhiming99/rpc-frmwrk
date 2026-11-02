@@ -1112,7 +1112,7 @@ ObjPtr ResolveNsPrefix(
     while( pScope != nullptr )
     {
         if( ( pScope->m_eKind == scopeNamespace ||
-              pScope->m_eKind == scopeGlobal ) &&
+            pScope->m_eKind == scopeGlobal ) &&
             !pScope->m_pSymbol.IsEmpty() )
             return pScope->m_pSymbol->m_pDeclNode;
         pScope = pScope->m_pParent;
@@ -1121,20 +1121,14 @@ ObjPtr ResolveNsPrefix(
     return pResult; // Return null if unfound
 }
 
-static std::vector< ObjPtr >
-GetUsingNs( ObjPtr& pObj )
+static std::vector< USINGS_ARR >&
+GetUsingsArr( CStScope* pScope )
 {
-    CStNamespaceDecl* pnsd = pObj;
-    if( pnsd != nullptr )
-        return pnsd->m_vecUsings;
-    CStDataTypeDeclNode* pdtd = pObj;
-    if( pdtd != nullptr )
-        return pdtd->m_vecUsings;
-    return std::vector< ObjPtr >();
+    return pScope->m_vecUsingsArr; 
 }
 
 gint32 ResolveUsingNs(
-    void* pctx, ObjPtr pHostNode )
+    void* pctx, ObjPtr pScopeIn )
 {
     gint32 ret = 0;
     do{
@@ -1143,45 +1137,51 @@ gint32 ResolveUsingNs(
         auto ost = pCtx->m_oSymTab;
         DebugPrint( ret, "Entering ResolveUsingNs" );
         bool bUnresolved = false;
-        auto vecUsings = GetUsingNs( pHostNode );
-        for( auto pObj : vecUsings )
+        auto pScope = pScopeIn;
+        if( pScope.IsEmpty() )
+            pScope = ost.GetCurrentScope();
+        auto vecUsingsArr = GetUsingsArr( pScope );
+        for( auto& vecUsings : vecUsingsArr )
         {
-            CStUsingDirective* pud = pObj;
-            if( pud == nullptr )
-                continue;
-            auto& vecNames = pud->m_vecNamespaces;
-            for( auto& elem: vecNames )
+            for( auto pObj : vecUsings )
             {
-                if( !elem.second.IsEmpty() )
+                CStUsingDirective* pud = pObj;
+                if( pud == nullptr )
                     continue;
-
-                auto vecComps = 
-                    ost.BreakdownQualified( elem.first );
-
-                if( vecComps.empty() )
-                    continue;
-
-                auto pSym = CStNamespaceDecl::ResolvePath(
-                    vecComps, pctx );
-                if( !pSym.IsEmpty() )
+                auto& vecNames = pud->m_vecNamespaces;
+                for( auto& elem: vecNames )
                 {
-                    elem.second = SymPtr( pSym );
-                    DebugPrint( 0,
-                    "Resoved namespace reference %s",
-                    elem.first.c_str() );
-                }
-                else
-                {
-                    DebugPrint( 0,
-                    "undefined namespace reference %s",
-                    elem.first.c_str() );
-                    bUnresolved = true;
+                    if( !elem.second.IsEmpty() )
+                        continue;
+
+                    auto vecComps = 
+                        ost.BreakdownQualified( elem.first );
+
+                    if( vecComps.empty() )
+                        continue;
+
+                    auto pSym = CStNamespaceDecl::ResolvePath(
+                        vecComps, pctx );
+                    if( !pSym.IsEmpty() )
+                    {
+                        elem.second = SymPtr( pSym );
+                        DebugPrint( 0,
+                        "Resoved namespace reference %s",
+                        elem.first.c_str() );
+                    }
+                    else
+                    {
+                        DebugPrint( 0,
+                        "undefined namespace reference %s",
+                        elem.first.c_str() );
+                        bUnresolved = true;
+                    }
                 }
             }
         }
         if( bUnresolved )
         {
-            ost.AddUnsolved( pHostNode,
+            ost.AddUnsolved( pScopeIn,
                 ([]( ObjPtr& pObj, void* pctx )->gint32
                 {
                     return ResolveUsingNs( pctx, pObj );
@@ -1194,7 +1194,6 @@ gint32 ResolveUsingNs(
 gint32 ResolveTypeRef( CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
-    std::vector< ObjPtr >& vecUsings,
     CStScope* pTopScope,
     SymPtr& pSym )
 {
@@ -1324,76 +1323,79 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
     }
 
     // 4. IMPORTED DIRECTIVES PASS (Evaluate USING)
-    for( auto pObj : vecUsings )
+    auto vecUsingsArr = GetUsingsArr( pTopScope );
+    for( auto vecUsings : vecUsingsArr )
     {
-        CStUsingDirective* pud = pObj;
-        if( pud == nullptr )
-            continue;
-
-        for( auto& elem : pud->m_vecNamespaces )
+        for( auto pObj : vecUsings )
         {
-            if( !elem.second.IsEmpty() )
+            CStUsingDirective* pud = pObj;
+            if( pud == nullptr )
                 continue;
 
-            auto vecComps = ost.BreakdownQualified(
-                elem.first
-            );
-            if( vecComps.empty() )
-                continue;
-
-            ScopePtr pRunScope;
-            size_t uStartIdx = 0;
-            
-            if( vecComps[ 0 ] == GLOBAL_SCOPE_MARK )
+            for( auto& elem : pud->m_vecNamespaces )
             {
-                pRunScope = ost.GetGlobalScope();
-                uStartIdx = 1;
-            }
-            else
-                pRunScope = pStartScope;
+                if( !elem.second.IsEmpty() )
+                    continue;
 
-            vecComps.insert( vecComps.end(),
-                vecPrefixPath.begin(),
-                vecPrefixPath.end() );
+                auto vecComps = ost.BreakdownQualified(
+                    elem.first );
+                if( vecComps.empty() )
+                    continue;
 
-            bool bPathOk = true;
-            for( size_t i = uStartIdx;
-                 i < vecComps.size(); ++i )
-            {
-                const auto& strPart = vecComps[ i ];
-                SymVector vecOut;
-                ost.LookupAllLocal(
-                    strPart, pRunScope, vecOut );
-                ScopePtr pNext;
-                for( auto elem : vecOut )
+                ScopePtr pRunScope;
+                size_t uStartIdx = 0;
+                
+                if( vecComps[ 0 ] == GLOBAL_SCOPE_MARK )
                 {
-                    if( elem->m_strName == strPart &&
-                        elem->m_eKind == symNamespace )
+                    pRunScope = ost.GetGlobalScope();
+                    uStartIdx = 1;
+                }
+                else
+                    pRunScope = pStartScope;
+
+                vecComps.insert( vecComps.end(),
+                    vecPrefixPath.begin(),
+                    vecPrefixPath.end() );
+
+                bool bPathOk = true;
+                for( size_t i = uStartIdx;
+                     i < vecComps.size(); ++i )
+                {
+                    const auto& strPart = vecComps[ i ];
+                    SymVector vecOut;
+                    ost.LookupAllLocal(
+                        strPart, pRunScope, vecOut );
+                    ScopePtr pNext;
+                    for( auto elem : vecOut )
                     {
-                        pNext = elem->m_pDefScope;
+                        if( elem->m_strName == strPart &&
+                            elem->m_eKind == symNamespace )
+                        {
+                            pNext = elem->m_pDefScope;
+                            break;
+                        }
+                    }
+                    if( pNext.IsEmpty() )
+                    {
+                        bPathOk = false;
                         break;
                     }
+                    pRunScope = pNext;
                 }
-                if( pNext.IsEmpty() )
-                {
-                    bPathOk = false;
-                    break;
-                }
-                pRunScope = pNext;
-            }
 
-            if( bPathOk && !pRunScope.IsEmpty() )
-            {
-                SymVector vecOut;
-                ost.LookupAllLocal(
-                    strName, pRunScope, vecOut );
-                for( auto elem : vecOut )
+                if( bPathOk && !pRunScope.IsEmpty() )
                 {
-                    if( elem->m_eKind == eKind &&
-                        elem->m_strName == strName )
+                    SymVector vecOut;
+                    ost.LookupAllLocal(
+                        strName, pRunScope, vecOut );
+                    for( auto elem : vecOut )
                     {
-                        pSym = elem;
-                        return 0;
+                        if( elem->m_eKind == eKind &&
+                            elem->m_strName == strName )
+                        {
+                            pSym = elem;
+                            return 0;
+                        }
                     }
                 }
             }
@@ -1459,21 +1461,30 @@ gint32 ResolveTypeToDirectType(
     CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
-    std::vector< ObjPtr >& vecUsings,
     CStScope* pTopScope,
     SymPtr& pSym, gint32& iType )
 {
     gint32 ret = 0;
+    if( pCtx == nullptr || vecNames.empty() )
+        return -EINVAL;
+    if( pTopScope == nullptr )
+    {
+        pTopScope =
+            pCtx->m_oSymTab.GetCurrentScope();
+    }
+
     do{
         SymPtr pCurSym;
         CStTypeDeclNode* ptd1 = nullptr;
         iType = -1;
 
         ret = ResolveTypeRef( pCtx,
-            vecNames, eKind, vecUsings,
+            vecNames, eKind,
             pTopScope, pCurSym );
+
         if( ERROR( ret ) )
             break;
+
 LBL_RESOLVE_SYMBOL:
         ObjPtr pNode = pCurSym->m_pDeclNode;
         if( pNode.IsEmpty() )

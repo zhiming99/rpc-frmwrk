@@ -659,7 +659,6 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
     typedef CStAstNodeBase super;
 
     CStScope* m_pScope;
-    std::vector< ObjPtr > m_vecUsings;
     std::vector< CStTypeDeclNode* > m_vecTypeDecls;
 
     CStDataTypeDeclNode() : super()
@@ -667,8 +666,8 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
 
     gint32 ResolveUsingNs( void* pCtx );
     virtual std::string GetNodeInfo() const override;
-    gint32 ResolveType( void* pCtx,
-        CStTypeDeclNode* ptd );
+    gint32 ResolveType(
+        void* pCtx, CStTypeDeclNode* ptd );
 };
 
 /**
@@ -1300,15 +1299,21 @@ struct CStMethodDecl : public CStPouDeclNode
  */
 struct CStSymbol;
 
-
-struct CStNamespaceDecl : public CStAstNodeBase
+struct CStScopeNodeDecl : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
+    CStSymbol* m_pSymbol = nullptr;
 
-    CStSymbol* m_pSymbol;
-    std::vector< ObjPtr > m_vecElements;
-    // std::vector< ObjPtr > m_vecDeclarations;
-    std::vector< ObjPtr > m_vecUsings;
+    CStScopeNodeDecl() : super()
+    {}
+};
+
+struct CStNamespaceDecl : public CStScopeNodeDecl
+{
+    typedef CStScopeNodeDecl super;
+
+    // array of namespace elements
+    std::vector< ObjPtr > m_vecnse;
 
     CStNamespaceDecl() : super()
     { SetClassId( clsid( CStNamespaceDecl ) ); }

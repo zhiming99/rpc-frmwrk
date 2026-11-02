@@ -265,6 +265,7 @@ typedef std::vector< SymPtr > SymVector;
 struct CStScope;
 typedef CAutoPtr< clsid( CStScope ), CStScope > ScopePtr;
 
+using USINGS_ARR=std::vector<ObjPtr>;
 struct CStScope : public CObjBase
 {
     enumScopeKind m_eKind;
@@ -283,6 +284,8 @@ struct CStScope : public CObjBase
     // are checked for duplicates at declare time,
     // which keeps these names unique
     std::map< std::string, ScopePtr > m_mapChildren;
+
+    std::vector< USINGS_ARR > m_vecUsingsArr;
 
     CStScope() : m_eKind( scopeInvalid ),
         m_pParent( nullptr )
@@ -341,6 +344,16 @@ struct CStScope : public CObjBase
             return ScopePtr();
         return itr->second;
     }
+
+    inline void PushUsingArr(
+        USINGS_ARR& vecUsings )
+    {
+        if( vecUsings.size() )
+            m_vecUsingsArr.push_back( vecUsings );
+    }
+
+    inline void PopUsingArr()
+    { m_vecUsingsArr.pop_back(); }
 };
 
 /**

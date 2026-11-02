@@ -95,12 +95,16 @@ decl_set
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
             auto pGlobal = ost.GetGlobalScope();
+
+            CStScope* pScope = pGlobal;
+            USINGS_ARR vecUsings = { $ud.pNode };
+            pScope->PushUsingArr( vecUsings );
+
             auto pSym = pGlobal->m_pSymbol;
             auto pNode = pSym->m_pDeclNode;
             auto pnsd = ( CStNamespaceDecl* )pNode;
             if( pnsd )
             {
-                pnsd->m_vecUsings.push_back( $ud.pNode );
                 std::string strFullPath =
                     GetReconstructedText(
                         $ud.ctx, _input, 1, 1 );
@@ -164,7 +168,9 @@ namespace_decl
                 strNsName = $rest.back()->getText();
             else
                 strNsName = $first.text;
-            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto pScope =
+                pCtx->m_oSymTab.GetCurrentScope();
+
             auto& pSym = pScope->m_pSymbol;
             if( pSym->m_strName != strNsName )
             {
@@ -174,9 +180,7 @@ namespace_decl
             }
             else
             {
-                CStNamespaceDecl* pnsd =
-                    pSym->m_pDeclNode;
-                pnsd->m_vecUsings = $uds.vecUsings;
+                pScope->PushUsingArr( $uds.vecUsings );
             }
         }})?
         namespace_elements
@@ -485,6 +489,7 @@ primary_expr
     | enum_value
     | namedval_value
     | func_call
+    | invocation
     | ref_value
     | TOK_LPAREN expression TOK_RPAREN
     ;
@@ -1063,13 +1068,14 @@ data_type_decl
         ObjPtr pObj;
         pObj.NewObj( clsid( CStDataTypeDeclNode ) );
         auto pdtd = ( CStDataTypeDeclNode* )pObj;
-        pdtd->m_pScope = ost.GetCurrentScope();
+        auto pScope = ost.GetCurrentScope();
+        pdtd->m_pScope = pScope;
 
     }
     opt_internal
     (uds = using_directive_list
     {{
-        pdtd->m_vecUsings = $uds.vecUsings;
+        pScope->PushUsingArr( $uds.vecUsings );
         pdtd->ResolveUsingNs( pCtx );
     }})?
     tds = type_decls
@@ -1100,11 +1106,10 @@ data_type_decl
                 auto pdtd = ( CStDataTypeDeclNode* )
                     ptd->m_pDtd;
 
+                auto pScope = pdtd->m_pScope;
                 auto ret = ResolveTypeToDirectType(
                     pCtx, vecComps, symDataType,
-                    pdtd->m_vecUsings,
-                    pdtd->m_pScope,
-                    pSym, iType );
+                    pScope, pSym, iType );
 
                 if( !pSym.IsEmpty() )
                     ptd->m_oTypeRef.second = pSym;
