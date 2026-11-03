@@ -660,6 +660,7 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
 
     CStScope* m_pScope;
     std::vector< CStTypeDeclNode* > m_vecTypeDecls;
+    std::vector< ObjPtr > m_vecUsings;
 
     CStDataTypeDeclNode() : super()
     { SetClassId( clsid( CStDataTypeDeclNode ) ); }

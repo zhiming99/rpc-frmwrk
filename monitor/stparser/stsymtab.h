@@ -353,7 +353,10 @@ struct CStScope : public CObjBase
     }
 
     inline void PopUsingArr()
-    { m_vecUsingsArr.pop_back(); }
+    {
+        if( m_vecUsingsArr.size() )
+            m_vecUsingsArr.pop_back();
+    }
 };
 
 /**

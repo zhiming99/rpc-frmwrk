@@ -546,6 +546,11 @@ enum enumPathStop
  * @param pCtx     the CStParseContext carrying the symbol table
  * @param iPos     [out] index of the last resolved component
  * @param eStop    [out] why the walk stopped, see enumPathStop
+ * @param pBaseScope the scope the lexical walk starts from.  A
+ *                 relative path is resolved from there and then
+ *                 from each of its enclosing scopes.  Pass nullptr
+ *                 to start from the current scope, which is what
+ *                 a fresh name in the source text needs.
  * @return the resolved symbol on success, otherwise the innermost
  *         CStNamespaceDecl reached
  */
@@ -553,11 +558,32 @@ ObjPtr ResolveNsPrefix(
     const std::vector<std::string>& vecNames,
     void* pCtx,
     size_t& iPos,
-    enumPathStop& eStop );
+    enumPathStop& eStop,
+    CStScope* pBaseScope = nullptr );
 
 gint32 ResolveUsingNs(
     void* pctx, ObjPtr pHostNode );
 
+/**
+ * @brief Resolve a possibly qualified name to a symbol
+ *
+ * An absolute name (leading '_') is resolved from the global
+ * scope only.  A relative name is resolved level by level,
+ * starting from pCurScope (or the current scope when null):
+ * at each level the scope's own declarations are searched
+ * first and its USING lists right after, so names imported by
+ * a USING behave as if they were declared in the scope that
+ * holds the directive.  The nearest level that binds the name
+ * wins; a USING at an inner level therefore beats a lexical
+ * declaration in an enclosing one.
+ *
+ * @param pctx      the CStParseContext carrying the symbol table
+ * @param vecNames  the name components, e.g. {"A","B","T"}
+ * @param eKind     the symbol kind to match
+ * @param pCurScope the scope to start from, nullptr for the
+ *                  current scope
+ * @param pSym      [out] the resolved symbol
+ */
 gint32 ResolveTypeRef( CStParseContext* pctx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,

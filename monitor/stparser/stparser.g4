@@ -1075,7 +1075,7 @@ data_type_decl
     opt_internal
     (uds = using_directive_list
     {{
-        pScope->PushUsingArr( $uds.vecUsings );
+        pdtd->m_vecUsings = $uds.vecUsings;
         pdtd->ResolveUsingNs( pCtx );
     }})?
     tds = type_decls
@@ -1107,6 +1107,7 @@ data_type_decl
                     ptd->m_pDtd;
 
                 auto pScope = pdtd->m_pScope;
+                pScope->PushUsingArr( pdtd->m_vecUsings );
                 auto ret = ResolveTypeToDirectType(
                     pCtx, vecComps, symDataType,
                     pScope, pSym, iType );
@@ -1124,7 +1125,7 @@ data_type_decl
                     ReplaceAmbiguousNode(
                         pCtx, pObj, iType, pNewNode );
                 }
-
+                pScope->PopUsingArr();
                 return ret;
             });
             ret = func( pType, pCtx );
@@ -1132,8 +1133,7 @@ data_type_decl
             {
                 CStTypeDeclNode* ptd = pType;             
                 auto pSym = ptd->m_pSymbol;
-                ost.AddUnsolved(
-                    pType, func, pSym );
+                ost.AddUnsolved( pType, func, pSym );
             }
         }
     }

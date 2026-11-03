@@ -130,7 +130,15 @@ std::string CStDataTypeDeclNode::GetNodeInfo() const
 gint32 CStDataTypeDeclNode::ResolveUsingNs(
     void* pctx )
 {
-    return rpcf::ResolveUsingNs( pctx, ObjPtr() );
+    auto pCtx = static_cast< CStParseContext* >(pctx );
+    ScopePtr pScope =
+        pCtx->m_oSymTab.GetCurrentScope();
+    if( !pScope.IsEmpty() )
+        pScope->PushUsingArr( m_vecUsings );
+    gint32 ret = rpcf::ResolveUsingNs( pctx, ObjPtr() );
+    if( !pScope.IsEmpty() )
+        pScope->PopUsingArr();
+    return ret;
 }
 
 gint32 CStDataTypeDeclNode::ResolveType(
@@ -493,7 +501,7 @@ bool CStNamespaceDecl::IsNamedNamespace() const
 
 gint32 CStNamespaceDecl::ResolveUsingNs( void* pctx )
 {
-    CStScope* pScope = m_pSymbol->m_pScope;
+    CStScope* pScope = m_pSymbol->m_pDefScope;
     return rpcf::ResolveUsingNs(
         pctx, ObjPtr( pScope ) );
 }
