@@ -203,7 +203,7 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "LValueExtNode";
     if( eClsid == clsid( CStInstancePathNode ) )
         return "InstancePathNode";
-    if( eClsid == clsid( CStFullExpressionNode ) )
+    if( eClsid == clsid( CStExpressionNode ) )
         return "FullExpressionNode";
     if( eClsid == clsid( CStSubrangeNode ) )
         return "SubrangeNode";
@@ -425,7 +425,7 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
         if( p )
             oss << "path=" << p->GetDottedName();
     }
-    else if( eClsid == clsid( CStFullExpressionNode ) )
+    else if( eClsid == clsid( CStExpressionNode ) )
     {
         oss << "full_expr";
     }
@@ -879,9 +879,9 @@ void DumpAstTree(
         if( p )
             DumpAstTree( p->m_pExpression, os, iDepth + 1, strIndent );
     }
-    else if( eClsid == clsid( CStFullExpressionNode ) )
+    else if( eClsid == clsid( CStExpressionNode ) )
     {
-        CStFullExpressionNode* p = dynamic_cast< CStFullExpressionNode* >( pBase );
+        CStExpressionNode* p = dynamic_cast< CStExpressionNode* >( pBase );
         if( p )
             DumpAstTree( p->m_pExpression, os, iDepth + 1, strIndent );
     }

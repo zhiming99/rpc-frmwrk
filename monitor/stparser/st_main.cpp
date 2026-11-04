@@ -85,7 +85,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStLValueNode );
     INIT_MAP_ENTRY( CStLValueExtNode );
     INIT_MAP_ENTRY( CStInstancePathNode );
-    INIT_MAP_ENTRY( CStFullExpressionNode );
+    INIT_MAP_ENTRY( CStExpressionNode );
+    INIT_MAP_ENTRY( CStPrimaryExprNode );
     INIT_MAP_ENTRY( CStSubrangeNode );
     INIT_MAP_ENTRY( CStSubrangeListNode );
     INIT_MAP_ENTRY( CStStmtListNode );

@@ -253,7 +253,7 @@ std::string CStInstancePathNode::GetNodeInfo() const
 // CStFullExpressionNode Implementation
 // ========================================================================
 
-std::string CStFullExpressionNode::GetNodeInfo() const
+std::string CStExpressionNode::GetNodeInfo() const
 {
     std::ostringstream oss;
     oss << "FullExpr{ ";
@@ -265,7 +265,7 @@ std::string CStFullExpressionNode::GetNodeInfo() const
     return oss.str();
 }
 
-std::string CStFullExpressionNode::GetSignature() const
+std::string CStExpressionNode::GetSignature() const
 {
     CStExprNode* pInner = m_pExpression;
     if( pInner != nullptr )

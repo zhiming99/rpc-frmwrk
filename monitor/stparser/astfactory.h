@@ -299,8 +299,8 @@ public:
         const YYLTYPE2& oLoc )
     {
         ObjPtr pNode;
-        pNode.NewObj( clsid( CStFullExpressionNode ) );
-        CStFullExpressionNode* p = pNode;
+        pNode.NewObj( clsid( CStExpressionNode ) );
+        CStExpressionNode* p = pNode;
         if( p != nullptr )
         {
             p->m_pExpression = pExpression;
@@ -1029,7 +1029,7 @@ inline CStAstFactory* GetAstFactory( CSTParserContext* pCtx )
  */
 inline ObjPtr UnwrapFullExpression( ObjPtr pExpr )
 {
-    CStFullExpressionNode* pWrapper = pExpr;
+    CStExpressionNode* pWrapper = pExpr;
     if( pWrapper != nullptr )
     {
         ObjPtr pInner = pWrapper->m_pExpression;

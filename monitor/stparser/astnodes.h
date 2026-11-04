@@ -398,17 +398,32 @@ struct CStInstancePathNode : public CStAstNodeBase
  * Expression-internal consumers (parenthesized factors, array indices,
  * subrange bounds) unwrap it via UnwrapFullExpression().
  */
-struct CStFullExpressionNode : public CStExprNode
+struct CStExpressionNode : public CStExprNode
 {
     typedef CStExprNode super;
 
     ObjPtr m_pExpression;
 
-    CStFullExpressionNode() : super()
-    { SetClassId( clsid( CStFullExpressionNode ) ); }
+    CStExpressionNode() : super()
+    { SetClassId( clsid( CStExpressionNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
     virtual std::string GetSignature() const override;
+};
+
+struct CStPrimaryExprNode : public CStExprNode
+{
+    typedef CStExprNode super;
+
+    ObjPtr m_pExpression;
+
+    CStPrimaryExprNode() : super()
+    { SetClassId( clsid( CStPrimaryExprNode ) ); }
+
+    virtual std::string GetNodeInfo() const override
+    { return ""; }
+    virtual std::string GetSignature() const override
+    { return ""; }
 };
 
 /**
@@ -646,31 +661,6 @@ struct CStEnumValueListNode : public CStAstNodeBase
     virtual std::string GetNodeInfo() const override;
 };
 
-struct CStTypeDeclNode;
-/**
- * @brief Data type specification wrapper node
- *
- * This node wraps various type specifications (basic types, strings, implicit enums)
- * into a uniform node for use in type_spec. This allows type_spec to have a
- * consistent child type instead of handling multiple node type variants.
- */
-struct CStDataTypeDeclNode : public CStAstNodeBase
-{
-    typedef CStAstNodeBase super;
-
-    CStScope* m_pScope;
-    std::vector< CStTypeDeclNode* > m_vecTypeDecls;
-    std::vector< ObjPtr > m_vecUsings;
-
-    CStDataTypeDeclNode() : super()
-    { SetClassId( clsid( CStDataTypeDeclNode ) ); }
-
-    gint32 ResolveUsingNs( void* pCtx );
-    virtual std::string GetNodeInfo() const override;
-    gint32 ResolveType(
-        void* pCtx, CStTypeDeclNode* ptd );
-};
-
 /**
  * @brief type_decl wrapper node
  *
@@ -708,6 +698,30 @@ struct CStTypeDeclNode :
     { return ( this->m_iDirectType != -1  ); }
 
     virtual std::string GetNodeInfo() const override;
+};
+
+/**
+ * @brief Data type specification wrapper node
+ *
+ * This node wraps various type specifications (basic types, strings, implicit enums)
+ * into a uniform node for use in type_spec. This allows type_spec to have a
+ * consistent child type instead of handling multiple node type variants.
+ */
+struct CStDataTypeDeclNode : public CStAstNodeBase
+{
+    typedef CStAstNodeBase super;
+
+    CStScope* m_pScope;
+    std::vector< CStTypeDeclNode* > m_vecTypeDecls;
+    std::vector< ObjPtr > m_vecUsings;
+
+    CStDataTypeDeclNode() : super()
+    { SetClassId( clsid( CStDataTypeDeclNode ) ); }
+
+    gint32 ResolveUsingNs( void* pCtx );
+    virtual std::string GetNodeInfo() const override;
+    gint32 ResolveType(
+        void* pCtx, CStTypeDeclNode* ptd );
 };
 
 struct CStAmbiguousTypeDeclNode :
@@ -2060,7 +2074,7 @@ REGISTER_AST_NODE( CStPointerMemberExpr );
 REGISTER_AST_NODE( CStLValueNode );
 REGISTER_AST_NODE( CStLValueExtNode );
 REGISTER_AST_NODE( CStInstancePathNode );
-REGISTER_AST_NODE( CStFullExpressionNode );
+REGISTER_AST_NODE( CStExpressionNode );
 REGISTER_AST_NODE( CStSubrangeNode );
 REGISTER_AST_NODE( CStSubrangeListNode );
 REGISTER_AST_NODE( CStStmtListNode );
