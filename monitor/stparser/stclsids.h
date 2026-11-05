@@ -102,7 +102,6 @@ typedef enum
     // AST Other Declaration Nodes
     DECL_CLSID( CStNamespaceDecl ),
     DECL_CLSID( CStInterfaceDecl ),
-    DECL_CLSID( CStTypeDecl ),
     DECL_CLSID( CStVarConfigDecl ),
     DECL_CLSID( CStTaskConfigNode ),
     DECL_CLSID( CStTaskConfigListNode ),

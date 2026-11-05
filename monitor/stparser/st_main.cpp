@@ -138,7 +138,6 @@ static FactoryPtr InitClassFactory()
     // AST Other Declaration Nodes
     INIT_MAP_ENTRY( CStNamespaceDecl );
     INIT_MAP_ENTRY( CStInterfaceDecl );
-    INIT_MAP_ENTRY( CStTypeDecl );
     INIT_MAP_ENTRY( CStVarConfigDecl );
     INIT_MAP_ENTRY( CStTaskConfigNode );
     INIT_MAP_ENTRY( CStTaskConfigListNode );

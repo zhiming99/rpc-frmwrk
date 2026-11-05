@@ -109,14 +109,20 @@ decl_set
                     GetReconstructedText(
                         $ud.ctx, _input, 1, 1 );
                 DebugPrint( $ud.start->getLine(),
-                "haha, added namespaces references to "
-                "global namespace: %s",
-                strFullPath.c_str() );
-                pnsd->ResolveUsingNs( pCtx );
+                    "haha, added namespaces references to "
+                    "global namespace: %s",
+                    strFullPath.c_str() );
+                auto ret = pnsd->ResolveUsingNs( pCtx );
+                if( ERROR( ret ) )
+                {
+                    ost.AddUnsolved( pSym->m_pDeclNode,
+                    ([]( ObjPtr& pObj, void* pctx )->gint32
+                    {
+                        CStNamespaceDecl* pnsd = pObj;
+                        return pnsd->ResolveUsingNs( pctx );
+                    }));
+                }
             }
-            // TODO add resolving namespace reference
-            // code if the namespace is not declared
-            // yet.
         })
     | TOK_PRAGMA
     ;
@@ -191,12 +197,22 @@ namespace_decl
             DebugPrint( 0, "Current line %d", lineno);
             auto pParser = static_cast< CStParser* >( this );
             auto pCtx = pParser->GetParseContext();
-            auto pScope = pCtx->m_oSymTab.GetCurrentScope();
+            auto ost = pCtx->m_oSymTab;
+            auto pScope = ost.GetCurrentScope();
             auto& pSym = pScope->m_pSymbol;
             pSym->SetTokens(
                 $TOK_NAMESPACE, $TOK_END_NAMESPACE );
             CStNamespaceDecl* pnsd = pSym->m_pDeclNode;
-            pnsd->ResolveUsingNs( pCtx );
+            auto ret = pnsd->ResolveUsingNs( pCtx );
+            if( ERROR( ret ) )
+            {
+                ost.AddUnsolved( pSym->m_pDeclNode,
+                ([]( ObjPtr& pObj, void* pctx )->gint32
+                {
+                    CStNamespaceDecl* pnsd = pObj;
+                    return pnsd->ResolveUsingNs( pctx );
+                }));
+            }
             pCtx->LeaveNamespace( $first.text, $rest );
         }}
     ;
@@ -1076,7 +1092,16 @@ data_type_decl
     (uds = using_directive_list
     {{
         pdtd->m_vecUsings = $uds.vecUsings;
-        pdtd->ResolveUsingNs( pCtx );
+        auto ret = pdtd->ResolveUsingNs( pCtx );
+        if( ERROR( ret ) )
+        {
+            ost.AddUnsolved( pObj,
+            ([]( ObjPtr& pObj, void* pctx )->gint32
+            {
+                auto pdtd = ( CStDataTypeDeclNode* )pObj;
+                return pdtd->ResolveUsingNs( pctx );
+            }));
+        }
     }})?
     tds = type_decls
     {

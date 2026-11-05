@@ -135,7 +135,8 @@ gint32 CStDataTypeDeclNode::ResolveUsingNs(
         pCtx->m_oSymTab.GetCurrentScope();
     if( !pScope.IsEmpty() )
         pScope->PushUsingArr( m_vecUsings );
-    gint32 ret = rpcf::ResolveUsingNs( pctx, ObjPtr() );
+    gint32 ret = rpcf::ResolveUsingNs(
+        pctx, ObjPtr( pScope ) );
     if( !pScope.IsEmpty() )
         pScope->PopUsingArr();
     return ret;
@@ -593,7 +594,6 @@ IMPL_GETNODEINFO( CStMethodDecl )
 // Other declaration nodes
 IMPL_GETNODEINFO( CStNamespaceDecl )
 IMPL_GETNODEINFO( CStInterfaceDecl )
-IMPL_GETNODEINFO( CStTypeDecl )
 IMPL_GETNODEINFO( CStVarConfigDecl )
 IMPL_GETNODEINFO( CStTaskConfigNode )
 IMPL_GETNODEINFO( CStTaskConfigListNode )

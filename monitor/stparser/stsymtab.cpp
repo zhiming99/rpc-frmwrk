@@ -236,16 +236,37 @@ void CStSymbolTable::AddUnsolved(
     RESOLVE_FUNC resolve,
     CStSymbol* pSym )
 {
-    m_mapUnresolved.insert(
-        std::pair( pCtx, resolve ) );
+    m_mapUnresolved.insert( { pCtx, resolve } );
     if( pSym == nullptr )
         return;
     auto itr = m_vecSymSeq.begin();
     while( itr != m_vecSymSeq.end() )
     {
-        if( (*itr)->m_iSeqNo == pSym->m_iSeqNo )
+        CStSymbol* pCurSym = *itr;
+        if( pCurSym->m_iSeqNo == pSym->m_iSeqNo )
         {
             m_vecSymSeq.erase( itr );
+            m_queUnresovedSeq.push_back( *itr);
+            break;
+        }
+        itr++;
+    }
+}
+
+void CStSymbolTable::AddSolved(
+    ObjPtr pCtx, CStSymbol* pSym )
+{
+    m_mapUnresolved.erase( pCtx );
+    if( pSym == nullptr )
+        return;
+    auto itr = m_queUnresovedSeq.begin();
+    while( itr != m_queUnresovedSeq.end() )
+    {
+        CStSymbol* pCurSym = *itr;
+        if( pCurSym->m_iSeqNo == pSym->m_iSeqNo )
+        {
+            m_queUnresovedSeq.erase( itr );
+            m_vecSymSeq.push_back( *itr);
             break;
         }
         itr++;

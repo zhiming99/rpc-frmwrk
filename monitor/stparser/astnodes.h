@@ -407,6 +407,9 @@ struct CStExpressionNode : public CStExprNode
     CStExpressionNode() : super()
     { SetClassId( clsid( CStExpressionNode ) ); }
 
+    virtual bool IsTypeResolved() const
+    { return false; }
+
     virtual std::string GetNodeInfo() const override;
     virtual std::string GetSignature() const override;
 };
@@ -419,6 +422,9 @@ struct CStPrimaryExprNode : public CStExprNode
 
     CStPrimaryExprNode() : super()
     { SetClassId( clsid( CStPrimaryExprNode ) ); }
+
+    virtual bool IsTypeResolved() const
+    { return false; }
 
     virtual std::string GetNodeInfo() const override
     { return ""; }
@@ -1372,23 +1378,6 @@ struct CStInterfaceDecl : public CStAstNodeBase
 };
 
 /**
- * @brief Type declaration
- */
-struct CStTypeDecl : public CStAstNodeBase
-{
-    typedef CStAstNodeBase super;
-
-    std::string m_strName;
-    ObjPtr m_pType;
-    ObjPtr m_pTypeDefinition;
-
-    CStTypeDecl() : super()
-    { SetClassId( clsid( CStTypeDecl ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
-
-/**
  * @brief Variable configuration declaration
  */
 struct CStVarConfigDecl : public CStAstNodeBase
@@ -2107,7 +2096,6 @@ REGISTER_AST_NODE( CStFunctionDecl );
 REGISTER_AST_NODE( CStMethodDecl );
 REGISTER_AST_NODE( CStNamespaceDecl );
 REGISTER_AST_NODE( CStInterfaceDecl );
-REGISTER_AST_NODE( CStTypeDecl );
 REGISTER_AST_NODE( CStVarConfigDecl );
 REGISTER_AST_NODE( CStTaskConfigNode );
 REGISTER_AST_NODE( CStTaskConfigListNode );

@@ -285,7 +285,7 @@ struct CStScope : public CObjBase
     // which keeps these names unique
     std::map< std::string, ScopePtr > m_mapChildren;
 
-    std::vector< USINGS_ARR > m_vecUsingsArr;
+    std::vector< USINGS_ARR > m_vecUsingsArrs;
 
     CStScope() : m_eKind( scopeInvalid ),
         m_pParent( nullptr )
@@ -349,13 +349,13 @@ struct CStScope : public CObjBase
         USINGS_ARR& vecUsings )
     {
         if( vecUsings.size() )
-            m_vecUsingsArr.push_back( vecUsings );
+            m_vecUsingsArrs.push_back( vecUsings );
     }
 
     inline void PopUsingArr()
     {
-        if( m_vecUsingsArr.size() )
-            m_vecUsingsArr.pop_back();
+        if( m_vecUsingsArrs.size() )
+            m_vecUsingsArrs.pop_back();
     }
 };
 
@@ -398,6 +398,7 @@ private:
     ScopePtr m_pGlobal;
     ScopeStack m_stackScopes;
     std::unordered_map< ObjPtr, RESOLVE_FUNC  > m_mapUnresolved;
+    std::deque< ObjPtr > m_queUnresovedSeq;
     gint32 m_iSeqNo = 0;
     std::vector< CStSymbol* > m_vecSymSeq;
 
@@ -576,6 +577,9 @@ public:
     void AddUnsolved( ObjPtr pCtx,
         RESOLVE_FUNC resolve,
         CStSymbol* pSym = nullptr );
+
+    void AddSolved(
+        ObjPtr pCtx, CStSymbol* pSym );
 };
 
 }

@@ -1131,7 +1131,7 @@ GetUsingsArr( CStScope* pScope )
     static std::vector< USINGS_ARR > vecEmpty;
     if( pScope == nullptr )
         return vecEmpty;
-    return pScope->m_vecUsingsArr; 
+    return pScope->m_vecUsingsArrs; 
 }
 
 gint32 ResolveUsingNs(
@@ -1193,11 +1193,8 @@ gint32 ResolveUsingNs(
         }
         if( bUnresolved )
         {
-            ost.AddUnsolved( ObjPtr( pScope ),
-                ([]( ObjPtr& pObj, void* pctx )->gint32
-                {
-                    return ResolveUsingNs( pctx, pObj );
-                }));
+            ret = -ENOENT;
+            break;
         }
     }while( 0 );
     return ret;
