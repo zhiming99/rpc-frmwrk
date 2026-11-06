@@ -1110,7 +1110,7 @@ data_type_decl
         for( auto& pType : vecDecls )
         {
             CStTypeDeclNode* ptd = pType;             
-            if( !ptd || ptd->IsTypeResolved() )
+            if( !ptd || ptd->IsSymbolResolved() )
                 continue;
 
             ptd->m_pDtd = pObj;
@@ -1224,7 +1224,8 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             initInfo.GetIntProp(
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
-            initInfo.GetObjPtr( 999, pTypeData );
+            initInfo.GetObjPtr(
+                propTypeData, pTypeData );
 
             if( iType == RuleDerived_type_access )
             {
@@ -1294,10 +1295,11 @@ simple_spec returns [ ObjPtr pTypeInfo ]
             ( guint32 )$etn.start->getType() );
 
         if( !$etn.pTypeInfo.IsEmpty() )
-            oParams.SetObjPtr( 999, $etn.pTypeInfo );
+            oParams.SetObjPtr(
+                propTypeData, $etn.pTypeInfo );
 
         oParams.SetIntProp(
-            1000, RuleElem_type_name );
+            propRuleId, RuleElem_type_name );
         $pTypeInfo = oParams.GetCfg();
     }}
     | sta = simple_type_access
@@ -1307,7 +1309,7 @@ simple_spec returns [ ObjPtr pTypeInfo ]
         oParams.Push(
             ( guint32 )RuleDerived_type_access );
         oParams.SetIntProp(
-            1000, RuleSimple_type_access );
+            propRuleId, RuleSimple_type_access );
         $pTypeInfo = oParams.GetCfg();
     }}
     ;
@@ -1468,9 +1470,12 @@ array_type_decl returns [ ObjPtr pTypeDecl ]
             initInfo.GetIntProp(
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
-            initInfo.GetObjPtr( 999, pTypeData );
+
+            initInfo.GetObjPtr(
+                propTypeData, pTypeData );
+
             initInfo.GetIntProp(
-                1000, ( guint32& )iSpec );
+                propRuleId, ( guint32& )iSpec );
 
             if( iSpec == RuleArray_spec )
             {
@@ -1532,8 +1537,10 @@ array_spec returns [ ObjPtr pTypeInfo ]
         oParams.Push( $dta.typePair.first );
         oParams.Push( $dta.typePair.second );
         if( !$rl.pRangeList.IsEmpty() )
-            oParams.SetObjPtr( 999, $rl.pRangeList );
-        oParams.SetIntProp( 1000, RuleArray_spec );
+            oParams.SetObjPtr(
+                propTypeData, $rl.pRangeList );
+        oParams.SetIntProp( propRuleId,
+            RuleArray_spec );
         $pTypeInfo = oParams.GetCfg();
     }
     | ata=array_type_access
@@ -1542,8 +1549,8 @@ array_spec returns [ ObjPtr pTypeInfo ]
         oParams.Push( $ata.ctx->getText() );
         oParams.Push(
             ( guint32 )RuleDerived_type_access );
-        oParams.SetIntProp(
-            1000, RuleArray_type_access );
+        oParams.SetIntProp( propRuleId,
+            RuleArray_type_access );
         $pTypeInfo = oParams.GetCfg();
     }
     ;
@@ -1653,7 +1660,8 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             initInfo.GetIntProp(
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
-            initInfo.GetObjPtr( 999, pTypeData );
+            initInfo.GetObjPtr(
+                propTypeData, pTypeData );
 
             if( IsElementaryType( iType ) )
             {
@@ -1673,7 +1681,7 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             CStAmbiguousTypeDeclNode* ptd = pNode;
             CParamList oTypeInit;
             ret = oTypeInit.CopyProp(
-                997, 2, $si.pTypeInfo );
+                propTypeInit, 2, $si.pTypeInfo );
             if( SUCCEEDED( ret ) )
                 ptd->m_pTypeInit = oTypeInit.GetCfg();
             ptd->m_oTypeRef = { strType, nullptr };
@@ -1751,8 +1759,8 @@ ref_type_decl returns [ ObjPtr pTypeDecl ]
 
             CStRefTypeDeclNode* ptd = pNode;
             CParamList oTypeInit;
-            ret = oTypeInit.CopyProp(
-                997, ( IConfigDb* )$rsi.pTypeInfo );
+            ret = oTypeInit.CopyProp( propTypeInit,
+                ( IConfigDb* )$rsi.pTypeInfo );
             if( SUCCEEDED( ret ) )
                 ptd->m_pTypeInit = oTypeInit.GetCfg();
             ptd->m_oTypeRef = { strType, nullptr };
@@ -1763,7 +1771,7 @@ ref_type_decl returns [ ObjPtr pTypeDecl ]
 
             gint32 iRank = 0;
             ret = initInfo.GetIntProp(
-                998, ( guint32& )iRank );
+                propRefRank, ( guint32& )iRank );
             if( SUCCEEDED( ret ) )
                 ptd->m_iRefRank = iRank;
 
@@ -1789,7 +1797,7 @@ ref_spec_init returns [ ObjPtr pTypeInfo ]
         if( $v.ctx )
         {
             oParams.SetStrProp(
-                997, $v.ctx->getText() );
+                propTypeInit, $v.ctx->getText() );
         }
         $pTypeInfo = oParams.GetCfg();
     }
@@ -1801,7 +1809,8 @@ ref_spec returns [ ObjPtr pTypeInfo ]
         CParamList oParams;
         oParams.Push( $dta.typePair.first );
         oParams.Push( $dta.typePair.second );
-        oParams.SetIntProp( 998, $tok.size() );
+        oParams.SetIntProp(
+            propRefRank, $tok.size() );
         $pTypeInfo = oParams.GetCfg();
     }
     ;
@@ -2460,7 +2469,7 @@ string_spec returns [ ObjPtr pTypeInfo ]
         
         if( $const_expr.ctx != nullptr )
         {
-            oParams.SetObjPtr( 999,
+            oParams.SetObjPtr( propTypeData,
                 $const_expr.pExpr );
         }
         $pTypeInfo = oParams.GetCfg();

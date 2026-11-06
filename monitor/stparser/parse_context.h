@@ -44,6 +44,15 @@
 
 namespace rpcf
 {
+
+enum EnumStPropId : gint32
+{
+    propTypeData = 1025,
+    propTypeInit,
+    propRefRank,
+    propRuleId,
+};
+
 enum class EnumTypeCategory {
     Invalid = -1,
     Unknown = 0,

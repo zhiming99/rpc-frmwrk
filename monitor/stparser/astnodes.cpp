@@ -189,6 +189,18 @@ std::string CStTypeDeclNode::GetNodeInfo() const
     return oss.str();
 }
 
+bool CStSimpleTypeDeclNode::IsSymbolResolved() const
+{
+    if( this->m_iDirectType == -1  )
+        return false;
+    if( m_pTypeData.IsEmpty() )
+        return true;
+    CStExprNode* pExpr = m_pTypeData;
+    if( pExpr == nullptr )
+        return true;
+    return pExpr->IsSymbolResolved();
+}
+
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const
 {
     std::ostringstream oss;

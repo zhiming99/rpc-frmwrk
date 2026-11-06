@@ -42,6 +42,19 @@ class CStTypeNode;
 class CStVarDeclNode;
 class CStSymbol;
 class CStScope;
+class CStSymbol;
+
+struct CStSymbolDeclNode : public CStAstNodeBase
+{
+    typedef CStAstNodeBase super;
+
+    CStSymbol* m_pSymbol;
+    CStSymbolDeclNode() : super()
+    {}
+
+    virtual bool IsSymbolResolved() const
+    { return false; }
+};
 
 // ============================================================================
 // Expression Nodes
@@ -56,6 +69,9 @@ struct CStExprNode : public CStAstNodeBase
 
     CStExprNode() : super()
     {}
+
+    virtual bool IsSymbolResolved() const
+    { return false; }
 
     virtual std::string GetNodeInfo() const override;
     virtual std::string GetSignature() const override;
@@ -407,7 +423,7 @@ struct CStExpressionNode : public CStExprNode
     CStExpressionNode() : super()
     { SetClassId( clsid( CStExpressionNode ) ); }
 
-    virtual bool IsTypeResolved() const
+    virtual bool IsSymbolResolved() const
     { return false; }
 
     virtual std::string GetNodeInfo() const override;
@@ -423,7 +439,7 @@ struct CStPrimaryExprNode : public CStExprNode
     CStPrimaryExprNode() : super()
     { SetClassId( clsid( CStPrimaryExprNode ) ); }
 
-    virtual bool IsTypeResolved() const
+    virtual bool IsSymbolResolved() const
     { return false; }
 
     virtual std::string GetNodeInfo() const override
@@ -673,25 +689,21 @@ struct CStEnumValueListNode : public CStAstNodeBase
  * base type declaration 
  * This allows the parent rules to handle a consistent node type.
  */
-struct CStTypeDeclNode :
-    public CStAstNodeBase
+struct CStTypeDeclNode : public CStSymbolDeclNode
 {
-    typedef CStAstNodeBase super;
-    CStSymbol* m_pSymbol;
+    typedef CStSymbolDeclNode super;
 
     using TYPE_REF =
         std::pair< std::string, CStSymbol* >;
     TYPE_REF m_oTypeRef; 
     ObjPtr m_pTypeInit;
+    ObjPtr m_pTypeData;
     using TypePair = std::pair< gint32, gint32 >;
-    // std::vector< TypePair > m_vecTypes { {-1,-1} };
     gint32 m_iTypeId = -1;
     gint32 m_iDirectType = -1;
     gint32 m_iRefRank = 0;
-    ObjPtr m_pTypeData;
 
-
-    // node for type resolution
+    // pointer to CStDataTypeDeclNode
     ObjPtr m_pDtd; 
 
     CStTypeDeclNode() : super()
@@ -699,9 +711,6 @@ struct CStTypeDeclNode :
 
     virtual CStTypeDeclNode& operator=(
         const CStTypeDeclNode& rhs );
-
-    virtual bool IsTypeResolved() const
-    { return ( this->m_iDirectType != -1  ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -752,6 +761,8 @@ struct CStSimpleTypeDeclNode :
         SetClassId( clsid(
             CStSimpleTypeDeclNode ) );
     }
+
+    bool IsSymbolResolved() const override;
 };
 
 struct CStSubrangeTypeDeclNode :
@@ -1297,6 +1308,7 @@ struct CStMethodDecl : public CStPouDeclNode
     std::vector< ObjPtr > m_vecInOutVars;
     std::vector< ObjPtr > m_vecLocalVars;
     std::vector< ObjPtr > m_vecTempVars;
+    std::vector< ObjPtr > m_vecExternVars;
 
     CStMethodDecl() : super(),
         m_eAccessModifier(amPublic),
@@ -1318,8 +1330,6 @@ struct CStMethodDecl : public CStPouDeclNode
  * which can be used to explicitly mark the boundary between global
  * declarations and backend-specific constructs.
  */
-struct CStSymbol;
-
 struct CStScopeNodeDecl : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;

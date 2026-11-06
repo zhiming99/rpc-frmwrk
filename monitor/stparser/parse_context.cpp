@@ -1556,7 +1556,7 @@ LBL_RESOLVE_SYMBOL:
             pSym = pCurSym;
 
         // declared from a direct type
-        if( ptd->IsTypeResolved() )
+        if( ptd->IsSymbolResolved() )
         {
             iType = ptd->m_iDirectType;
             break;
@@ -1670,7 +1670,7 @@ gint32 ReplaceAmbiguousNode(
         pNode.NewObj( iClsid );
         auto ptd = ( CStTypeDeclNode* )pNode;
         ( *ptd ) = *patd;
-        if( ptd->IsTypeResolved() )
+        if( ptd->IsSymbolResolved() )
             ptd->m_pDtd.Clear();
 
     }while( 0 );
