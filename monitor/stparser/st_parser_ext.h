@@ -5,6 +5,9 @@
 #include "parse_context.h"
 #include "clsids.h"
 
+namespace rpcf 
+{
+
 /**
  * Extended parser that adds semantic predicates for type disambiguation.
  * 
@@ -162,6 +165,8 @@ public:
         return m_pContext->m_strPendingTypeName;
     }
 
+    gint32 ResolveTypeDecl( ObjPtr& pObj );
+
     static bool IsElementaryType(int tokenType);
     static bool IsStringType(int tokenType);
 
@@ -169,4 +174,5 @@ private:
     CStParseContext* m_pContext;
 };
 
+}
 #endif // ST_PARSER_EXT_H

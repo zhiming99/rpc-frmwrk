@@ -299,8 +299,8 @@ public:
         const YYLTYPE2& oLoc )
     {
         ObjPtr pNode;
-        pNode.NewObj( clsid( CStFullExpressionNode ) );
-        CStFullExpressionNode* p = pNode;
+        pNode.NewObj( clsid( CStExpressionNode ) );
+        CStExpressionNode* p = pNode;
         if( p != nullptr )
         {
             p->m_pExpression = pExpression;
@@ -426,11 +426,11 @@ public:
         return pNode;
     }
 
-    ObjPtr CreateDataTypeSpecNode( ObjPtr pTypeSpec, const YYLTYPE2& oLoc )
+    ObjPtr CreateDataTypeDeclNode( ObjPtr pTypeSpec, const YYLTYPE2& oLoc )
     {
         ObjPtr pNode;
-        pNode.NewObj( clsid( CStDataTypeSpecNode ) );
-        CStDataTypeSpecNode* p = pNode;
+        pNode.NewObj( clsid( CStDataTypeDeclNode ) );
+        CStDataTypeDeclNode* p = pNode;
         if( p != nullptr )
         {
             p->m_pTypeSpec = pTypeSpec;
@@ -440,11 +440,11 @@ public:
         return pNode;
     }
 
-    ObjPtr CreateTypeSpecNode( ObjPtr pType, const YYLTYPE2& oLoc )
+    ObjPtr CreateTypeDeclNode( ObjPtr pType, const YYLTYPE2& oLoc )
     {
         ObjPtr pNode;
-        pNode.NewObj( clsid( CStTypeSpecNode ) );
-        CStTypeSpecNode* p = pNode;
+        pNode.NewObj( clsid( CStTypeDeclNode ) );
+        CStTypeDeclNode* p = pNode;
         if( p != nullptr )
         {
             p->m_pType = pType;
@@ -1029,7 +1029,7 @@ inline CStAstFactory* GetAstFactory( CSTParserContext* pCtx )
  */
 inline ObjPtr UnwrapFullExpression( ObjPtr pExpr )
 {
-    CStFullExpressionNode* pWrapper = pExpr;
+    CStExpressionNode* pWrapper = pExpr;
     if( pWrapper != nullptr )
     {
         ObjPtr pInner = pWrapper->m_pExpression;

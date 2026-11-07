@@ -85,7 +85,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStLValueNode );
     INIT_MAP_ENTRY( CStLValueExtNode );
     INIT_MAP_ENTRY( CStInstancePathNode );
-    INIT_MAP_ENTRY( CStFullExpressionNode );
+    INIT_MAP_ENTRY( CStExpressionNode );
+    INIT_MAP_ENTRY( CStPrimaryExprNode );
     INIT_MAP_ENTRY( CStSubrangeNode );
     INIT_MAP_ENTRY( CStSubrangeListNode );
     INIT_MAP_ENTRY( CStStmtListNode );
@@ -98,8 +99,17 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStEnumTypeNode );
     INIT_MAP_ENTRY( CStEnumValueNode );
     INIT_MAP_ENTRY( CStEnumValueListNode );
-    INIT_MAP_ENTRY( CStDataTypeSpecNode );
-    INIT_MAP_ENTRY( CStTypeSpecNode );
+    INIT_MAP_ENTRY( CStDataTypeDeclNode );
+    INIT_MAP_ENTRY( CStTypeDeclNode );
+    INIT_MAP_ENTRY( CStAmbiguousTypeDeclNode );
+    INIT_MAP_ENTRY( CStSimpleTypeDeclNode );
+    INIT_MAP_ENTRY( CStSubrangeTypeDeclNode );
+    INIT_MAP_ENTRY( CStArrayTypeDeclNode );
+    INIT_MAP_ENTRY( CStStructTypeDeclNode );
+    INIT_MAP_ENTRY( CStStringTypeDeclNode );
+    INIT_MAP_ENTRY( CStNamedvalTypeDeclNode );
+    INIT_MAP_ENTRY( CStEnumTypeDeclNode );
+    INIT_MAP_ENTRY( CStRefTypeDeclNode );
     INIT_MAP_ENTRY( CStTypeDefinitionBlockNode );
     INIT_MAP_ENTRY( CStPointerTypeNode );
     INIT_MAP_ENTRY( CStReferenceTypeNode );
@@ -128,7 +138,6 @@ static FactoryPtr InitClassFactory()
     // AST Other Declaration Nodes
     INIT_MAP_ENTRY( CStNamespaceDecl );
     INIT_MAP_ENTRY( CStInterfaceDecl );
-    INIT_MAP_ENTRY( CStTypeDecl );
     INIT_MAP_ENTRY( CStVarConfigDecl );
     INIT_MAP_ENTRY( CStTaskConfigNode );
     INIT_MAP_ENTRY( CStTaskConfigListNode );
@@ -164,6 +173,7 @@ static FactoryPtr InitClassFactory()
 
     // Symbol table
     INIT_MAP_ENTRY( CStSymbol );
+    INIT_MAP_ENTRY( CStScope );
 
     END_FACTORY_MAPS;
 };
@@ -207,12 +217,13 @@ int main(int argc, char* argv[])
     if( ret )
         return ret;
 
+    FactoryPtr pFactory = InitClassFactory();
+    ret = CoAddClassFactory( pFactory );
+    if( ERROR( ret ) )
+        return ret;
+
     CStParseContext oCtx;
     do{
-        FactoryPtr pFactory = InitClassFactory();
-        ret = CoAddClassFactory( pFactory );
-        if( ERROR( ret ) )
-            break;
 
         // Set up the parse context with a symbol table
         while( true ) 

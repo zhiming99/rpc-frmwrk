@@ -26,6 +26,9 @@
 #include "stclsids.h"
 #include "astnodes.h"
 #include <sstream>
+#include <string_view>
+#include "stsymtab.h"
+#include "st_parser_ext.h"
 
 namespace rpcf
 {
@@ -109,41 +112,181 @@ std::string CStEnumValueListNode::GetNodeInfo() const
 }
 
 // ========================================================================
-// CStDataTypeSpecNode Implementation
+// CStDataTypeDeclNode Implementation
 // ========================================================================
 
-std::string CStDataTypeSpecNode::GetNodeInfo() const
+std::string CStDataTypeDeclNode::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "DataTypeSpec{ ";
-    if( !m_pTypeSpec.IsEmpty() )
-        oss << "type_spec set";
+    oss << "DataTypeDecl{ ";
+    if( !m_vecTypeDecls.empty() )
+        oss << "type_decls set";
     else
-        oss << "no type_spec";
+        oss << "no type_decls";
     oss << " }";
     return oss.str();
 }
 
+gint32 CStDataTypeDeclNode::ResolveUsingNs(
+    void* pctx )
+{
+    auto pCtx = static_cast< CStParseContext* >(pctx );
+    ScopePtr pScope =
+        pCtx->m_oSymTab.GetCurrentScope();
+    if( !pScope.IsEmpty() )
+        pScope->PushUsingArr( m_vecUsings );
+    gint32 ret = rpcf::ResolveUsingNs(
+        pctx, ObjPtr( pScope ) );
+    if( !pScope.IsEmpty() )
+        pScope->PopUsingArr();
+    return ret;
+}
+
+gint32 CStDataTypeDeclNode::ResolveType(
+    void* pctx,
+    CStTypeDeclNode* ptd )
+{
+    gint32 ret = 0;
+    do{
+
+    }while( 0 );
+    return ret;
+}
 // ========================================================================
-// CStTypeSpecNode Implementation
+// CStTypeDeclNode Implementation
 // ========================================================================
 
-std::string CStTypeSpecNode::GetNodeInfo() const
+CStTypeDeclNode& CStTypeDeclNode::operator=(
+    const CStTypeDeclNode& rhs )
+{
+    m_pSymbol = rhs.m_pSymbol;
+
+    m_oTypeRef = rhs.m_oTypeRef; 
+    m_pTypeInit = rhs.m_pTypeInit;
+    m_iTypeId = rhs.m_iTypeId;
+    m_iDirectType = rhs.m_iDirectType;
+    m_iRefRank = rhs.m_iRefRank;
+    m_pTypeData = rhs.m_pTypeData;
+
+    // set the symbol's declare node to this one
+    m_pSymbol->m_pDeclNode = ObjPtr( this );
+
+    // node for type resolution
+    m_pDtd = rhs.m_pDtd; 
+    return *this;
+}
+
+std::string CStTypeDeclNode::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "TypeSpec{ ";
-    if( !m_pType.IsEmpty() )
-        oss << "type set";
+    oss << "TypeRef{ ";
+    if( m_oTypeRef.first.size() )
+        oss << "type is derived from '"
+            << m_oTypeRef.first << "'";
     else
         oss << "no type";
     oss << " }";
     return oss.str();
 }
 
+gint32 CStTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iSymType ) 
+{
+    if( IsSymbolResolved() )
+        return 0;
+
+    if( pctx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        stdstr strType = this->m_oTypeRef.first;
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto& ost = pCtx->m_oSymTab;
+        std::vector< stdstr > vecComps =
+            ost.BreakdownQualified( strType );
+
+        auto pScope = ost.GetCurrentScope();
+        SymPtr pSym;
+        gint32 iType = -1;
+
+        ret = ResolveTypeToDirectType(
+            pCtx, vecComps, iSymType,
+            pScope, pSym, iType );
+
+        if( !pSym.IsEmpty() )
+            this->m_oTypeRef.second = pSym;
+
+        if( iType >= 0 )
+            this->m_iDirectType = iType;
+
+    }while( 0 );
+    return ret;
+}
+
+bool CStSimpleTypeDeclNode::IsSymbolResolved() const
+{
+    if( this->m_iDirectType == -1  )
+        return false;
+    if( m_pTypeInit.IsEmpty() &&
+        m_pTypeData.IsEmpty() )
+        return true;
+
+    CStExprNode* pExpr = m_pTypeInit;
+    bool bResolved = false;
+    if( pExpr )
+    {
+        bResolved = pExpr->IsSymbolResolved();
+        if( !bResolved )
+            return false;
+    }
+
+    if( m_pTypeData.IsEmpty() )
+        return true;
+
+    pExpr = m_pTypeData;
+    if( !pExpr )
+        return true;
+    return pExpr->IsSymbolResolved();
+}
+
+gint32 CStSimpleTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iSymType ) 
+{
+    gint32 ret = super::ResolveSymbol(
+        pctx, iSymType );
+    if( ERROR( ret ) )
+        return ret;
+    do{
+        if( !m_pTypeInit.IsEmpty() )
+        {
+            CStExprNode* pExpr = m_pTypeInit;
+            if( pExpr )
+                ret = pExpr->ResolveSymbol(
+                    pctx, iSymType );
+            if( ERROR( ret ) )
+                break;
+        }
+        if( !m_pTypeData.IsEmpty() )
+        {
+            CStExprNode* pExpr = m_pTypeData;
+            if( pExpr )
+                ret = pExpr->ResolveSymbol(
+                    pctx, iSymType );
+            if( ERROR( ret ) )
+                break;
+        }
+    }while( 0 );
+    return ret;
+}
+
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "TypeDefinitionBlock{ " << m_vecTypeDecls.size() << " declarations }";
+    oss << "TypeDefinitionBlock{ "
+        << m_vecTypeDecls.size()
+        << " declarations }";
     return oss.str();
 }
 
@@ -203,7 +346,7 @@ std::string CStInstancePathNode::GetNodeInfo() const
 // CStFullExpressionNode Implementation
 // ========================================================================
 
-std::string CStFullExpressionNode::GetNodeInfo() const
+std::string CStExpressionNode::GetNodeInfo() const
 {
     std::ostringstream oss;
     oss << "FullExpr{ ";
@@ -215,7 +358,7 @@ std::string CStFullExpressionNode::GetNodeInfo() const
     return oss.str();
 }
 
-std::string CStFullExpressionNode::GetSignature() const
+std::string CStExpressionNode::GetSignature() const
 {
     CStExprNode* pInner = m_pExpression;
     if( pInner != nullptr )
@@ -443,6 +586,34 @@ std::string CStArrayRepeatNode::GetNodeInfo() const
     return oss.str();
 }
 
+bool CStNamespaceDecl::IsGlobalScope() const 
+{ return m_pSymbol->m_strName.empty(); }
+
+bool CStNamespaceDecl::IsNamedNamespace() const
+{ return !m_pSymbol->m_strName.empty(); }
+
+gint32 CStNamespaceDecl::ResolveUsingNs( void* pctx )
+{
+    CStScope* pScope = m_pSymbol->m_pDefScope;
+    return rpcf::ResolveUsingNs(
+        pctx, ObjPtr( pScope ) );
+}
+
+
+ObjPtr CStNamespaceDecl::ResolvePath(
+    const std::vector<std::string>& vecNames,
+    void* pctx )
+{
+    size_t iPos;
+    enumPathStop eReason = pathStopResolved;
+    auto pSym = ResolveNsPrefix(
+        vecNames, pctx, iPos, eReason );
+    if( pSym.IsEmpty() ) 
+        return pSym;
+    if( eReason != pathStopResolved )
+        return ObjPtr();
+    return pSym;
+}
 // ========================================================================
 // Default implementations for AST nodes
 // These use base class dummy implementation via override
@@ -484,8 +655,8 @@ IMPL_GETNODEINFO( CStBasicTypeNode )
 IMPL_GETNODEINFO( CStArrayTypeNode )
 IMPL_GETNODEINFO( CStStructTypeNode )
 IMPL_GETNODEINFO( CStEnumTypeNode )
-// CStDataTypeSpecNode has explicit implementation
-// CStTypeSpecNode has explicit implementation
+// CStDataTypeDeclNode has explicit implementation
+// CStTypeDeclNode has explicit implementation
 IMPL_GETNODEINFO( CStPointerTypeNode )
 IMPL_GETNODEINFO( CStReferenceTypeNode )
 IMPL_GETNODEINFO( CStDerivedTypeNode )
@@ -515,7 +686,6 @@ IMPL_GETNODEINFO( CStMethodDecl )
 // Other declaration nodes
 IMPL_GETNODEINFO( CStNamespaceDecl )
 IMPL_GETNODEINFO( CStInterfaceDecl )
-IMPL_GETNODEINFO( CStTypeDecl )
 IMPL_GETNODEINFO( CStVarConfigDecl )
 IMPL_GETNODEINFO( CStTaskConfigNode )
 IMPL_GETNODEINFO( CStTaskConfigListNode )

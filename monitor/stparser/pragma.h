@@ -31,7 +31,8 @@
 #include "Parser.h"
 #include "TokenStream.h"
 
-
+namespace rpcf 
+{
 struct CStParseContext;
 struct CStPragmaEvaluator :
     public pragma_exprVisitor
@@ -112,3 +113,4 @@ public:
     CStParseContext* GetParseContext() const
     { return m_pContext; }
 };
+}
