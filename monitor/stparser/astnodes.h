@@ -34,6 +34,24 @@
 namespace rpcf
 {
 
+enum enumSymKind {
+    symUnknown = 0,
+    symVariable,      // variable, incl. FB instances and vars with AT addresses
+    symEnumValue,     // enumerated value constant
+    symDataType,      // named data type from TYPE...END_TYPE
+    symProgram,
+    symFunctionBlock,
+    symFunction,
+    symMethod,
+    symInterface,
+    symNamespace,
+    symClass,
+    symProperty,
+    symAccess,
+    symResource,
+    symTask,
+};
+
 // Forward declarations
 class CStDeclNode;
 class CStStmtNode;
@@ -54,6 +72,10 @@ struct CStSymbolDeclNode : public CStAstNodeBase
 
     virtual bool IsSymbolResolved() const
     { return false; }
+
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iSymKind )
+    { return ERROR_FAIL; }
 };
 
 // ============================================================================
@@ -72,6 +94,9 @@ struct CStExprNode : public CStAstNodeBase
 
     virtual bool IsSymbolResolved() const
     { return false; }
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind )
+    { return ERROR_FAIL; }
 
     virtual std::string GetNodeInfo() const override;
     virtual std::string GetSignature() const override;
@@ -709,8 +734,14 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     CStTypeDeclNode() : super()
     {}
 
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iSymKind ) override;
+
     virtual CStTypeDeclNode& operator=(
         const CStTypeDeclNode& rhs );
+
+    bool IsSymbolResolved() const override
+    { return ( m_iDirectType != -1 ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -729,6 +760,7 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
     CStScope* m_pScope;
     std::vector< CStTypeDeclNode* > m_vecTypeDecls;
     std::vector< ObjPtr > m_vecUsings;
+    bool m_bPushed = false;
 
     CStDataTypeDeclNode() : super()
     { SetClassId( clsid( CStDataTypeDeclNode ) ); }
@@ -761,6 +793,9 @@ struct CStSimpleTypeDeclNode :
         SetClassId( clsid(
             CStSimpleTypeDeclNode ) );
     }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 
     bool IsSymbolResolved() const override;
 };

@@ -189,16 +189,96 @@ std::string CStTypeDeclNode::GetNodeInfo() const
     return oss.str();
 }
 
+gint32 CStTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iSymType ) 
+{
+    if( IsSymbolResolved() )
+        return 0;
+
+    if( pctx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        stdstr strType = this->m_oTypeRef.first;
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto& ost = pCtx->m_oSymTab;
+        std::vector< stdstr > vecComps =
+            ost.BreakdownQualified( strType );
+
+        auto pScope = ost.GetCurrentScope();
+        SymPtr pSym;
+        gint32 iType = -1;
+
+        ret = ResolveTypeToDirectType(
+            pCtx, vecComps, iSymType,
+            pScope, pSym, iType );
+
+        if( !pSym.IsEmpty() )
+            this->m_oTypeRef.second = pSym;
+
+        if( iType >= 0 )
+            this->m_iDirectType = iType;
+
+    }while( 0 );
+    return ret;
+}
+
 bool CStSimpleTypeDeclNode::IsSymbolResolved() const
 {
     if( this->m_iDirectType == -1  )
         return false;
+    if( m_pTypeInit.IsEmpty() &&
+        m_pTypeData.IsEmpty() )
+        return true;
+
+    CStExprNode* pExpr = m_pTypeInit;
+    bool bResolved = false;
+    if( pExpr )
+    {
+        bResolved = pExpr->IsSymbolResolved();
+        if( !bResolved )
+            return false;
+    }
+
     if( m_pTypeData.IsEmpty() )
         return true;
-    CStExprNode* pExpr = m_pTypeData;
-    if( pExpr == nullptr )
+
+    pExpr = m_pTypeData;
+    if( !pExpr )
         return true;
     return pExpr->IsSymbolResolved();
+}
+
+gint32 CStSimpleTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iSymType ) 
+{
+    gint32 ret = super::ResolveSymbol(
+        pctx, iSymType );
+    if( ERROR( ret ) )
+        return ret;
+    do{
+        if( !m_pTypeInit.IsEmpty() )
+        {
+            CStExprNode* pExpr = m_pTypeInit;
+            if( pExpr )
+                ret = pExpr->ResolveSymbol(
+                    pctx, iSymType );
+            if( ERROR( ret ) )
+                break;
+        }
+        if( !m_pTypeData.IsEmpty() )
+        {
+            CStExprNode* pExpr = m_pTypeData;
+            if( pExpr )
+                ret = pExpr->ResolveSymbol(
+                    pctx, iSymType );
+            if( ERROR( ret ) )
+                break;
+        }
+    }while( 0 );
+    return ret;
 }
 
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const

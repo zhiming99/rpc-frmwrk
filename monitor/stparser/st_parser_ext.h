@@ -165,6 +165,8 @@ public:
         return m_pContext->m_strPendingTypeName;
     }
 
+    gint32 ResolveTypeDecl( ObjPtr& pObj );
+
     static bool IsElementaryType(int tokenType);
     static bool IsStringType(int tokenType);
 

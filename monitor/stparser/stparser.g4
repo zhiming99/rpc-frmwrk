@@ -66,6 +66,7 @@ options { tokenVocab=stlexer; }
 #include "astnodes.h"
 #include "stsymtab.h"
 using namespace rpcf;
+#define GET_PARSER() static_cast< CStParser* >( this )
 }
 
 // ============================================================
@@ -90,8 +91,7 @@ decl_set
     | access_decl
     | ( ud = using_directive 
         {
-            auto pParser =
-                static_cast< CStParser* >( this );
+            auto pParser = GET_PARSER();
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
             auto pGlobal = ost.GetGlobalScope();
@@ -1086,7 +1086,6 @@ data_type_decl
         auto pdtd = ( CStDataTypeDeclNode* )pObj;
         auto pScope = ost.GetCurrentScope();
         pdtd->m_pScope = pScope;
-
     }
     opt_internal
     (uds = using_directive_list
@@ -1102,67 +1101,31 @@ data_type_decl
                 return pdtd->ResolveUsingNs( pctx );
             }));
         }
+        else
+        {
+            pScope->PushUsingArr( pdtd->m_vecUsings );
+            pdtd->m_bPushed = true;
+        }
     }})?
     tds = type_decls
     {
-        gint32 ret = 0;
         auto& vecDecls = $tds.vecTypeDecls;
         for( auto& pType : vecDecls )
         {
             CStTypeDeclNode* ptd = pType;             
             if( !ptd || ptd->IsSymbolResolved() )
                 continue;
-
             ptd->m_pDtd = pObj;
-            auto func =
-            ([]( ObjPtr& pObj, void* pctx )->gint32
-            {
-                CStTypeDeclNode* ptd = pObj;             
-                stdstr strType = ptd->m_oTypeRef.first;
-                auto pCtx = reinterpret_cast
-                    < CStParseContext* >( pctx );
-                auto& ost = pCtx->m_oSymTab;
-                std::vector< stdstr > vecComps =
-                    ost.BreakdownQualified( strType );
-
-                SymPtr pSym;
-                gint32 iType = -1;
-
-                auto pdtd = ( CStDataTypeDeclNode* )
-                    ptd->m_pDtd;
-
-                auto pScope = pdtd->m_pScope;
-                pScope->PushUsingArr( pdtd->m_vecUsings );
-                auto ret = ResolveTypeToDirectType(
-                    pCtx, vecComps, symDataType,
-                    pScope, pSym, iType );
-
-                if( !pSym.IsEmpty() )
-                    ptd->m_oTypeRef.second = pSym;
-
-                if( iType >= 0 )
-                    ptd->m_iDirectType = iType;
-
-                if( SUCCEEDED( ret ) && ptd->GetClsid() ==
-                    clsid( CStAmbiguousTypeDeclNode ) )
-                {
-                    ObjPtr pNewNode;
-                    ReplaceAmbiguousNode(
-                        pCtx, pObj, iType, pNewNode );
-                }
-                pScope->PopUsingArr();
-                return ret;
-            });
-            ret = func( pType, pCtx );
-            if( ERROR( ret ) )
-            {
-                CStTypeDeclNode* ptd = pType;             
-                auto pSym = ptd->m_pSymbol;
-                ost.AddUnsolved( pType, func, pSym );
-            }
         }
     }
     TOK_END_TYPE
+    {
+        if( pdtd->m_bPushed )
+        {
+            pScope->PopUsingArr();
+            pdtd->m_bPushed = false;
+        }
+    }
     ;
 
 type_decls returns [ std::vector< ObjPtr > vecTypeDecls ]
@@ -1182,23 +1145,50 @@ type_decls returns [ std::vector< ObjPtr > vecTypeDecls ]
 
 type_decl returns [ ObjPtr pTypeDecl ]
     : st = simple_type_decl
-    { $pTypeDecl = $st.pTypeDecl; }
+    {
+        ResolveTypeDecl( $st.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | subt = subrange_type_decl
-    { $pTypeDecl = $subt.pTypeDecl; }
+    {
+        ResolveTypeDecl( $subt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | et = enum_type_decl
-    { $pTypeDecl = $et.pTypeDecl; }
+    {
+        ResolveTypeDecl( $et.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | nt = namedval_type_decl
-    { $pTypeDecl = $nt.pTypeDecl; }
+    {
+        ResolveTypeDecl( $nt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | at = array_type_decl
-    { $pTypeDecl = $at.pTypeDecl; }
+    {
+        ResolveTypeDecl( $at.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | stru = struct_type_decl_init
-    { $pTypeDecl = $stru.pTypeDecl; }
+    {
+        ResolveTypeDecl( $stru.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | str = string_type_decl
-    { $pTypeDecl = $str.pTypeDecl; }
+    {
+        ResolveTypeDecl( $str.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | rt = ref_type_decl
-    { $pTypeDecl = $rt.pTypeDecl; }
+    {
+        ResolveTypeDecl( $rt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     | ambt = ambiguous_type_decl
-    { $pTypeDecl = $ambt.pTypeDecl; }
+    {
+        ResolveTypeDecl( $ambt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     ;
 
 simple_type_decl returns [ ObjPtr pTypeDecl ]
@@ -1206,8 +1196,7 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
     {
         gint32 ret = 0;
         do{
-            auto pParser =
-                static_cast< CStParser* >( this );
+            auto pParser = GET_PARSER();
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
@@ -1220,24 +1209,17 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             stdstr strType;
             gint32 iType = -1;
 
-            initInfo.GetObjPtr( 2, pTypeInit );
-            initInfo.GetIntProp(
+            ret = initInfo.GetIntProp(
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
+
             initInfo.GetObjPtr(
                 propTypeData, pTypeData );
 
-            if( iType == RuleDerived_type_access )
-            {
-                ret = pNode.NewObj(
-                    clsid( CStAmbiguousTypeDeclNode ) );
-            }
-            else if( IsElementaryType( iType ) )
-            {
-                ret = pNode.NewObj(
-                    clsid( CStSimpleTypeDeclNode ) );
-            }
-            else
+            initInfo.GetObjPtr(
+                propTypeInit, pTypeInit );
+
+            if( ERROR( ret ) )
             {
                 ret = -EINVAL;
                 pCtx->LogError( $si.start,
@@ -1245,8 +1227,21 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
                     $si.ctx->spec->getText().c_str(),
                     ret );
             }
+            else if( iType == RuleDerived_type_access
+                && pTypeInit.IsEmpty() )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else 
+            {
+                ret = pNode.NewObj(
+                    clsid( CStSimpleTypeDeclNode ) );
+            }
+
             if( ERROR( ret ) )
                 break;
+
             CStTypeDeclNode* ptd = pNode;
             ptd->m_pTypeInit = pTypeInit;
             ptd->m_oTypeRef = { strType, nullptr };
@@ -1280,27 +1275,29 @@ simple_spec_init returns [ ObjPtr pTypeInfo ]
         CParamList oParams(
             ( IConfigDb* )$pTypeInfo );
         if( $expr.ctx != nullptr )
-            oParams.Push( $expr.pExpr );
-        else
-            oParams.Push( ObjPtr() );
+            oParams.SetObjPtr(
+                propTypeInit, $expr.pExpr );
     }
     ;
 
 simple_spec returns [ ObjPtr pTypeInfo ]
     : etn = elem_type_name
     {{ 
-        CParamList oParams;
-        oParams.Push( $etn.ctx->getText() );
-        oParams.Push(
-            ( guint32 )$etn.start->getType() );
+        if( $etn.pTypeInfo.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams.Push( $etn.ctx->getText() );
+            oParams.Push(
+                ( guint32 )$etn.start->getType() );
 
-        if( !$etn.pTypeInfo.IsEmpty() )
-            oParams.SetObjPtr(
-                propTypeData, $etn.pTypeInfo );
-
-        oParams.SetIntProp(
-            propRuleId, RuleElem_type_name );
-        $pTypeInfo = oParams.GetCfg();
+            oParams.SetIntProp(
+                propRuleId, RuleElem_type_name );
+            $pTypeInfo = oParams.GetCfg();
+        }
+        else
+        {
+            $pTypeInfo = $etn.pTypeInfo;
+        }
     }}
     | sta = simple_type_access
     {{ 
@@ -1464,39 +1461,43 @@ array_type_decl returns [ ObjPtr pTypeDecl ]
             ObjPtr pTypeData;
             stdstr strType;
             gint32 iType = -1;
-            gint32 iSpec = -1;
 
-            initInfo.GetObjPtr( 2, pTypeInit );
-            initInfo.GetIntProp(
+            ret = initInfo.GetIntProp(
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr(
+                propTypeInit, pTypeInit );
 
             initInfo.GetObjPtr(
                 propTypeData, pTypeData );
 
-            initInfo.GetIntProp(
-                propRuleId, ( guint32& )iSpec );
-
-            if( iSpec == RuleArray_spec )
+            if( ERROR( ret ) )
             {
-                ret = pNode.NewObj(
-                    clsid( CStArrayTypeDeclNode ) );
+                ret = -EINVAL;
+                pCtx->LogError( $asi.start,
+                    "Unknown type:'%s'(%d).",
+                    $asi.ctx->spec->getText().c_str(),
+                    ret );
             }
-            else
+            else if( iType == RuleDerived_type_access
+                && pTypeInit.IsEmpty() )
             {
                 ret = pNode.NewObj(
                     clsid( CStAmbiguousTypeDeclNode ) );
             }
+            else
+            {
+                ret = pNode.NewObj(
+                    clsid( CStArrayTypeDeclNode ) );
+            }
+
             if( ERROR( ret ) )
                 break;
 
             CStTypeDeclNode* ptd = pNode;
             ptd->m_pTypeInit = pTypeInit;
             ptd->m_oTypeRef = { strType, nullptr };
-            if( iSpec == RuleArray_spec )
-                ptd->m_iTypeId = TOK_ARRAY;
-            else
-                ptd->m_iTypeId = iType;
+            ptd->m_iTypeId = iType;
 
             if( !pTypeData.IsEmpty() )
                 ptd->m_pTypeData = pTypeData;
@@ -1518,14 +1519,15 @@ array_type_decl returns [ ObjPtr pTypeDecl ]
     ;
 
 array_spec_init returns [ ObjPtr pTypeInfo ]
-    : spec=array_spec (TOK_ASSIGN array_init)?
+    : spec=array_spec (TOK_ASSIGN ai=array_init)?
     {
         $pTypeInfo = $spec.pTypeInfo;
         CParamList oParams(
             ( IConfigDb* )$pTypeInfo );
         // The array initializer is not built yet, keep the
         // slot consistently as simple_spec_init does.
-        oParams.Push( ObjPtr() );
+        oParams.SetObjPtr(
+            propTypeInit, $ai.pTypeInit );
     }
     ;
 
@@ -1590,7 +1592,7 @@ range_list returns [ ObjPtr pRangeList ]
     }
     ;
 
-array_init
+array_init returns [ ObjPtr pTypeInit ]
     : TOK_LBRACKET array_elem_init_list TOK_RBRACKET
     ;
 
@@ -1678,10 +1680,10 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             }
             if( ERROR( ret ) )
                 break;
-            CStAmbiguousTypeDeclNode* ptd = pNode;
+            CStTypeDeclNode* ptd = pNode;
             CParamList oTypeInit;
             ret = oTypeInit.CopyProp(
-                propTypeInit, 2, $si.pTypeInfo );
+                propTypeInit, $si.pTypeInfo );
             if( SUCCEEDED( ret ) )
                 ptd->m_pTypeInit = oTypeInit.GetCfg();
             ptd->m_oTypeRef = { strType, nullptr };
@@ -1690,10 +1692,10 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             if( !pTypeData.IsEmpty() )
                 ptd->m_pTypeData = pTypeData;
 
-            if( IsDirectType( iType ) )
-                ptd->m_iDirectType = iType;
+            ptd->m_iDirectType = iType;
 
-            auto pSym = ost.Declare( $stn.ctx->getText(),
+            auto pSym = ost.Declare(
+                $stn.ctx->getText(),
                 symDataType, pNode, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( pSym.IsEmpty() )
@@ -1704,7 +1706,8 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             $pTypeDecl = pNode;
 
         }while( 0 );
-    }    ;
+    }
+    ;
 
 string_spec_init returns [ ObjPtr pTypeInfo ]
     : sp=string_spec (TOK_ASSIGN sl=string_literal)?
@@ -1712,7 +1715,8 @@ string_spec_init returns [ ObjPtr pTypeInfo ]
         CParamList oParams(
             ( IConfigDb* ) $sp.pTypeInfo );
         if( $sl.ctx )
-            oParams.Push( $sl.ctx->getText() );
+            oParams.SetStrProp(
+                propTypeInit, $sl.ctx->getText() );
         $pTypeInfo = oParams.GetCfg();
     }
     ;
@@ -1748,32 +1752,60 @@ ref_type_decl returns [ ObjPtr pTypeDecl ]
             stdstr strType;
             gint32 iType = -1;
 
-            initInfo.GetIntProp(
+            ret = initInfo.GetIntProp(
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr(
+                propTypeInit , pTypeInit );
 
-            ret = pNode.NewObj(
-                clsid( CStRefTypeDeclNode ) );
+            initInfo.GetObjPtr(
+                propTypeData, pTypeData );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $rsi.start,
+                    "Unknown type:'%s'(%d).",
+                    $rsi.ctx->rs->getText().c_str(),
+                    ret );
+            }
+            else if( iType == RuleDerived_type_access
+                && pTypeInit.IsEmpty() )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else 
+            {
+                ret = pNode.NewObj(
+                    clsid( CStRefTypeDeclNode ) );
+            }
+
             if( ERROR( ret ) )
                 break;
 
             CStRefTypeDeclNode* ptd = pNode;
-            CParamList oTypeInit;
-            ret = oTypeInit.CopyProp( propTypeInit,
-                ( IConfigDb* )$rsi.pTypeInfo );
-            if( SUCCEEDED( ret ) )
-                ptd->m_pTypeInit = oTypeInit.GetCfg();
+            if( !pTypeInit.IsEmpty() )
+                ptd->m_pTypeInit = pTypeInit;
+
             ptd->m_oTypeRef = { strType, nullptr };
             ptd->m_iTypeId = TOK_REF_TO;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
 
             if( IsDirectType( iType ) )
                 ptd->m_iDirectType = iType;
 
-            gint32 iRank = 0;
-            ret = initInfo.GetIntProp(
-                propRefRank, ( guint32& )iRank );
-            if( SUCCEEDED( ret ) )
-                ptd->m_iRefRank = iRank;
+            if( !pTypeData.IsEmpty() )
+            {
+                CParamList oTypeData( pTypeData );
+                gint32 iRank = 0;
+                ret = oTypeData.GetIntProp(
+                    propRefRank, ( guint32& )iRank );
+                if( SUCCEEDED( ret ) )
+                    ptd->m_iRefRank = iRank;
+            }
 
             auto pSym = ost.Declare(
                 $rtn.text, symDataType,
@@ -1796,8 +1828,10 @@ ref_spec_init returns [ ObjPtr pTypeInfo ]
             ( IConfigDb* )$rs.pTypeInfo );
         if( $v.ctx )
         {
-            oParams.SetStrProp(
-                propTypeInit, $v.ctx->getText() );
+            CParamList oTypeInit;
+            oTypeInit.Push( $v.ctx->getText() );
+            oParams.SetObjPtr(
+                propTypeInit, oTypeInit.GetCfg() );
         }
         $pTypeInfo = oParams.GetCfg();
     }
@@ -1809,8 +1843,11 @@ ref_spec returns [ ObjPtr pTypeInfo ]
         CParamList oParams;
         oParams.Push( $dta.typePair.first );
         oParams.Push( $dta.typePair.second );
-        oParams.SetIntProp(
+        CParamList oTypeData;
+        oTypeData.SetIntProp(
             propRefRank, $tok.size() );
+        oParams.SetObjPtr(
+            propTypeData, oTypeData.GetCfg() );
         $pTypeInfo = oParams.GetCfg();
     }
     ;

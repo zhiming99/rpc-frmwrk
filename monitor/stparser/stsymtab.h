@@ -38,24 +38,6 @@
 namespace rpcf
 {
 
-enum enumSymKind {
-    symUnknown = 0,
-    symVariable,      // variable, incl. FB instances and vars with AT addresses
-    symEnumValue,     // enumerated value constant
-    symDataType,      // named data type from TYPE...END_TYPE
-    symProgram,
-    symFunctionBlock,
-    symFunction,
-    symMethod,
-    symInterface,
-    symNamespace,
-    symClass,
-    symProperty,
-    symAccess,
-    symResource,
-    symTask,
-};
-
 /**
  * @brief What kind of lexical scope a CStScope represents
  */

@@ -616,6 +616,10 @@ gint32 ReplaceAmbiguousNode(
     CStAmbiguousTypeDeclNode* ptd,
     gint32 iDirectType,
     ObjPtr& pNode );
+
+gint32 ResolveTypeDecl(
+    ObjPtr& pObj, void* pctx );
+
 }
 
 #endif // ST_PARSE_CONTEXT_H

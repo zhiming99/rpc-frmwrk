@@ -1677,4 +1677,63 @@ gint32 ReplaceAmbiguousNode(
     return ret;
 }
 
+gint32 ResolveTypeDecl(
+    ObjPtr& pObj, void* pctx )
+{
+    gint32 ret = 0;
+    do{
+        CStTypeDeclNode* ptd = pObj;
+        if( ptd == nullptr || pctx == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        ptd->m_pDtd = pObj;
+        auto func =
+        ([]( ObjPtr& pObj, void* pctx )->gint32
+        {
+            CStTypeDeclNode* ptd = pObj;             
+            if( !ptd )
+                return -EINVAL;
+
+            if( ptd->IsSymbolResolved() )
+                return 0;
+
+            gint32 ret = 0;
+            auto pdtd = ( CStDataTypeDeclNode* )ptd->m_pDtd;
+            auto pScope = pdtd->m_pScope;
+            if( pdtd && !pdtd->m_bPushed )
+                pScope->PushUsingArr( pdtd->m_vecUsings );
+
+            ret = ptd->ResolveSymbol( pctx, symDataType );
+
+            if( SUCCEEDED( ret ) && ptd->GetClsid() ==
+                clsid( CStAmbiguousTypeDeclNode ) )
+            {
+                ObjPtr pNewNode;
+                auto pCtx = reinterpret_cast
+                    < CStParseContext* >( pctx );
+                ReplaceAmbiguousNode( pCtx,
+                    pObj, ptd->m_iDirectType,
+                    pNewNode );
+            }
+            if( pdtd && !pdtd->m_bPushed )
+                pScope->PopUsingArr();
+            return ret;
+        });
+        ret = func( pObj, pctx );
+        if( ERROR( ret ) )
+        {
+            auto pCtx = reinterpret_cast
+                < CStParseContext* >( pctx );
+            auto& ost = pCtx->m_oSymTab;
+            auto pSym = ptd->m_pSymbol;
+            ost.AddUnsolved( pObj, func, pSym );
+            ret = -EAGAIN;
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 }
