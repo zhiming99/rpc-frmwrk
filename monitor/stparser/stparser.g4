@@ -464,42 +464,198 @@ const_expr returns [ ObjPtr pExpr ]
     ;
 
 expression returns [ ObjPtr pExpr]
-    : xor_expr (TOK_OR xor_expr)*
+    : xe1=xor_expr
+    {{
+        $pExpr = $xe1.pExpr;
+    }}
+    ( TOK_OR xe2=xor_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $xe2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boOr;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-xor_expr
-    : and_expr ( TOK_XOR and_expr )*
+xor_expr returns [ ObjPtr pExpr ]
+    : ae1=and_expr
+    {{
+        $pExpr = $ae1.pExpr;
+    }}
+    ( TOK_XOR ae2=and_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ae2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boXor;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-and_expr
-    : compare_expr ((TOK_AND | TOK_AND_OP )compare_expr)*
+and_expr returns [ ObjPtr pExpr ]
+    : ce1=compare_expr
+    {{
+        $pExpr = $ce1.pExpr;
+    }}
+    ( ( TOK_AND | TOK_AND_OP ) ce2=compare_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ce2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boAnd;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-compare_expr
-    : equ_expr ( (TOK_EQUAL|TOK_NEQU) equ_expr)*
+compare_expr returns [ ObjPtr pExpr ]
+    : ee1=equ_expr
+    {{
+        $pExpr = $ee1.pExpr;
+    }}
+    ( op=( TOK_EQUAL | TOK_NEQU ) ee2=equ_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ee2.pExpr;
+        pb->m_eOperator = ( $op.type == TOK_EQUAL ) ?
+            CStBinaryExpr::boEqual :
+            CStBinaryExpr::boNotEqual;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-equ_expr
-    : add_expr ( ( TOK_LT | TOK_LE | TOK_GT | TOK_NLE ) add_expr )*
+equ_expr returns [ ObjPtr pExpr ]
+    : ade1=add_expr
+    {{
+        $pExpr = $ade1.pExpr;
+    }}
+    ( op=( TOK_LT | TOK_LE | TOK_GT | TOK_NLE ) ade2=add_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ade2.pExpr;
+        switch( $op.type )
+        {
+        case TOK_LE:
+            pb->m_eOperator = CStBinaryExpr::boLessEqual;
+            break;
+        case TOK_GT:
+            pb->m_eOperator = CStBinaryExpr::boGreaterThan;
+            break;
+        case TOK_NLE:
+            pb->m_eOperator = CStBinaryExpr::boGreaterEqual;
+            break;
+        default:
+            pb->m_eOperator = CStBinaryExpr::boLessThan;
+            break;
+        }
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-add_expr
-    : term ( ( TOK_ADD | TOK_MINUS) term )*
+add_expr returns [ ObjPtr pExpr ]
+    : t1=term
+    {{
+        $pExpr = $t1.pExpr;
+    }}
+    ( op=( TOK_ADD | TOK_MINUS ) t2=term
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $t2.pExpr;
+        pb->m_eOperator = ( $op.type == TOK_ADD ) ?
+            CStBinaryExpr::boAdd : CStBinaryExpr::boSub;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-term
-    : power_expr (( TOK_MUL | TOK_DIV | TOK_MOD ) power_expr )*
+term returns [ ObjPtr pExpr ]
+    : pe1=power_expr
+    {{
+        $pExpr = $pe1.pExpr;
+    }}
+    ( op=( TOK_MUL | TOK_DIV | TOK_MOD ) pe2=power_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $pe2.pExpr;
+        if( $op.type == TOK_DIV )
+            pb->m_eOperator = CStBinaryExpr::boDiv;
+        else if( $op.type == TOK_MOD )
+            pb->m_eOperator = CStBinaryExpr::boMod;
+        else
+            pb->m_eOperator = CStBinaryExpr::boMul;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-power_expr
-    : unary_expr (TOK_POWER unary_expr)*
+power_expr returns [ ObjPtr pExpr ]
+    : ue1=unary_expr
+    {{
+        $pExpr = $ue1.pExpr;
+    }}
+    ( TOK_POWER ue2=unary_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ue2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boPower;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-unary_expr
-    : ( TOK_NOT | TOK_ADD | TOK_MINUS | TOK_CARET )? primary_expr
+unary_expr returns [ ObjPtr pExpr ]
+    : ( op=TOK_NOT | op=TOK_ADD | op=TOK_MINUS | op=TOK_CARET )? pe=primary_expr
+    {{
+        $pExpr = $pe.pExpr;
+        // unary '+' does not change the operand
+        if( $op.type != 0 && $op.type != TOK_ADD &&
+            !$pExpr.IsEmpty() )
+        {
+            ObjPtr pObj;
+            pObj.NewObj( clsid( CStUnaryExpr ) );
+            CStUnaryExpr* pu = pObj;
+            pu->m_pOperand = $pExpr;
+            if( $op.type == TOK_MINUS )
+                pu->m_eOperator = CStUnaryExpr::uoNeg;
+            else if( $op.type == TOK_NOT )
+                pu->m_eOperator = CStUnaryExpr::uoNot;
+            else
+                pu->m_eOperator = CStUnaryExpr::uoCaret;
+            $pExpr = pObj;
+        }
+    }}
     ;
 
-primary_expr
+// Only the parenthesized form produces an expression node for
+// now: constant, variable_access, enum_value, namedval_value,
+// func_call and invocation do not return one yet.
+primary_expr returns [ ObjPtr pExpr ]
     : constant
     | variable_access
     | enum_value
@@ -507,7 +663,10 @@ primary_expr
     | func_call
     | invocation
     | ref_value
-    | TOK_LPAREN expression TOK_RPAREN
+    | TOK_LPAREN ec=expression TOK_RPAREN
+    {{
+        $pExpr = $ec.pExpr;
+    }}
     ;
 
 variable_access
@@ -530,20 +689,43 @@ constant
     : numeric_literal
     | string_literal
     | time_literal
-    | bit_str_literal
     | bool_literal
+    | bit_str_literal
     ;
 
-numeric_literal
-    : TOK_INT
-    | TOK_REAL
+numeric_literal returns [ std::pair< int, ObjPtr > pair ]
+    : td=TOK_INT
+    {{
+        $pair = ParseStNumericLiteral(
+            $td.text.c_str(), stparser::TOK_INT );
+    }}
+    | td=TOK_REAL
+    {{
+        $pair = ParseStNumericLiteral(
+            $td.text.c_str(), stparser::TOK_REAL );
+    }}
     ;
 
-time_literal
-    : TOK_DURATION
-    | TOK_TIME_OF_DAY
-    | TOK_DATE
-    | TOK_DATE_TIME
+time_literal returns [ std::pair< int, ObjPtr > pair ]
+    : td=TOK_DURATION
+    {{
+        $pair = ParseStDuration( $td.text.c_str() );
+    }}
+    | td=TOK_TIME_OF_DAY
+    {{
+        $pair = ParseStTimeLiteral(
+            $td.text.c_str(), stparser::TOK_TIME_OF_DAY );
+    }}
+    | td=TOK_DATE
+    {{
+        $pair = ParseStTimeLiteral(
+            $td.text.c_str(), stparser::TOK_DATE );
+    }}
+    | td=TOK_DATE_TIME
+    {{
+        $pair = ParseStTimeLiteral(
+            $td.text.c_str(), stparser::TOK_DATE_TIME );
+    }}
     ;
 
 string_literal
@@ -553,14 +735,36 @@ string_literal
     ;
 
 bool_value
-    : TOK_INT
+    : TOK_INT // value must be 0 or 1
     | TOK_TRUE
     | TOK_FALSE
     ;
 
-bool_literal
-    : bool_value
-    | bool_type_name TOK_PUNC bool_value
+bool_literal returns [ std::pair< int, ObjPtr > pair ]
+    : bv=bool_value
+    {{
+        $pair = ParseStBoolLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $bv.start,
+                "Invalid bool literal:'%s'.",
+                $text.c_str() );
+        }
+    }}
+    | bool_type_name TOK_PUNC bv=bool_value
+    {{
+        $pair = ParseStBoolLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $bv.start,
+                "Invalid bool literal:'%s'.",
+                $text.c_str() );
+        }
+    }}
     ;
 
 bit_str_literal
@@ -1526,8 +1730,9 @@ array_spec_init returns [ ObjPtr pTypeInfo ]
             ( IConfigDb* )$pTypeInfo );
         // The array initializer is not built yet, keep the
         // slot consistently as simple_spec_init does.
-        oParams.SetObjPtr(
-            propTypeInit, $ai.pTypeInit );
+        if( $ai.ctx )
+            oParams.SetObjPtr(
+                propTypeInit, $ai.pTypeInit );
     }
     ;
 

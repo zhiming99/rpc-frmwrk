@@ -4,6 +4,7 @@
 #include "stparser.h"
 #include "parse_context.h"
 #include "clsids.h"
+#include "stbase.h"
 
 namespace rpcf 
 {

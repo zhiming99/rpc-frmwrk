@@ -35,7 +35,7 @@ pragma_obj = $(pragma_auto_gen:.cpp=.o)
 key_headers=pragma.h parse_context.h st_parser_ext.h stsymtab.h stparser.h stast.h astnodes.h stclsids.h $(pragma_auto_headers)
 
 # Build rpcfstc
-$(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parser_ext.o astnodes.o parse_context.o stsymtab.o
+$(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parser_ext.o astnodes.o parse_context.o stsymtab.o stbase.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) -L. -lpragma
 
 %.o: %.cpp
@@ -58,6 +58,7 @@ parse_context.o: parse_context.cpp $(key_headers)
 st_parser_ext.o: st_parser_ext.cpp $(key_headers)
 astnodes.o: astnodes.cpp $(key_headers)
 stsymtab.o: stsymtab.cpp $(key_headers)
+stbase.o: stbase.cpp stbase.h $(key_headers)
 st_main.o: st_main.cpp $(key_headers)
 
 $(pragma_auto_gen) $(pragma_auto_headers) &: pragma_expr.g4

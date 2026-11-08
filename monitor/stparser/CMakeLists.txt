@@ -172,6 +172,7 @@ add_executable(rpcfstc
     astnodes.cpp
     parse_context.cpp
     stsymtab.cpp
+    stbase.cpp
     ${ANTLR_GEN_CPP}
     ${ANTLR_GEN_H})
 

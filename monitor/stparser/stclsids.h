@@ -57,7 +57,7 @@ typedef enum
     DECL_CLSID( CStIfBranchListNode ),
 
     // AST Type Nodes
-    DECL_CLSID( CStBasicTypeNode ),
+    DECL_CLSID( CStConstValueNode ),
     DECL_CLSID( CStArrayTypeNode ),
     DECL_CLSID( CStStructTypeNode ),
     DECL_CLSID( CStEnumTypeNode ),

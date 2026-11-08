@@ -93,7 +93,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStIfBranchListNode );
 
     // AST Type Nodes
-    INIT_MAP_ENTRY( CStBasicTypeNode );
+    INIT_MAP_ENTRY( CStConstValueNode );
     INIT_MAP_ENTRY( CStArrayTypeNode );
     INIT_MAP_ENTRY( CStStructTypeNode );
     INIT_MAP_ENTRY( CStEnumTypeNode );
@@ -407,6 +407,15 @@ int main(int argc, char* argv[])
             std::cerr << "Parse failed with "
                 << parser.getNumberOfSyntaxErrors()
                 << " errors" << std::endl;
+            ret = ERROR_FAIL;
+            goto cleanup;
+        }
+
+        if( oCtx.GetErrorCount() )
+        {
+            std::cerr << "Parse failed with "
+                << oCtx.GetErrorCount()
+                << " semantic errors" << std::endl;
             ret = ERROR_FAIL;
             goto cleanup;
         }

@@ -484,6 +484,9 @@ struct CStParseContext
             pToken, szMsgId, args...);
     }
 
+    inline gint32 GetErrorCount() const
+    { return m_dwErrorCount; }
+
     guint32 m_dwWarningCount = 0;
     guint32 m_dwErrorCount = 0;
 };

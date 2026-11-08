@@ -24,54 +24,164 @@
 #include "rpc.h"
 #include "stlexer.h"
 #include "stparser.h"
+#include "stbase.h"
+
+#include <climits>
+#include <cerrno>
 
 using namespace rpcf;
 
-timespec st_time_to_timespec(const char* text) {
+// All the long time literal forms ('LT#', 'LTIME#', 'LDATE#',
+// 'LDT#', 'LTOD#', ...) start with an 'L' in their prefix.
+static bool StLiteralIsLong( const char* text )
+{
+    const char* pHash = strchr( text, '#' );
+    if( pHash == nullptr || pHash == text )
+        return false;
+    return std::toupper( ( unsigned char )text[ 0 ] ) == 'L';
+}
+
+// Pack a time value into the configuration object shared by all
+// the time literal conversions.
+static gint32 PackStTimeObject(
+    const void* pData, size_t dwSize,
+    bool bLongTime, ObjPtr& pObj )
+{
+    BufPtr pBuf;
+    gint32 ret = pBuf.NewObj();
+    if( ERROR( ret ) || pBuf.IsEmpty() )
+        return ret;
+
+    ret = pBuf->Resize( dwSize );
+    if( ERROR( ret ) )
+        return ret;
+
+    memcpy( pBuf->ptr(), pData, dwSize );
+
+    CfgPtr pCfg;
+    ret = pCfg.NewObj();
+    if( ERROR( ret ) || pCfg.IsEmpty() )
+        return ret;
+
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+    ret = oCfg.SetBufPtr( propStTimeSpec, pBuf );
+    if( ERROR( ret ) )
+        return ret;
+
+    ret = oCfg.SetBoolProp( propStTimeIsLong, bLongTime );
+    if( ERROR( ret ) )
+        return ret;
+
+    pObj = pCfg;
+    return 0;
+}
+
+timespec st_time_to_timespec(const char* text)
+{
     struct timespec ts = {0, 0};
     if (!text) return ts;
 
-    // Skip the "T#" or "TIME#" prefix
+    // Skip the prefix, which can be T#, TIME#, LT# or LTIME#.
+    // The prefix only selects the literal's width; the lexical
+    // form after '#' is the same for all of them.
     const char* ptr = strchr(text, '#');
     if (!ptr) return ts;
     ptr++; 
 
-    double total_seconds = 0.0;
-    char* endptr;
-
-    while (*ptr != '\0') {
-        // strtod handles numeric values (including decimals like 1.5)
-        double val = std::strtod(ptr, &endptr);
-        if (ptr == endptr) break;
-        ptr = endptr;
-
-        // Skip underscores (ST allows T#1_000ms)
-        while (*ptr == '_') ptr++;
-
-        // Unit detection using POSIX strncasecmp
-        if (strncasecmp(ptr, "ms", 2) == 0) { 
-            total_seconds += val * 0.001; 
-            ptr += 2; 
-        } else if (strncasecmp(ptr, "us", 2) == 0) { 
-            total_seconds += val * 1e-6; 
-            ptr += 2; 
-        } else if (strncasecmp(ptr, "ns", 2) == 0) { 
-            total_seconds += val * 1e-9; 
-            ptr += 2; 
-        } else {
-            char unit = std::tolower(*ptr);
-            if (unit == 'd')      total_seconds += val * 86400.0;
-            else if (unit == 'h') total_seconds += val * 3600.0;
-            else if (unit == 'm') total_seconds += val * 60.0;
-            else if (unit == 's') total_seconds += val * 1.0;
-            ptr++;
-        }
+    bool bNegative = false;
+    if( *ptr == '+' )
+        ptr++;
+    else if( *ptr == '-' )
+    {
+        bNegative = true;
+        ptr++;
     }
 
-    // Convert to timespec
-    ts.tv_sec = static_cast<time_t>(total_seconds);
-    ts.tv_nsec = static_cast<long>((total_seconds - static_cast<double>(ts.tv_sec)) * 1e9);
-    
+    // Accumulate in nanoseconds instead of 'double seconds'.
+    // LTIME covers the full signed 64-bit range, and a double
+    // only has 53 bits of mantissa, so large LTIME values used
+    // to lose their sub-second part (e.g. the standard maximum
+    // LTIME#106751d23h47m16s854ms775us807ns).  __int128 is used
+    // as an overflow guard before the final clamp.
+    __int128 iTotalNs = 0;
+
+    while (*ptr != '\0') {
+        // Skip underscores (ST allows T#1_000ms)
+        if( *ptr == '_' )
+        {
+            ptr++;
+            continue;
+        }
+        if( !std::isdigit( ( unsigned char )*ptr ) )
+            break;
+
+        // Integer part; saturate early so the later unit
+        // multiplication cannot overflow __int128.
+        __int128 iIntPart = 0;
+        while( std::isdigit( ( unsigned char )*ptr ) )
+        {
+            if( iIntPart < 1000000000000000000LL )
+                iIntPart = iIntPart * 10 + ( *ptr - '0' );
+            ptr++;
+        }
+
+        // Optional fractional part, applied with the unit below
+        __int128 iFracNum = 0;
+        __int128 iFracDen = 1;
+        if( *ptr == '.' )
+        {
+            ptr++;
+            while( std::isdigit( ( unsigned char )*ptr ) )
+            {
+                if( iFracDen <= 1000000000000000000LL )
+                {
+                    iFracNum = iFracNum * 10 + ( *ptr - '0' );
+                    iFracDen *= 10;
+                }
+                ptr++;
+            }
+        }
+
+        // Longest units first so that 'ms' is not read as 'm'
+        __int128 iUnitNs = 0;
+        if (strncasecmp(ptr, "ms", 2) == 0) { 
+            iUnitNs = 1000000LL;
+            ptr += 2; 
+        } else if (strncasecmp(ptr, "us", 2) == 0) { 
+            iUnitNs = 1000LL;
+            ptr += 2; 
+        } else if (strncasecmp(ptr, "ns", 2) == 0) { 
+            iUnitNs = 1LL;
+            ptr += 2; 
+        } else {
+            char unit = std::tolower( ( unsigned char )*ptr );
+            if (unit == 'd')      iUnitNs = 86400LL * 1000000000LL;
+            else if (unit == 'h') iUnitNs = 3600LL * 1000000000LL;
+            else if (unit == 'm') iUnitNs = 60LL * 1000000000LL;
+            else if (unit == 's') iUnitNs = 1000000000LL;
+            else break;   // unknown unit: keep what we have
+            ptr++;
+        }
+
+        iTotalNs += iIntPart * iUnitNs;
+        if( iFracNum != 0 )
+            iTotalNs += iFracNum * iUnitNs / iFracDen;
+    }
+
+    if( bNegative )
+        iTotalNs = -iTotalNs;
+
+    // Clamp to the signed 64-bit nanosecond range that
+    // time_t/long can carry on this platform.
+    if( iTotalNs > ( __int128 )LLONG_MAX )
+        iTotalNs = ( __int128 )LLONG_MAX;
+    else if( iTotalNs < ( __int128 )LLONG_MIN )
+        iTotalNs = ( __int128 )LLONG_MIN;
+
+    gint64 qwNs = ( gint64 )iTotalNs;
+    ts.tv_sec = ( time_t )( qwNs / 1000000000LL );
+    ts.tv_nsec = ( long )( qwNs % 1000000000LL );
+
     // Safety: ensure nsec is within [0, 999999999]
     if (ts.tv_nsec < 0) {
         ts.tv_sec -= 1;
@@ -81,41 +191,366 @@ timespec st_time_to_timespec(const char* text) {
     return ts;
 }
 
-// Helper to convert ST literals to Unix Epoch
-uint64_t ParseStTimeToUnix(const char* input) {
-    struct tm tm_info = {0};
-    std::string s(input);
+std::pair< gint32, ObjPtr > ParseStDuration( const char* text )
+{
+    std::pair< gint32, ObjPtr > result(
+        stparser::TOK_DURATION, ObjPtr() );
 
-    // 1. DATE_AND_TIME / DT (yyyy-mm-dd-hh:mm:ss)
-    if (s.find("DT#") == 0 || s.find("DATE_AND_TIME#") == 0) {
-        const char* start = strchr(input, '#') + 1;
-        sscanf(start, "%d-%d-%d-%d:%d:%d",
-               &tm_info.tm_year, &tm_info.tm_mon, &tm_info.tm_mday,
-               &tm_info.tm_hour, &tm_info.tm_min, &tm_info.tm_sec);
-        tm_info.tm_year -= 1900; // Years since 1900
-        tm_info.tm_mon -= 1;     // Months 0-11
-        return (uint64_t)mktime(&tm_info);
+    if( text == nullptr )
+        return result;
+
+    timespec ts = st_time_to_timespec( text );
+
+    ObjPtr pObj;
+    gint32 ret = PackStTimeObject( &ts, sizeof( ts ),
+        StLiteralIsLong( text ), pObj );
+    if( ERROR( ret ) )
+        return result;
+
+    result.second = pObj;
+    return result;
+}
+
+// Parse the characters following '#' into a 'struct tm'.  Only
+// the fields carried by the literal are filled in.
+static gint32 ParseStTmText(
+    const char* pText, gint32 iTokId,
+    struct tm& tmVal, double* pdSec = nullptr )
+{
+    memset( &tmVal, 0, sizeof( tmVal ) );
+    tmVal.tm_isdst = -1;
+    // A TIME_OF_DAY literal has no date, keep the fields at a
+    // valid epoch day so the struct is always well formed.
+    tmVal.tm_mday = 1;
+
+    int iYear = 0, iMon = 0, iDay = 0;
+    int iHour = 0, iMin = 0;
+    double dSec = 0;
+    int iCount = 0;
+
+    switch( iTokId )
+    {
+    case stparser::TOK_TIME_OF_DAY:
+        iCount = sscanf( pText, "%d:%d:%lf",
+            &iHour, &iMin, &dSec );
+        if( iCount != 3 )
+            return -EINVAL;
+        break;
+    case stparser::TOK_DATE:
+        iCount = sscanf( pText, "%d-%d-%d",
+            &iYear, &iMon, &iDay );
+        if( iCount != 3 )
+            return -EINVAL;
+        break;
+    case stparser::TOK_DATE_TIME:
+        iCount = sscanf( pText, "%d-%d-%d-%d:%d:%lf",
+            &iYear, &iMon, &iDay, &iHour, &iMin, &dSec );
+        if( iCount != 6 )
+            return -EINVAL;
+        break;
+    default:
+        return -EINVAL;
     }
 
-    // 2. DATE (yyyy-mm-dd)
-    if (s.find("D#") == 0 || s.find("DATE#") == 0) {
-        const char* start = strchr(input, '#') + 1;
-        sscanf(start, "%d-%d-%d", &tm_info.tm_year, &tm_info.tm_mon, &tm_info.tm_mday);
-        tm_info.tm_year -= 1900;
-        tm_info.tm_mon -= 1;
-        return (uint64_t)mktime(&tm_info); // Returns start of that day
+    if( iTokId != stparser::TOK_TIME_OF_DAY &&
+        ( iMon < 1 || iMon > 12 || iDay < 1 || iDay > 31 ) )
+        return -EINVAL;
+
+    if( iTokId != stparser::TOK_DATE &&
+        ( iHour < 0 || iHour > 23 ||
+          iMin < 0 || iMin > 59 ||
+          dSec < 0 || dSec > 60 ) )
+        return -EINVAL;
+
+    if( iTokId != stparser::TOK_TIME_OF_DAY )
+    {
+        tmVal.tm_year = iYear - 1900;
+        tmVal.tm_mon = iMon - 1;
+        tmVal.tm_mday = iDay;
     }
 
-    // 3. TIME_OF_DAY (hh:mm:ss)
-    if (s.find("TOD#") == 0 || s.find("TIME_OF_DAY#") == 0) {
-        const char* start = strchr(input, '#') + 1;
-        int ms = 0;
-        sscanf(start, "%d:%d:%d.%d", &tm_info.tm_hour, &tm_info.tm_min, &tm_info.tm_sec, &ms);
-        // TOD is often stored as milliseconds since midnight in PLCs
-        return (tm_info.tm_hour * 3600000) + (tm_info.tm_min * 60000) + (tm_info.tm_sec * 1000) + ms;
+    if( iTokId != stparser::TOK_DATE )
+    {
+        tmVal.tm_hour = iHour;
+        tmVal.tm_min = iMin;
+        // 'struct tm' only has second resolution, the
+        // fractional part is dropped
+        tmVal.tm_sec = ( int )dSec;
     }
+
+    if( pdSec != nullptr )
+        *pdSec = dSec;
 
     return 0;
+}
+
+std::pair< gint32, ObjPtr > ParseStTimeLiteral(
+    const char* text, gint32 iTokId )
+{
+    std::pair< gint32, ObjPtr > result( iTokId, ObjPtr() );
+
+    if( text == nullptr )
+        return result;
+
+    const char* pStart = strchr( text, '#' );
+    if( pStart == nullptr )
+        return result;
+    pStart++;
+
+    struct tm tmVal;
+    gint32 ret = ParseStTmText( pStart, iTokId, tmVal );
+    if( ERROR( ret ) )
+        return result;
+
+    ObjPtr pObj;
+    ret = PackStTimeObject( &tmVal, sizeof( tmVal ),
+        StLiteralIsLong( text ), pObj );
+    if( ERROR( ret ) )
+        return result;
+
+    result.second = pObj;
+    return result;
+}
+
+// Parse an integer literal into a 64-bit bit pattern.
+// The radix comes from the '2#'/'16#' prefix, or is 10
+// without a prefix.  Underscores are ignored, and a
+// leading '-' negates the value.
+static gint32 ParseStIntText(
+    const char* pText, guint64& qwValRet, gint32& iBase )
+{
+    const char* pHash = strchr( pText, '#' );
+    const char* p = pText;
+    iBase = 10;
+
+    if( pHash != nullptr )
+    {
+        // The prefix before '#' is the radix in decimal
+        char* pEnd = nullptr;
+        unsigned long ulBase = strtoul( pText, &pEnd, 10 );
+        if( pEnd != pHash ||
+            ( ulBase != 2 && ulBase != 16 ) )
+            return -EINVAL;
+        iBase = ( gint32 )ulBase;
+        p = pHash + 1;
+    }
+
+    bool bNegative = false;
+    if( *p == '+' )
+        p++;
+    else if( *p == '-' )
+    {
+        bNegative = true;
+        p++;
+    }
+
+    guint64 qwVal = 0;
+    bool bAnyDigit = false;
+
+    for( ; *p != '\0'; p++ )
+    {
+        if( *p == '_' )
+            continue;
+
+        int iDigit = 0;
+        if( *p >= '0' && *p <= '9' )
+            iDigit = *p - '0';
+        else if( *p >= 'A' && *p <= 'F' )
+            iDigit = *p - 'A' + 10;
+        else if( *p >= 'a' && *p <= 'f' )
+            iDigit = *p - 'a' + 10;
+        else
+            return -EINVAL;
+
+        if( iDigit >= iBase )
+            return -EINVAL;
+
+        if( qwVal > ( UINT64_MAX - iDigit ) / iBase )
+            return -ERANGE;
+
+        qwVal = qwVal * iBase + iDigit;
+        bAnyDigit = true;
+    }
+
+    if( false == bAnyDigit )
+        return -EINVAL;
+
+    if( bNegative )
+        qwVal = 0 - qwVal; // keep the two's complement bit pattern
+
+    qwValRet = qwVal;
+    return 0;
+}
+
+std::pair< gint32, ObjPtr > ParseStNumericLiteral(
+    const char* text, gint32 iTokId )
+{
+    std::pair< gint32, ObjPtr > result( iTokId, ObjPtr() );
+
+    if( text == nullptr )
+        return result;
+
+    CfgPtr pCfg;
+    gint32 ret = pCfg.NewObj();
+    if( ERROR( ret ) || pCfg.IsEmpty() )
+        return result;
+
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+
+    if( iTokId == stparser::TOK_INT )
+    {
+        guint64 qwVal = 0;
+        gint32 iBase = 10;
+        ret = ParseStIntText( text, qwVal, iBase );
+        if( ERROR( ret ) )
+            return result;
+
+        ret = oCfg.SetQwordProp( propStNumValue, qwVal );
+        if( ERROR( ret ) )
+            return result;
+
+        ret = oCfg.SetIntProp( propStNumFlag, iBase );
+        if( ERROR( ret ) )
+            return result;
+    }
+    else if( iTokId == stparser::TOK_REAL )
+    {
+        const char* pHash = strchr( text, '#' );
+        const char* p = ( pHash != nullptr ) ? pHash + 1 : text;
+
+        // strtod does not accept the ST '_' separators
+        std::string strVal;
+        for( ; *p != '\0'; p++ )
+        {
+            if( *p != '_' )
+                strVal += *p;
+        }
+
+        if( strVal.empty() )
+            return result;
+
+        errno = 0;
+        char* pEnd = nullptr;
+        double dVal = strtod( strVal.c_str(), &pEnd );
+        if( pEnd == strVal.c_str() || *pEnd != '\0' ||
+            errno == ERANGE )
+            return result;
+
+        ret = oCfg.SetDoubleProp( propStNumValue, dVal );
+        if( ERROR( ret ) )
+            return result;
+
+        // 'LREAL#' is double precision; 'REAL#' and the
+        // unprefixed form are single precision
+        bool bDouble = ( pHash != nullptr &&
+            std::toupper( ( unsigned char )text[ 0 ] ) == 'L' );
+
+        ret = oCfg.SetIntProp( propStNumFlag,
+            bDouble ? stRealDouble : stRealFloat );
+        if( ERROR( ret ) )
+            return result;
+    }
+    else
+        return result;
+
+    result.second = pCfg;
+    return result;
+}
+
+std::pair< gint32, ObjPtr > ParseStBoolLiteral( const char* text )
+{
+    std::pair< gint32, ObjPtr > result(
+        stparser::TOK_BOOL, ObjPtr() );
+
+    if( text == nullptr )
+        return result;
+
+    const char* p = text;
+    const char* pHash = strchr( text, '#' );
+    if( pHash != nullptr )
+    {
+        // the only accepted prefix is 'BOOL#'
+        if( pHash - text != 4 ||
+            strncasecmp( text, "BOOL", 4 ) != 0 )
+            return result;
+        p = pHash + 1;
+    }
+
+    bool bVal = false;
+    if( strcasecmp( p, "TRUE" ) == 0 )
+        bVal = true;
+    else if( strcasecmp( p, "FALSE" ) == 0 )
+        bVal = false;
+    else if( p[ 0 ] == '0' && p[ 1 ] == '\0' )
+        bVal = false;
+    else if( p[ 0 ] == '1' && p[ 1 ] == '\0' )
+        bVal = true;
+    else
+        // rejects 'BOOL#23', 'BOOL#01', 'BOOL#-1' and the like
+        return result;
+
+    CfgPtr pCfg;
+    gint32 ret = pCfg.NewObj();
+    if( ERROR( ret ) || pCfg.IsEmpty() )
+        return result;
+
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+    ret = oCfg.SetBoolProp( propStBoolValue, bVal );
+    if( ERROR( ret ) )
+        return result;
+
+    result.second = pCfg;
+    return result;
+}
+
+// Helper to convert ST date/time literals to Unix
+// Epoch (UTC).  For a TIME_OF_DAY literal the returned
+// value is milliseconds since midnight instead, as
+// PLCs commonly store it that way.  Returns 0 on
+// malformed input.
+uint64_t ParseStTimeToUnix(const char* input)
+{
+    if( input == nullptr )
+        return 0;
+
+    const char* pStart = strchr( input, '#' );
+    if( pStart == nullptr )
+        return 0;
+    pStart++;
+
+    gint32 iTokId = 0;
+    bool bHasDate = strchr( pStart, '-' ) != nullptr;
+    bool bHasTime = strchr( pStart, ':' ) != nullptr;
+    if( bHasDate && bHasTime )
+        iTokId = stparser::TOK_DATE_TIME;
+    else if( bHasDate )
+        iTokId = stparser::TOK_DATE;
+    else if( bHasTime )
+        iTokId = stparser::TOK_TIME_OF_DAY;
+    else
+        return 0;
+
+    struct tm tmVal;
+    double dSec = 0;
+    gint32 ret = ParseStTmText( pStart, iTokId, tmVal, &dSec );
+    if( ERROR( ret ) )
+        return 0;
+
+    if( iTokId == stparser::TOK_TIME_OF_DAY )
+    {
+        // Milliseconds since midnight
+        return ( uint64_t )( tmVal.tm_hour * 3600000LL +
+            tmVal.tm_min * 60000LL +
+            ( gint64 )( dSec * 1000.0 + 0.5 ) );
+    }
+
+    // Use UTC rather than the local timezone so the result
+    // does not depend on the environment
+    time_t t = timegm( &tmVal );
+    if( t == ( time_t )-1 )
+        return 0;
+
+    return ( uint64_t )t;
 }
 
 
@@ -334,6 +769,12 @@ std::string TranslateSTUString(const std::string& yytext)
     return result;
 }
 
+// The legacy address scanners below depend on the bison
+// scanner (yyscan_t, yyget_*, ParserPrint) and on the old
+// CSTParserContext, which are not part of the ANTLR build.
+// Keep the code for the future port, but do not compile it.
+#ifdef ST_LEGACY_ADDR_SCANNERS
+
 ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
 {
     gint32 ret = 0;
@@ -525,3 +966,5 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
 
     return ObjPtr( pvecStr );
 }
+
+#endif // ST_LEGACY_ADDR_SCANNERS

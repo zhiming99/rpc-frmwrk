@@ -1688,7 +1688,6 @@ gint32 ResolveTypeDecl(
             ret = -EINVAL;
             break;
         }
-        ptd->m_pDtd = pObj;
         auto func =
         ([]( ObjPtr& pObj, void* pctx )->gint32
         {
@@ -1701,9 +1700,20 @@ gint32 ResolveTypeDecl(
 
             gint32 ret = 0;
             auto pdtd = ( CStDataTypeDeclNode* )ptd->m_pDtd;
-            auto pScope = pdtd->m_pScope;
-            if( pdtd && !pdtd->m_bPushed )
-                pScope->PushUsingArr( pdtd->m_vecUsings );
+
+            // The first attempt happens while the TYPE block is
+            // still being parsed, so its USING list is already
+            // pushed by the grammar (m_bPushed).  A retry runs
+            // after END_TYPE and has to push it again.
+            bool bPushedHere = false;
+            if( pdtd && !pdtd->m_bPushed &&
+                pdtd->m_pScope != nullptr &&
+                !pdtd->m_vecUsings.empty() )
+            {
+                pdtd->m_pScope->PushUsingArr(
+                    pdtd->m_vecUsings );
+                bPushedHere = true;
+            }
 
             ret = ptd->ResolveSymbol( pctx, symDataType );
 
@@ -1717,8 +1727,8 @@ gint32 ResolveTypeDecl(
                     pObj, ptd->m_iDirectType,
                     pNewNode );
             }
-            if( pdtd && !pdtd->m_bPushed )
-                pScope->PopUsingArr();
+            if( bPushedHere )
+                pdtd->m_pScope->PopUsingArr();
             return ret;
         });
         ret = func( pObj, pctx );

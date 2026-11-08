@@ -223,7 +223,8 @@ struct CStUnaryExpr : public CStExprNode
 
     enum enumUnaryOp {
         uoNot,
-        uoNeg
+        uoNeg,
+        uoCaret,
     };
 
     enumUnaryOp m_eOperator;
@@ -558,16 +559,22 @@ struct CStTypeNode : public CStAstNodeBase
 /**
  * @brief Basic type node (int, bool, string, etc.)
  */
-struct CStBasicTypeNode : public CStTypeNode
+struct CStConstValueNode : public CStPrimaryExprNode
 {
-    typedef CStTypeNode super;
+    typedef CStPrimaryExprNode super;
 
     enum enumBasicType {
-        btInt, btBool, btString, btWString, btUString,
-        btByte, btWord, btDWord, btLWord,
-        btInt8, btInt16, btInt32, btInt64,
+        // bit_str_literal
+        btBool, btByte, btWord, btDWord, btLWord,
+
+        // numeric_literal
+        btInt, btInt8, btInt16, btInt32, btInt64,
         btUint8, btUint16, btUint32, btUint64,
-        btReal, btLReal, btChar, btWChar, btUChar,
+        btReal, btLReal, 
+
+        // string literal
+        btString, btWString, btUString, btChar, btWChar, btUChar,
+        // time_literal
         btTime, btDate, btDateTime, btTimeOfDay,
         // Additional types for compatibility
         btDInt, btSInt, btUInt, btUDInt, btUSInt,
@@ -577,17 +584,18 @@ struct CStBasicTypeNode : public CStTypeNode
     enumBasicType m_eBasicType;
     bool m_bSigned;
     gint32 m_iStringLength;
-    // String length as a constant expression for the STRING( n ) /
-    // WSTRING( n ) forms. The parser keeps the expression; the
-    // numeric m_iStringLength is filled by the semantic phase after
-    // constant evaluation.
+    // String length as a constant expression for
+    // the STRING( n ) / WSTRING( n ) forms. The
+    // parser keeps the expression; the numeric
+    // m_iStringLength is filled by the semantic
+    // phase after constant evaluation.
     ObjPtr m_pStringLength;
 
-    CStBasicTypeNode() : super(),
+    CStConstValueNode() : super(),
         m_eBasicType(btInt),
         m_bSigned(true),
         m_iStringLength(0)
-    { SetClassId( clsid( CStBasicTypeNode ) ); }
+    { SetClassId( clsid( CStConstValueNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -2113,7 +2121,7 @@ REGISTER_AST_NODE( CStSubrangeNode );
 REGISTER_AST_NODE( CStSubrangeListNode );
 REGISTER_AST_NODE( CStStmtListNode );
 REGISTER_AST_NODE( CStIfBranchListNode );
-REGISTER_AST_NODE( CStBasicTypeNode );
+REGISTER_AST_NODE( CStConstValueNode );
 REGISTER_AST_NODE( CStArrayTypeNode );
 REGISTER_AST_NODE( CStStructTypeNode );
 REGISTER_AST_NODE( CStEnumTypeNode );

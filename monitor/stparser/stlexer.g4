@@ -268,7 +268,7 @@ TOK_REAL : ('REAL' | 'LREAL') '#' SIGNED_INT ( '.' UNSIGNED_INT ('E' SIGNED_INT)
            | UNSIGNED_INT '.' UNSIGNED_INT ('E' SIGNED_INT)?  // Real literal
            ;
 
-TOK_INT:   '16#' HEX_DIGIT+  // Based literal 16#FF
+TOK_INT:   '16#' HEX_DIGIT ( '_'? HEX_DIGIT )*  // Based literal 16#FF
            | SIGNED_INT        // Simple integer
            | UNSIGNED_INT 
            | '2#' BIT ('_'? BIT)*   // binary literal
@@ -341,7 +341,7 @@ fragment MINUTES: FIX_POINT 'm' | ( UNSIGNED_INT 'm' '_'? )? SECONDS;
 fragment SECONDS: FIX_POINT 's' | ( UNSIGNED_INT 's' '_'? )? MILLISECONDES;
 fragment MILLISECONDES: FIX_POINT 'ms' | ( UNSIGNED_INT 'ms' '_'? )? MICROSECONDES;
 fragment MICROSECONDES: FIX_POINT 'us' | ( UNSIGNED_INT 'us' '_'? )? NANOSECONDES;
-fragment NANOSECONDES: FIX_POINT 'us';
+fragment NANOSECONDES: FIX_POINT 'ns';
 TOK_TIME_OF_DAY: TOD_TYPE_NAME '#' DAYTIME;
 fragment DAYTIME : DAY_HOUR ':' DAY_MINUTE ':' DAY_SECOND;
 fragment DAY_HOUR : UNSIGNED_INT;
