@@ -503,6 +503,89 @@ std::pair< gint32, ObjPtr > ParseStBoolLiteral( const char* text )
     return result;
 }
 
+std::pair< gint32, ObjPtr > ParseStBitStrLiteral( const char* text )
+{
+    // the untyped form has no type token
+    std::pair< gint32, ObjPtr > result(
+        stparser::TOK_INT, ObjPtr() );
+
+    if( text == nullptr )
+        return result;
+
+    static const struct
+    {
+        const char* m_szName;
+        gint32 m_iTokId;
+        gint32 m_iWidth;
+    } vecTypes[] = {
+        { "BOOL",  stparser::TOK_BOOL,  1 },
+        { "BYTE",  stparser::TOK_BYTE,  8 },
+        { "WORD",  stparser::TOK_WORD,  16 },
+        { "DWORD", stparser::TOK_DWORD, 32 },
+        { "LWORD", stparser::TOK_LWORD, 64 },
+    };
+
+    // 64 bits until an untyped literal's type is resolved
+    gint32 iWidth = 64;
+    const char* p = text;
+    const char* pHash = strchr( text, '#' );
+    if( pHash != nullptr )
+    {
+        size_t dwLen = pHash - text;
+        bool bFound = false;
+        for( size_t i = 0;
+            i < sizeof( vecTypes ) / sizeof( vecTypes[ 0 ] ); i++ )
+        {
+            if( strlen( vecTypes[ i ].m_szName ) != dwLen ||
+                strncasecmp( text, vecTypes[ i ].m_szName,
+                    dwLen ) != 0 )
+                continue;
+            result.first = vecTypes[ i ].m_iTokId;
+            iWidth = vecTypes[ i ].m_iWidth;
+            bFound = true;
+            break;
+        }
+        if( bFound )
+            p = pHash + 1;
+        // Otherwise the '#' belongs to a radix prefix such as
+        // '2#' or '16#', and the literal is untyped. A bogus
+        // prefix like 'FOO#' is still rejected by the integer
+        // parser below.
+    }
+
+    // bit string literals are never signed
+    if( *p == '-' )
+        return result;
+
+    guint64 qwVal = 0;
+    gint32 iBase = 10;
+    if( ERROR( ParseStIntText( p, qwVal, iBase ) ) )
+        return result;
+
+    CfgPtr pCfg;
+    gint32 ret = pCfg.NewObj();
+    if( ERROR( ret ) || pCfg.IsEmpty() )
+        return result;
+
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+    ret = oCfg.SetQwordProp( propStBitStrValue, qwVal );
+    if( ERROR( ret ) )
+        return result;
+
+    ret = oCfg.SetIntProp( propStBitStrWidth, iWidth );
+    if( ERROR( ret ) )
+        return result;
+
+    // record the parser rule that produced this literal
+    ret = oCfg.SetIntProp( propStRuleId,
+        stparser::RuleBit_str_literal );
+    if( ERROR( ret ) )
+        return result;
+
+    result.second = pCfg;
+    return result;
+}
+
 // Helper to convert ST date/time literals to Unix
 // Epoch (UTC).  For a TIME_OF_DAY literal the returned
 // value is milliseconds since midnight instead, as
@@ -554,10 +637,116 @@ uint64_t ParseStTimeToUnix(const char* input)
 }
 
 
+#include <cctype>
+
+// Strip the optional type prefix ('S#', 'WSTRING#', ...) and
+// the quotes from an ST string literal. The prefix and the
+// quotes are not part of the returned body.
+static bool StripStStringLiteral( const char* pText,
+    const char* const* ppszPrefixes, size_t dwPrefixes,
+    std::string& strBody )
+{
+    if( pText == nullptr )
+        return false;
+
+    const char* p = pText;
+
+    const char* pSharp = strchr( p, '#' );
+    if( pSharp != nullptr )
+    {
+        size_t dwLen = pSharp - p;
+        for( size_t i = 0; i < dwPrefixes; i++ )
+        {
+            if( strlen( ppszPrefixes[ i ] ) == dwLen &&
+                strncasecmp( p, ppszPrefixes[ i ], dwLen ) == 0 )
+            {
+                p = pSharp + 1;
+                break;
+            }
+        }
+    }
+
+    // the opening and closing quotes must match
+    size_t dwSize = strlen( p );
+    if( dwSize < 2 ||
+        ( p[ 0 ] != '\'' && p[ 0 ] != '"' ) ||
+        p[ dwSize - 1 ] != p[ 0 ] )
+        return false;
+
+    strBody.assign( p + 1, dwSize - 2 );
+    return true;
+}
+
+// Decode one UTF-8 sequence starting at strText[i] into a
+// Unicode code point. Returns the number of bytes consumed, or
+// 0 if the sequence is invalid.
+static size_t DecodeStUtf8( const std::string& strText,
+    size_t i, unsigned int& uCode )
+{
+    unsigned char c = ( unsigned char )strText[ i ];
+    size_t dwLen = 0;
+    unsigned int uVal = 0;
+
+    if( c < 0x80 )
+    {
+        uVal = c;
+        dwLen = 1;
+    }
+    else if( ( c & 0xE0 ) == 0xC0 )
+    {
+        uVal = c & 0x1F;
+        dwLen = 2;
+    }
+    else if( ( c & 0xF0 ) == 0xE0 )
+    {
+        uVal = c & 0x0F;
+        dwLen = 3;
+    }
+    else if( ( c & 0xF8 ) == 0xF0 )
+    {
+        uVal = c & 0x07;
+        dwLen = 4;
+    }
+    else
+        return 0;
+
+    if( i + dwLen > strText.size() )
+        return 0;
+
+    for( size_t k = 1; k < dwLen; k++ )
+    {
+        unsigned char cc = ( unsigned char )strText[ i + k ];
+        if( ( cc & 0xC0 ) != 0x80 )
+            return 0;
+        uVal = ( uVal << 6 ) | ( cc & 0x3F );
+    }
+
+    uCode = uVal;
+    return dwLen;
+}
+
+// Append a Unicode code point to a std::wstring
+static void AppendStWChar( std::wstring& strVal,
+    unsigned int uCode )
+{
+    if( sizeof( wchar_t ) >= 4 || uCode <= 0xFFFF )
+    {
+        strVal += ( wchar_t )uCode;
+        return;
+    }
+
+    uCode -= 0x10000;
+    strVal += ( wchar_t )( 0xD800 + ( uCode >> 10 ) );
+    strVal += ( wchar_t )( 0xDC00 + ( uCode & 0x3FF ) );
+}
+
 std::string TranslateSTString(const std::string& input) {
-    // 1. Remove the surrounding single quotes
-    if (input.size() < 2) return "";
-    std::string st = input.substr(1, input.size() - 2);
+    // 1. Skip the optional prefix and remove the quotes
+    static const char* ppszPrefixes[] = { "S", "STRING" };
+    std::string st;
+    if( !StripStStringLiteral( input.c_str(),
+        ppszPrefixes, 2, st ) )
+        return "";
 
     std::string result;
     result.reserve(st.size()); // Optimization
@@ -580,6 +769,7 @@ std::string TranslateSTString(const std::string& input) {
                 case 'T': case 't': result += '\t'; break; // Tab
                 case '$': result += '$';  break;           // Literal $
                 case '\'': result += '\''; break;          // Literal '
+                case '"': result += '"'; break;            // Literal "
                 default:
                     // Handle Hex: $0A
                     if (isxdigit(escape) && i + 1 < st.size() && isxdigit(st[i+1])) {
@@ -605,13 +795,14 @@ std::string TranslateSTString(const std::string& input) {
     return result;
 }
 
-#include <cctype>
-
 std::wstring TranslateSTWString(const std::string& input) 
 {
-    // 1. Remove surrounding double quotes
-    if (input.size() < 2) return L"";
-    std::string st = input.substr(1, input.size() - 2);
+    // 1. Skip the optional prefix and remove the quotes
+    static const char* ppszPrefixes[] = { "W", "WSTRING" };
+    std::string st;
+    if( !StripStStringLiteral( input.c_str(),
+        ppszPrefixes, 2, st ) )
+        return L"";
                                                                                                                                                                                                                    
     std::wstring result;
     result.reserve(st.size());
@@ -658,7 +849,19 @@ std::wstring TranslateSTWString(const std::string& input)
                 break;
             }
         } else {
-            result += static_cast<wchar_t>(st[i]);
+            // decode UTF-8 source bytes into wchar_t
+            unsigned int uCode = 0;
+            size_t dwLen = DecodeStUtf8( st, i, uCode );
+            if( dwLen == 0 )
+            {
+                result += static_cast<wchar_t>(
+                    ( unsigned char )st[i] );
+            }
+            else
+            {
+                AppendStWChar( result, uCode );
+                i += dwLen - 1;
+            }
         }
     }
     return result;
@@ -668,28 +871,20 @@ std::wstring TranslateSTWString(const std::string& input)
 #include <iomanip>
 #include <iostream>
 
-std::string TranslateSTUString(const std::string& yytext)
+std::string TranslateSTUString(const std::string& input)
 {
+    static const char* ppszPrefixes[] = { "U", "USTRING" };
+    std::string strBody;
+    if( !StripStStringLiteral( input.c_str(),
+        ppszPrefixes, 2, strBody ) )
+        return std::string();
+
     std::string result;
-    if (yytext.empty()) return result;
+    const std::string& yytext = strBody;
 
-    // 1. Identify and skip the prefix (USTRING#' or U#')
+    // 1. Operate on the text between the quotes
     size_t start_idx = 0;
-    if (yytext.rfind("USTRING#'", 0) == 0) {
-        start_idx = 9; // length of "USTRING#'"
-    } else if (yytext.rfind("U#'", 0) == 0) {
-        start_idx = 3; // length of "U#'"
-    } else {
-        // Fallback if the token doesn't match expected prefixes
-        return yytext;
-    }
-
-    // Ensure we don't read past the terminating single quote
-    size_t end_idx = yytext.length() - 1;
-    // C++11 Safe: check back element via index instead of using string::back()
-    if (yytext[yytext.length() - 1] != '\'') {
-        end_idx = yytext.length(); // Malformed string safety check
-    }
+    size_t end_idx = yytext.size();
 
     // 2. Parse the body of the string literal
     for (size_t i = start_idx; i < end_idx; ++i) {
@@ -766,6 +961,86 @@ std::string TranslateSTUString(const std::string& yytext)
         }
     }
 
+    return result;
+}
+
+std::pair< gint32, ObjPtr > ParseStStringLiteral(
+    const char* text, gint32 iTokId )
+{
+    std::pair< gint32, ObjPtr > result( iTokId, ObjPtr() );
+
+    if( text == nullptr )
+        return result;
+
+    static const char* ppszChar[] = { "S", "STRING" };
+    static const char* ppszWChar[] = { "W", "WSTRING" };
+    static const char* ppszUChar[] = { "U", "USTRING" };
+
+    const char* const* ppszPrefixes = nullptr;
+    std::string strBody;
+
+    switch( iTokId )
+    {
+    case stparser::TOK_CHAR_LITERAL:
+        ppszPrefixes = ppszChar;
+        break;
+    case stparser::TOK_WCHAR_LITERAL:
+        ppszPrefixes = ppszWChar;
+        break;
+    case stparser::TOK_UCHAR_LITERAL:
+        ppszPrefixes = ppszUChar;
+        break;
+    default:
+        return result;
+    }
+
+    if( !StripStStringLiteral( text, ppszPrefixes, 2, strBody ) )
+        return result;
+
+    CfgPtr pCfg;
+    gint32 ret = pCfg.NewObj();
+    if( ERROR( ret ) || pCfg.IsEmpty() )
+        return result;
+
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+
+    if( iTokId == stparser::TOK_WCHAR_LITERAL )
+    {
+        // CConfigDb2 has no wide string type, so the raw bytes
+        // of the std::wstring are stored in a BufPtr
+        std::wstring strVal = TranslateSTWString( text );
+
+        BufPtr pBuf;
+        ret = pBuf.NewObj();
+        if( ERROR( ret ) || pBuf.IsEmpty() )
+            return result;
+
+        size_t dwSize = strVal.size() * sizeof( wchar_t );
+        ret = pBuf->Resize( ( guint32 )dwSize );
+        if( ERROR( ret ) )
+            return result;
+
+        if( dwSize > 0 )
+            memcpy( pBuf->ptr(), strVal.data(), dwSize );
+
+        ret = oCfg.SetBufPtr( propStStrValue, pBuf );
+        if( ERROR( ret ) )
+            return result;
+    }
+    else
+    {
+        std::string strVal;
+        if( iTokId == stparser::TOK_UCHAR_LITERAL )
+            strVal = TranslateSTUString( text );
+        else
+            strVal = TranslateSTString( text );
+
+        ret = oCfg.SetStrProp( propStStrValue, strVal );
+        if( ERROR( ret ) )
+            return result;
+    }
+
+    result.second = pCfg;
     return result;
 }
 

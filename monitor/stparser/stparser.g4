@@ -652,11 +652,13 @@ unary_expr returns [ ObjPtr pExpr ]
     }}
     ;
 
-// Only the parenthesized form produces an expression node for
-// now: constant, variable_access, enum_value, namedval_value,
-// func_call and invocation do not return one yet.
+// Only the parenthesized form produces an expression
+// node for now: constant, variable_access, enum_value,
+// namedval_value, func_call and invocation do not
+// return one yet.
 primary_expr returns [ ObjPtr pExpr ]
     : constant
+    {  $pExpr = $constant.pNode; }
     | variable_access
     | enum_value
     | namedval_value
@@ -685,12 +687,47 @@ derived_func_name
 // Constants
 // ============================================================
 
-constant
-    : numeric_literal
-    | string_literal
-    | time_literal
-    | bool_literal
-    | bit_str_literal
+constant returns [ ObjPtr pNode ]
+    : nl = numeric_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $nl.pair;
+        $pNode = pNode;
+    }}
+    | sl = string_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $sl.pair;
+        $pNode = pNode;
+    }}
+    | tl = time_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $tl.pair;
+        $pNode = pNode;
+    }}
+    | bl = bool_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $bl.pair;
+        $pNode = pNode;
+    }}
+    | bsl = bit_str_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $bsl.pair;
+        $pNode = pNode;
+    }}
     ;
 
 numeric_literal returns [ std::pair< int, ObjPtr > pair ]
@@ -698,11 +735,41 @@ numeric_literal returns [ std::pair< int, ObjPtr > pair ]
     {{
         $pair = ParseStNumericLiteral(
             $td.text.c_str(), stparser::TOK_INT );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid numeric literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleNumeric_literal );
+        }
     }}
     | td=TOK_REAL
     {{
         $pair = ParseStNumericLiteral(
             $td.text.c_str(), stparser::TOK_REAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid numeric literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleNumeric_literal );
+        }
     }}
     ;
 
@@ -710,28 +777,145 @@ time_literal returns [ std::pair< int, ObjPtr > pair ]
     : td=TOK_DURATION
     {{
         $pair = ParseStDuration( $td.text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
     }}
     | td=TOK_TIME_OF_DAY
     {{
         $pair = ParseStTimeLiteral(
             $td.text.c_str(), stparser::TOK_TIME_OF_DAY );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
     }}
     | td=TOK_DATE
     {{
         $pair = ParseStTimeLiteral(
             $td.text.c_str(), stparser::TOK_DATE );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
     }}
     | td=TOK_DATE_TIME
     {{
         $pair = ParseStTimeLiteral(
             $td.text.c_str(), stparser::TOK_DATE_TIME );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
     }}
     ;
 
-string_literal
-    : TOK_CHAR_LITERAL
-    | TOK_WCHAR_LITERAL
-    | TOK_UCHAR_LITERAL
+string_literal returns [ std::pair< int, ObjPtr > pair ]
+    : td=TOK_CHAR_LITERAL
+    {{
+        $pair = ParseStStringLiteral(
+            $td.text.c_str(), stparser::TOK_CHAR_LITERAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid string literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleString_literal );
+        }
+    }}
+    | td=TOK_WCHAR_LITERAL
+    {{
+        $pair = ParseStStringLiteral(
+            $td.text.c_str(), stparser::TOK_WCHAR_LITERAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid string literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleString_literal );
+        }
+    }}
+    | td=TOK_UCHAR_LITERAL
+    {{
+        $pair = ParseStStringLiteral(
+            $td.text.c_str(), stparser::TOK_UCHAR_LITERAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid string literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleString_literal );
+        }
+    }}
     ;
 
 bool_value
@@ -752,6 +936,13 @@ bool_literal returns [ std::pair< int, ObjPtr > pair ]
                 "Invalid bool literal:'%s'.",
                 $text.c_str() );
         }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleBool_literal );
+        }
     }}
     | bool_type_name TOK_PUNC bv=bool_value
     {{
@@ -764,12 +955,41 @@ bool_literal returns [ std::pair< int, ObjPtr > pair ]
                 "Invalid bool literal:'%s'.",
                 $text.c_str() );
         }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleBool_literal );
+        }
     }}
     ;
 
-bit_str_literal
-    : TOK_INT
-    | bit_str_type_name TOK_PUNC TOK_INT
+bit_str_literal returns [ std::pair< int, ObjPtr > pair ]
+    : v=TOK_INT
+    {{
+        $pair = ParseStBitStrLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $v,
+                "Invalid bit string literal:'%s'.",
+                $text.c_str() );
+        }
+    }}
+    | bit_str_type_name TOK_PUNC v=TOK_INT
+    {{
+        $pair = ParseStBitStrLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $v,
+                "Invalid bit string literal:'%s'.",
+                $text.c_str() );
+        }
+    }}
     ;
 
 bool_type_name
@@ -1418,10 +1638,10 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             initInfo.GetStrProp( 0, strType );
 
             initInfo.GetObjPtr(
-                propTypeData, pTypeData );
+                propStTypeData, pTypeData );
 
             initInfo.GetObjPtr(
-                propTypeInit, pTypeInit );
+                propStTypeInit, pTypeInit );
 
             if( ERROR( ret ) )
             {
@@ -1480,7 +1700,7 @@ simple_spec_init returns [ ObjPtr pTypeInfo ]
             ( IConfigDb* )$pTypeInfo );
         if( $expr.ctx != nullptr )
             oParams.SetObjPtr(
-                propTypeInit, $expr.pExpr );
+                propStTypeInit, $expr.pExpr );
     }
     ;
 
@@ -1495,7 +1715,7 @@ simple_spec returns [ ObjPtr pTypeInfo ]
                 ( guint32 )$etn.start->getType() );
 
             oParams.SetIntProp(
-                propRuleId, RuleElem_type_name );
+                propStRuleId, RuleElem_type_name );
             $pTypeInfo = oParams.GetCfg();
         }
         else
@@ -1510,7 +1730,7 @@ simple_spec returns [ ObjPtr pTypeInfo ]
         oParams.Push(
             ( guint32 )RuleDerived_type_access );
         oParams.SetIntProp(
-            propRuleId, RuleSimple_type_access );
+            propStRuleId, RuleSimple_type_access );
         $pTypeInfo = oParams.GetCfg();
     }}
     ;
@@ -1670,10 +1890,10 @@ array_type_decl returns [ ObjPtr pTypeDecl ]
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
             initInfo.GetObjPtr(
-                propTypeInit, pTypeInit );
+                propStTypeInit, pTypeInit );
 
             initInfo.GetObjPtr(
-                propTypeData, pTypeData );
+                propStTypeData, pTypeData );
 
             if( ERROR( ret ) )
             {
@@ -1732,7 +1952,7 @@ array_spec_init returns [ ObjPtr pTypeInfo ]
         // slot consistently as simple_spec_init does.
         if( $ai.ctx )
             oParams.SetObjPtr(
-                propTypeInit, $ai.pTypeInit );
+                propStTypeInit, $ai.pTypeInit );
     }
     ;
 
@@ -1745,8 +1965,8 @@ array_spec returns [ ObjPtr pTypeInfo ]
         oParams.Push( $dta.typePair.second );
         if( !$rl.pRangeList.IsEmpty() )
             oParams.SetObjPtr(
-                propTypeData, $rl.pRangeList );
-        oParams.SetIntProp( propRuleId,
+                propStTypeData, $rl.pRangeList );
+        oParams.SetIntProp( propStRuleId,
             RuleArray_spec );
         $pTypeInfo = oParams.GetCfg();
     }
@@ -1756,7 +1976,7 @@ array_spec returns [ ObjPtr pTypeInfo ]
         oParams.Push( $ata.ctx->getText() );
         oParams.Push(
             ( guint32 )RuleDerived_type_access );
-        oParams.SetIntProp( propRuleId,
+        oParams.SetIntProp( propStRuleId,
             RuleArray_type_access );
         $pTypeInfo = oParams.GetCfg();
     }
@@ -1868,7 +2088,7 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
             initInfo.GetObjPtr(
-                propTypeData, pTypeData );
+                propStTypeData, pTypeData );
 
             if( IsElementaryType( iType ) )
             {
@@ -1888,7 +2108,7 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             CStTypeDeclNode* ptd = pNode;
             CParamList oTypeInit;
             ret = oTypeInit.CopyProp(
-                propTypeInit, $si.pTypeInfo );
+                propStTypeInit, $si.pTypeInfo );
             if( SUCCEEDED( ret ) )
                 ptd->m_pTypeInit = oTypeInit.GetCfg();
             ptd->m_oTypeRef = { strType, nullptr };
@@ -1921,7 +2141,7 @@ string_spec_init returns [ ObjPtr pTypeInfo ]
             ( IConfigDb* ) $sp.pTypeInfo );
         if( $sl.ctx )
             oParams.SetStrProp(
-                propTypeInit, $sl.ctx->getText() );
+                propStTypeInit, $sl.ctx->getText() );
         $pTypeInfo = oParams.GetCfg();
     }
     ;
@@ -1961,10 +2181,10 @@ ref_type_decl returns [ ObjPtr pTypeDecl ]
                 1, ( guint32& )iType );
             initInfo.GetStrProp( 0, strType );
             initInfo.GetObjPtr(
-                propTypeInit , pTypeInit );
+                propStTypeInit , pTypeInit );
 
             initInfo.GetObjPtr(
-                propTypeData, pTypeData );
+                propStTypeData, pTypeData );
 
             if( ERROR( ret ) )
             {
@@ -2007,7 +2227,7 @@ ref_type_decl returns [ ObjPtr pTypeDecl ]
                 CParamList oTypeData( pTypeData );
                 gint32 iRank = 0;
                 ret = oTypeData.GetIntProp(
-                    propRefRank, ( guint32& )iRank );
+                    propStRefRank, ( guint32& )iRank );
                 if( SUCCEEDED( ret ) )
                     ptd->m_iRefRank = iRank;
             }
@@ -2036,7 +2256,7 @@ ref_spec_init returns [ ObjPtr pTypeInfo ]
             CParamList oTypeInit;
             oTypeInit.Push( $v.ctx->getText() );
             oParams.SetObjPtr(
-                propTypeInit, oTypeInit.GetCfg() );
+                propStTypeInit, oTypeInit.GetCfg() );
         }
         $pTypeInfo = oParams.GetCfg();
     }
@@ -2050,9 +2270,9 @@ ref_spec returns [ ObjPtr pTypeInfo ]
         oParams.Push( $dta.typePair.second );
         CParamList oTypeData;
         oTypeData.SetIntProp(
-            propRefRank, $tok.size() );
+            propStRefRank, $tok.size() );
         oParams.SetObjPtr(
-            propTypeData, oTypeData.GetCfg() );
+            propStTypeData, oTypeData.GetCfg() );
         $pTypeInfo = oParams.GetCfg();
     }
     ;
@@ -2711,7 +2931,7 @@ string_spec returns [ ObjPtr pTypeInfo ]
         
         if( $const_expr.ctx != nullptr )
         {
-            oParams.SetObjPtr( propTypeData,
+            oParams.SetObjPtr( propStTypeData,
                 $const_expr.pExpr );
         }
         $pTypeInfo = oParams.GetCfg();

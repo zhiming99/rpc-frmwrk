@@ -563,39 +563,16 @@ struct CStConstValueNode : public CStPrimaryExprNode
 {
     typedef CStPrimaryExprNode super;
 
-    enum enumBasicType {
-        // bit_str_literal
-        btBool, btByte, btWord, btDWord, btLWord,
-
-        // numeric_literal
-        btInt, btInt8, btInt16, btInt32, btInt64,
-        btUint8, btUint16, btUint32, btUint64,
-        btReal, btLReal, 
-
-        // string literal
-        btString, btWString, btUString, btChar, btWChar, btUChar,
-        // time_literal
-        btTime, btDate, btDateTime, btTimeOfDay,
-        // Additional types for compatibility
-        btDInt, btSInt, btUInt, btUDInt, btUSInt,
-        btLInt, btULInt, btLTime
-    };
-
-    enumBasicType m_eBasicType;
-    bool m_bSigned;
-    gint32 m_iStringLength;
-    // String length as a constant expression for
-    // the STRING( n ) / WSTRING( n ) forms. The
-    // parser keeps the expression; the numeric
-    // m_iStringLength is filled by the semantic
-    // phase after constant evaluation.
-    ObjPtr m_pStringLength;
-
-    CStConstValueNode() : super(),
-        m_eBasicType(btInt),
-        m_bSigned(true),
-        m_iStringLength(0)
+    std::pair< int, ObjPtr > m_oValue;
+    CStConstValueNode() : super()
     { SetClassId( clsid( CStConstValueNode ) ); }
+
+    virtual bool IsSymbolResolved() const
+    { return true; }
+
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind )
+    { return 0; }
 
     virtual std::string GetNodeInfo() const override;
 };
