@@ -596,12 +596,12 @@ gint32 CBuffer::Resize( guint32 dwSize )
         break;
     }
 
-    if( ERROR( ret ) )
+    /*if( ERROR( ret ) )
     {
         std::string strMsg = DebugMsg( ret,
             "Resizing buffer failed" );
         throw std::runtime_error( strMsg );
-    }
+    }*/
 
     return ret;
 }
