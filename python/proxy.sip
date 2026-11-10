@@ -1119,7 +1119,7 @@ class CPythonInterfBase : public T
 
             PyObject* pyRespArgs = nullptr;
             if( PyList_Size( listResp ) > 1 )
-                PyList_GetItem( listResp, 1 );
+                pyRespArgs = PyList_GetItem( listResp, 1 );
             if( pyRespArgs == nullptr )
             {
                 // fine, no resp params
@@ -2517,6 +2517,13 @@ class CPythonProxy :
 
     PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
+    if( pResp != nullptr )
+    {
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 0, Py_None );
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 1, Py_None );
+    }
 
     do{
 
@@ -2560,8 +2567,9 @@ class CPythonProxy :
 
     }while( 0 );
 
-    PyList_SetItem( pResp, 0,
-        PyLong_FromLong( ret ) );
+    if( pResp != nullptr )
+        PyList_SetItem( pResp, 0,
+            PyLong_FromLong( ret ) );
 
     %End
 
@@ -2624,6 +2632,13 @@ class CPythonProxy :
     %MethodCode
     PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
+    if( pResp != nullptr )
+    {
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 0, Py_None );
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 1, Py_None );
+    }
     gint32 ret = 0;
     do{
         auto* pImpl = dynamic_cast
@@ -2694,8 +2709,9 @@ class CPythonProxy :
 
     }while( 0 );
 
-    PyList_SetItem( pResp, 0,
-        PyLong_FromLong( ret ) );
+    if( pResp != nullptr )
+        PyList_SetItem( pResp, 0,
+            PyLong_FromLong( ret ) );
 
     %End
 

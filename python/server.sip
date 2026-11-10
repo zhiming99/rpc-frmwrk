@@ -80,6 +80,15 @@ class CPythonServer:
                 Py_INCREF( pCallback );
 
                 PyObject* listResp = PyList_New( 2 );
+                if( listResp != nullptr )
+                {
+                    // element 0 is always set when the
+                    // response is delivered. element 1
+                    // must hold a valid object even when
+                    // there are no response parameters.
+                    Py_INCREF( Py_None );
+                    PyList_SetItem( listResp, 1, Py_None );
+                }
                 oReqCtx.Push( ( intptr_t )listResp );
                 bDec = true;
             }
@@ -342,6 +351,13 @@ class CPythonServer :
 
     PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
+    if( pResp != nullptr )
+    {
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 0, Py_None );
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 1, Py_None );
+    }
 
     do{
 
@@ -385,8 +401,9 @@ class CPythonServer :
 
     }while( 0 );
 
-    PyList_SetItem( pResp, 0,
-        PyLong_FromLong( ret ) );
+    if( pResp != nullptr )
+        PyList_SetItem( pResp, 0,
+            PyLong_FromLong( ret ) );
 
     %End
 
@@ -449,6 +466,13 @@ class CPythonServer :
     %MethodCode
     PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
+    if( pResp != nullptr )
+    {
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 0, Py_None );
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 1, Py_None );
+    }
     gint32 ret = 0;
     do{
         auto* pImpl = dynamic_cast
@@ -519,8 +543,9 @@ class CPythonServer :
 
     }while( 0 );
 
-    PyList_SetItem( pResp, 0,
-        PyLong_FromLong( ret ) );
+    if( pResp != nullptr )
+        PyList_SetItem( pResp, 0,
+            PyLong_FromLong( ret ) );
 
     %End
 
@@ -804,6 +829,14 @@ class CPythonServer :
     %MethodCode
     PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
+    if( pResp == nullptr )
+        return PyErr_NoMemory();
+
+    Py_INCREF( Py_None );
+    PyList_SetItem( pResp, 0, Py_None );
+    Py_INCREF( Py_None );
+    PyList_SetItem( pResp, 1, Py_None );
+
     gint32 ret = 0;
     do{
         auto* pImpl = dynamic_cast
@@ -824,6 +857,15 @@ class CPythonServer :
         if( ERROR( ret ) )
             break;
         PyObject* pParams = PyList_New( 2 );
+        if( pParams == nullptr )
+        {
+            Py_DECREF( pPyProp );
+            ret = -ENOMEM;
+            break; 
+        }
+
+        Py_INCREF( Py_None );
+        PyList_SetItem( pParams, 1, Py_None );
         PyList_SetItem( pParams, 0, pPyProp );
         if( oVar.GetTypeId() == typeByteArr )
         {
