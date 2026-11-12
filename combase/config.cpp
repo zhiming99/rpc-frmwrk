@@ -149,8 +149,13 @@ gint32 CConfigDb2::GetProperty(
         oBuf = o.m_pObj;
         break;
     case typeByteArr:
-        oBuf = *o.m_pBuf;
-        break;
+        {
+            if( o.m_pBuf.IsEmpty() )
+                oBuf.Resize( 0 );
+            else
+                oBuf = *o.m_pBuf;
+            break;
+        }
     case typeString:
         oBuf = o.m_strVal;
         break;
@@ -203,10 +208,10 @@ void CConfigDb2::RemoveAll()
 #define RESIZE_BUF( _Size, _Ret ) \
 do{ \
     guint32 dwLocOff = pLoc - oBuf.ptr(); \
-    oBuf.Resize( ( _Size ) ); \
-    if( oBuf.ptr() == nullptr ) \
+    gint32 iResizeRet = oBuf.Resize( ( _Size ) ); \
+    if( ERROR( iResizeRet ) ) \
     { \
-        _Ret = -ENOMEM; \
+        _Ret = iResizeRet; \
         break; \
     } \
     pLoc = ( dwLocOff + oBuf.ptr() ); \
@@ -394,6 +399,13 @@ gint32 CConfigDb2::Serialize(
                 if( pObj.IsEmpty() )
                 {
                     SERI_HEADER_BASE oBase;
+                    if( pEnd - pLoc <
+                        ( gint32 )sizeof( oBase ) )
+                    {
+                        RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                        if( ERROR( ret ) )
+                            break;
+                    }
                     memcpy( pLoc,
                         &oBase, sizeof( oBase ) );
                     pLoc += sizeof( oBase );
@@ -435,12 +447,12 @@ gint32 CConfigDb2::Serialize(
                 }
                 len = htonl( len );
                 memcpy( pLoc, &len, sizeof( guint32 ) );
-                len = ntohl( len );
+                pLoc += sizeof( guint32 );
 
+                len = ntohl( len );
                 if( len == 0 )
                     break;
 
-                pLoc += sizeof( guint32 );
                 memcpy( pLoc, pBufVal->ptr(), len );
                 pLoc += len;
                 break;
@@ -477,14 +489,12 @@ gint32 CConfigDb2::Serialize(
 gint32 CConfigDb2::Deserialize(
     const char* pBuf, guint32 dwSize )
 {
-    if( pBuf == nullptr || dwSize == 0 )
+    if( pBuf == nullptr ||
+        dwSize < sizeof( SERI_HEADER ) )
         return -EINVAL;
 
-    const SERI_HEADER* pHeader =
-        reinterpret_cast< const SERI_HEADER* >( pBuf );
-
     SERI_HEADER oHeader;
-    memcpy( &oHeader, pHeader, sizeof( oHeader ) );
+    memcpy( &oHeader, pBuf, sizeof( oHeader ) );
     oHeader.ntoh();
 
     gint32 ret = 0;
@@ -492,8 +502,9 @@ gint32 CConfigDb2::Deserialize(
     do{
         if( oHeader.dwClsid != clsid( CConfigDb2 ) ||
             oHeader.dwCount > CFGDB_MAX_ITEM ||
-            oHeader.dwSize + sizeof( SERI_HEADER_BASE ) > dwSize ||
-            oHeader.dwSize > CFGDB_MAX_SIZE )
+            oHeader.dwSize > CFGDB_MAX_SIZE ||
+            ( guint64 )oHeader.dwSize +
+                sizeof( SERI_HEADER_BASE ) > dwSize )
         {
             ret = -EINVAL;
             break;
@@ -509,8 +520,17 @@ gint32 CConfigDb2::Deserialize(
 
         for( guint32 i = 0; i < oHeader.dwCount; i++ )
         {
-            gint32 iKey = ntohl( *( guint32* )pLoc );
-            guint32 dwValSize = ntohl( ( ( guint32* )pLoc )[ 1 ] );
+            if( pLoc > pEnd ||
+                ( size_t )( pEnd - pLoc ) <
+                sizeof( guint32 ) + sizeof( guint8 ) )
+            {
+                ret = -E2BIG;
+                break;
+            }
+
+            guint32 dwKey = 0;
+            memcpy( &dwKey, pLoc, sizeof( dwKey ) );
+            gint32 iKey = ( gint32 )ntohl( dwKey );
             pLoc += sizeof( guint32 );
             guint8 byType = pLoc[ 0 ];
             Variant oVar;
@@ -520,6 +540,11 @@ gint32 CConfigDb2::Deserialize(
             {
             case typeByte: 
                 {
+                    if( pLoc >= pEnd )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
                     guint8 val = pLoc[ 0 ];
                     oVar = val;
                     pLoc++;
@@ -527,6 +552,12 @@ gint32 CConfigDb2::Deserialize(
                 }
             case typeUInt16:
                 {
+                    if( ( size_t )( pEnd - pLoc ) <
+                        sizeof( guint16 ) )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
                     guint16 val = 0;
                     memcpy( &val, pLoc, sizeof( guint16 ) );
                     oVar = ntohs( val );
@@ -536,6 +567,12 @@ gint32 CConfigDb2::Deserialize(
             case typeUInt32:
             case typeFloat:
                 {
+                    if( ( size_t )( pEnd - pLoc ) <
+                        sizeof( guint32 ) )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
                     guint32 val = 0;
                     memcpy( &val, pLoc, sizeof( guint32 ) );
                     val = ntohl( val );
@@ -549,6 +586,12 @@ gint32 CConfigDb2::Deserialize(
             case typeUInt64:
             case typeDouble:
                 {
+                    if( ( size_t )( pEnd - pLoc ) <
+                        sizeof( guint64 ) )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
                     guint64 val = 0;
                     memcpy( &val, pLoc, sizeof( guint64 ) );
                     val = ntohll( val );
@@ -562,7 +605,8 @@ gint32 CConfigDb2::Deserialize(
             case typeString:
                 {
                     guint32 len = 0;
-                    if( pLoc + sizeof( guint32 ) > pEnd )
+                    if( ( size_t )( pEnd - pLoc ) <
+                        sizeof( guint32 ) )
                     {
                         ret = -E2BIG;
                         break;
@@ -572,22 +616,23 @@ gint32 CConfigDb2::Deserialize(
                     pLoc += sizeof( guint32 );
                     if( len == 0 )
                     {
-                        new ( &oVar ) Variant("");
+                        oVar = stdstr();
                         break;
                     }
-                    if( pLoc + len > pEnd )
+                    if( len > ( guint32 )( pEnd - pLoc ) )
                     {
                         ret = -E2BIG;
                         break;
                     }
-                    new ( &oVar ) Variant( ( const char* )pLoc, len );
+                    oVar = stdstr( ( const char* )pLoc, len );
                     pLoc += len;
                     break;
                 }
             case typeDMsg:
                 {
                     guint32 len = 0;
-                    if( pLoc + sizeof( guint32 ) > pEnd )
+                    if( ( size_t )( pEnd - pLoc ) <
+                        sizeof( guint32 ) )
                     {
                         ret = -E2BIG;
                         break;
@@ -595,7 +640,7 @@ gint32 CConfigDb2::Deserialize(
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
                     pLoc += sizeof( guint32 );
-                    if( pLoc + len > pEnd )
+                    if( len > ( guint32 )( pEnd - pLoc ) )
                     {
                         ret = -E2BIG;
                         break;
@@ -611,23 +656,30 @@ gint32 CConfigDb2::Deserialize(
                 }
             case typeObj:
                 {
-                    SERI_HEADER_BASE* pHdr =
-                        ( SERI_HEADER_BASE* )pLoc;
-                    SERI_HEADER_BASE oHdr;
-                    memcpy( &oHdr, pHdr, sizeof( oHdr ) );
-                    oHdr.ntoh();
-                    guint32 len = oHdr.dwSize +
-                        sizeof( SERI_HEADER_BASE );
-                    
-                    if( pLoc + len > pEnd )
+                    if( ( size_t )( pEnd - pLoc ) <
+                        sizeof( SERI_HEADER_BASE ) )
                     {
                         ret = -E2BIG;
                         break;
                     }
 
+                    SERI_HEADER_BASE oHdr;
+                    memcpy( &oHdr, pLoc, sizeof( oHdr ) );
+                    oHdr.ntoh();
+
+                    guint32 dwRemain =
+                        ( guint32 )( pEnd - pLoc );
+                    if( oHdr.dwSize >
+                        dwRemain - sizeof( SERI_HEADER_BASE ) )
+                    {
+                        ret = -E2BIG;
+                        break;
+                    }
+                    guint32 len = oHdr.dwSize +
+                        sizeof( SERI_HEADER_BASE );
+                    
                     ObjPtr pObj;
-                    if( len == 0 ||
-                        oHdr.dwClsid == clsid( Invalid ) )
+                    if( oHdr.dwClsid == clsid( Invalid ) )
                     {
                         oVar = pObj;
                         pLoc += len;
@@ -650,7 +702,8 @@ gint32 CConfigDb2::Deserialize(
             case typeByteArr:
                 {
                     guint32 len = 0;
-                    if( pLoc + sizeof( guint32 ) > pEnd )
+                    if( ( size_t )( pEnd - pLoc ) <
+                        sizeof( guint32 ) )
                     {
                         ret = -E2BIG;
                         break;
@@ -658,18 +711,21 @@ gint32 CConfigDb2::Deserialize(
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
                     pLoc += sizeof( guint32 );
-                    if( pLoc + len > pEnd )
+                    if( len > ( guint32 )( pEnd - pLoc ) )
                     {
                         ret = -E2BIG;
                         break;
                     }
                     BufPtr pBufVal( true );
-                    ret = pBufVal->Resize( len );
-                    if( ERROR( ret ) )
-                        break;
-                    memcpy( pBufVal->ptr(), pLoc, len );
+                    if( len > 0 )
+                    {
+                        ret = pBufVal->Resize( len );
+                        if( ERROR( ret ) )
+                            break;
+                        memcpy( pBufVal->ptr(), pLoc, len );
+                        pLoc += len;
+                    }
                     oVar = pBufVal;
-                    pLoc += len;
                     break;
                 }
             default:
@@ -680,13 +736,13 @@ gint32 CConfigDb2::Deserialize(
             if( ERROR( ret ) )
                 break;
 
-            SetProperty( iKey, oVar );
             if( pLoc > pEnd )
             {
                 // don't know how to handle
                 ret = -E2BIG;
                 break;
             }
+            SetProperty( iKey, oVar );
         }
 
     }while( 0 );
