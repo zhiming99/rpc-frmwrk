@@ -205,10 +205,26 @@ gint32 CConfigDb2::GetPropIds(
 void CConfigDb2::RemoveAll()
 { m_mapProps.clear(); }
 
+// minimum growth step for the serialization buffer
+#define SERI_BUF_MIN_GROW  ( 64u )
+
 #define RESIZE_BUF( _Size, _Ret ) \
 do{ \
     guint32 dwLocOff = pLoc - oBuf.ptr(); \
-    gint32 iResizeRet = oBuf.Resize( ( _Size ) ); \
+    guint32 dwCurSize = oBuf.size(); \
+    guint32 dwNeed = ( _Size ); \
+    if( dwNeed > dwCurSize ) \
+    { \
+        guint32 dwTarget = dwCurSize << 1; \
+        if( dwTarget < dwCurSize + SERI_BUF_MIN_GROW ) \
+            dwTarget = dwCurSize + SERI_BUF_MIN_GROW; \
+        if( dwTarget > MAX_BYTES_PER_BUFFER ) \
+            dwTarget = MAX_BYTES_PER_BUFFER; \
+        if( dwTarget < dwNeed ) \
+            dwTarget = dwNeed; \
+        dwNeed = dwTarget; \
+    } \
+    gint32 iResizeRet = oBuf.Resize( dwNeed ); \
     if( ERROR( iResizeRet ) ) \
     { \
         _Ret = iResizeRet; \
@@ -218,8 +234,6 @@ do{ \
     pEnd = ( oBuf.size() + oBuf.ptr() ); \
  \
 }while( 0 ) 
-
-#define QPAGE ( ( guint32 )( PAGE_SIZE >> 1 ) )
 
 gint32 CConfigDb2::Serialize(
     CBuffer& oBuf ) const
@@ -235,8 +249,13 @@ gint32 CConfigDb2::Serialize(
     // estimated size at this moment
 
     guint32 dwOrigOff = oBuf.size();
+
+    // start small and let RESIZE_BUF grow
+    // geometrically. sizeof( SERI_HEADER ) + 32
+    // keeps tiny configs within CBuffer's
+    // 48-byte inline storage.
     ret = oBuf.Resize( dwOrigOff +
-        sizeof( SERI_HEADER ) + QPAGE );
+        sizeof( SERI_HEADER ) + SERI_BUF_MIN_GROW / 2 );
     if( ERROR( ret ) )
         return ret;
 
@@ -256,7 +275,8 @@ gint32 CConfigDb2::Serialize(
         guint32 dwKey = htonl( itr->first );
         if( pEnd - pLoc < ( gint32 )( sizeof( guint32 ) ) )
         {
-            RESIZE_BUF( oBuf.size() + QPAGE, ret );
+            RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                sizeof( guint32 ), ret );
             if( ERROR( ret ) )
                 break;
         }
@@ -272,7 +292,8 @@ gint32 CConfigDb2::Serialize(
         guint8 byType = oVar.GetTypeId();
         if( pEnd - pLoc < sizeof( byType ) )
         {
-            RESIZE_BUF( oBuf.size() + QPAGE, ret );
+            RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                sizeof( byType ), ret );
             if( ERROR( ret ) )
                 break;
         }
@@ -284,7 +305,8 @@ gint32 CConfigDb2::Serialize(
             {
                 if( pEnd - pLoc < sizeof( guint8 ) )
                 {
-                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        sizeof( guint8 ), ret );
                     if( ERROR( ret ) )
                         break;
                 }
@@ -297,7 +319,8 @@ gint32 CConfigDb2::Serialize(
                     htons( ( const guint16& )oVar );
                 if( pEnd - pLoc < sizeof( guint16 ) )
                 {
-                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        sizeof( guint16 ), ret );
                     if( ERROR( ret ) )
                         break;
                 }
@@ -312,7 +335,8 @@ gint32 CConfigDb2::Serialize(
                     htonl( ( const guint32& )oVar );
                 if( pEnd - pLoc < sizeof( guint32 ) )
                 {
-                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        sizeof( guint32 ), ret );
                     if( ERROR( ret ) )
                         break;
                 }
@@ -328,7 +352,8 @@ gint32 CConfigDb2::Serialize(
 
                 if( pEnd - pLoc < sizeof( guint64 ) )
                 {
-                    RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        sizeof( guint64 ), ret );
                     if( ERROR( ret ) )
                         break;
                 }
@@ -342,10 +367,8 @@ gint32 CConfigDb2::Serialize(
                 guint32 dwFree = pEnd - pLoc;
                 if( dwFree < sizeof( guint32 ) + len )
                 {
-                    guint32 dwIncSize = 
-                        len + sizeof( guint32 ) - dwFree + QPAGE;
-
-                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        sizeof( guint32 ) + len, ret );
                     if( ERROR( ret ) )
                         break;
                 }
@@ -375,10 +398,8 @@ gint32 CConfigDb2::Serialize(
                 guint32 len = pBuf->size();
                 if( dwFree < len + sizeof( guint32 ) )
                 {
-                    guint32 dwIncSize = 
-                        len + sizeof( guint32 ) - dwFree + QPAGE;
-
-                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        sizeof( guint32 ) + len, ret );
                     if( ERROR( ret ) )
                         break;
                 }
@@ -402,7 +423,8 @@ gint32 CConfigDb2::Serialize(
                     if( pEnd - pLoc <
                         ( gint32 )sizeof( oBase ) )
                     {
-                        RESIZE_BUF( oBuf.size() + QPAGE, ret );
+                        RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                            sizeof( oBase ), ret );
                         if( ERROR( ret ) )
                             break;
                     }
@@ -417,10 +439,8 @@ gint32 CConfigDb2::Serialize(
                 guint32 len = pBuf->size();
                 if( pEnd - pLoc < len )
                 {
-                    guint32 dwIncSize = std::max(
-                        QPAGE, len + QPAGE );
-
-                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        len, ret );
                     if( ERROR( ret ) )
                         break;
                 }
@@ -438,10 +458,8 @@ gint32 CConfigDb2::Serialize(
                 guint32 dwFree = pEnd - pLoc;
                 if( dwFree < len + sizeof( guint32 ) )
                 {
-                    guint32 dwIncSize =
-                        len + sizeof( guint32 ) - dwFree + QPAGE;
-
-                    RESIZE_BUF( oBuf.size() + dwIncSize, ret );
+                    RESIZE_BUF( ( guint32 )( pLoc - oBuf.ptr() ) +
+                        sizeof( guint32 ) + len, ret );
                     if( ERROR( ret ) )
                         break;
                 }
