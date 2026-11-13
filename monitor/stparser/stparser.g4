@@ -63,8 +63,8 @@ options { tokenVocab=stlexer; }
 
 @parser::context {
 #include "rpc.h"
-#include "astnodes.h"
-#include "stsymtab.h"
+//#include "astnodes.h"
+//#include "stsymtab.h"
 using namespace rpcf;
 #define GET_PARSER() static_cast< CStParser* >( this )
 }
@@ -661,6 +661,7 @@ primary_expr returns [ ObjPtr pExpr ]
     {  $pExpr = $constant.pNode; }
     | variable_access
     | enum_value
+    {  $pExpr = $enum_value.pNode; }
     | namedval_value
     | func_call
     | invocation
@@ -1818,16 +1819,146 @@ enum_type_name
     ;
 
 enum_type_decl returns [ ObjPtr pTypeDecl ]
-    : enum_type_name TOK_COLON enum_spec_init
+    : etn = enum_type_name TOK_COLON si = enum_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser = GET_PARSER();
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$si.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType = $etn.ctx->getText();
+            gint32 iType = RuleEnum_type_decl;
+
+            initInfo.GetObjPtr(
+                propStTypeData, pTypeData );
+
+            initInfo.GetObjPtr(
+                propStTypeInit, pTypeInit );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->getText().c_str(),
+                    ret );
+            }
+            ret = pNode.NewObj(
+                clsid( CStEnumTypeDeclNode ) );
+
+            if( ERROR( ret ) )
+                break;
+
+            CStTypeDeclNode* ptd = pNode;
+            CStEnumValueRef* pRef = pTypeInit;
+
+            if( !pTypeInit.IsEmpty() )
+                ptd->m_pTypeInit = pTypeInit;
+
+            if( pRef )
+                pRef->m_pDeclNode = pNode;
+
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = iType;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare( strType,
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $etn.start, $si.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+
+            $pTypeDecl = pNode;
+
+            // declare the symbols for each each value
+            if( pTypeData.IsEmpty() )
+                break;
+            ObjVecPtr pvecValues = pTypeData;
+            if( pvecValues.IsEmpty() )
+                break;
+            auto& vecValues = ( *pvecValues )();
+            for( auto pVal : vecValues )
+            {
+                CCfgOpener oCfg( ( IConfigDb* )pVal );
+                stdstr strName;
+                oCfg.GetStrProp( 0, strName );
+                if( strName.empty() )
+                    continue;
+                auto pValSym = ost.Declare( strName,
+                    symEnumValue, pNode, strType,
+                    ( CStVarDeclNode::enumVarCategory )0 );
+                if( pSym.IsEmpty() )
+                    break;
+                pSym->m_pDeclNode = pNode;
+                antlr4::Token *pStart = nullptr;
+                antlr4::Token *pStop = nullptr;
+                oCfg.GetIntPtr( 1, ( guint32*& )pStart );
+                oCfg.GetIntPtr( 2, ( guint32*& )pStop );
+                if( pStart && pStop )
+                    pSym->SetTokens( pStart, pStop );
+            }
+
+        }while( 0 );
+    }
     ;
 
-enum_spec_init
-    : TOK_LPAREN ( identifier ( TOK_COMMA identifier )* ) TOK_RPAREN
-    ( TOK_ASSIGN enum_value )?
+enum_spec_init returns [ ObjPtr pTypeInfo ]
+    : TOK_LPAREN ( id1=identifier ( TOK_COMMA idRest+=identifier )* ) TOK_RPAREN ( TOK_ASSIGN initval=enum_value )?
+    {
+        ObjVecPtr pvecIds( true );
+        CCfgOpener oCfg;
+        oCfg.SetStrProp( 0, $id1.ctx->getText() );
+        oCfg.SetIntPtr( 1, ( guint32* )$id1.start );
+        oCfg.SetIntPtr( 2, ( guint32* )$id1.stop );
+
+        ( *pvecIds )().push_back(
+            ObjPtr( oCfg.GetCfg() ) );
+
+        for( auto& elem : $idRest )
+        {
+            CCfgOpener oCfg1;
+            oCfg1.SetStrProp( 0, elem->getText() );
+            oCfg1.SetIntPtr( 1, ( guint32* )elem->start );
+            oCfg1.SetIntPtr( 2, ( guint32* )elem->stop );
+            ( *pvecIds )().push_back(
+                ObjPtr( oCfg1.GetCfg() ) );
+        }
+
+        CCfgOpener oCfg2;
+        oCfg2.SetObjPtr( propStTypeData, pvecIds );
+        if( $initval.ctx )
+            oCfg2.SetObjPtr(
+                propStTypeInit, $initval.pNode );
+        $pTypeInfo = oCfg2.GetCfg();
+    }
     ;
 
-enum_value
-    : ( enum_type_access TOK_PUNC )? identifier
+enum_value returns [ ObjPtr pNode ]
+    : ( eta=enum_type_access TOK_PUNC )? val=identifier
+    {
+        stdstr strQualified;
+        if( $eta.ctx )
+            strQualified = $eta.ctx->getText();
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStEnumValueRef ) );
+        CStEnumValueRef* pVal = pNode;
+        pVal->m_strQualified = strQualified;
+        pVal->m_strValue = $val.ctx->getText();
+        pVal->SetTokens( $eta.start, $val.stop );
+        $pNode = pNode;
+    }
     ;
 
 enum_type_access

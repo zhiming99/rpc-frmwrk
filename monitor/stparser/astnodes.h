@@ -31,6 +31,8 @@
 #include "stast.h"
 #include "stclsids.h"
 
+namespace antlr4 { class Token; }
+
 namespace rpcf
 {
 
@@ -50,6 +52,7 @@ enum enumSymKind {
     symAccess,
     symResource,
     symTask,
+    symNamedValue,   // named value, similiar to enum value
 };
 
 // Forward declarations
@@ -64,8 +67,8 @@ class CStSymbol;
 
 struct CStSymbolDeclNode : public CStAstNodeBase
 {
+    static stdstr m_strEmpty;
     typedef CStAstNodeBase super;
-
     CStSymbol* m_pSymbol;
     CStSymbolDeclNode() : super()
     {}
@@ -76,6 +79,8 @@ struct CStSymbolDeclNode : public CStAstNodeBase
     virtual gint32 ResolveSymbol(
         void* pctx, enumSymKind iSymKind )
     { return ERROR_FAIL; }
+
+    const stdstr& GetName() const;
 };
 
 // ============================================================================
@@ -100,6 +105,20 @@ struct CStExprNode : public CStAstNodeBase
 
     virtual std::string GetNodeInfo() const override;
     virtual std::string GetSignature() const override;
+    antlr4::Token*       m_pStart = nullptr;
+    antlr4::Token*       m_pStop = nullptr;
+
+    inline void SetTokens(
+        antlr4::Token* pStart,
+        antlr4::Token* pStop )
+    { m_pStart = pStart, m_pStop = pStop; }
+
+    antlr4::Token* Start()
+    { return m_pStart; }
+
+    antlr4::Token* Stop()
+    { return m_pStop; }
+
 };
 
 /**
@@ -460,8 +479,6 @@ struct CStPrimaryExprNode : public CStExprNode
 {
     typedef CStExprNode super;
 
-    ObjPtr m_pExpression;
-
     CStPrimaryExprNode() : super()
     { SetClassId( clsid( CStPrimaryExprNode ) ); }
 
@@ -577,6 +594,28 @@ struct CStConstValueNode : public CStPrimaryExprNode
     virtual std::string GetNodeInfo() const override;
 };
 
+class CStEnumTypeDeclNode;
+struct CStEnumValueRef : public CStPrimaryExprNode
+{
+    typedef CStPrimaryExprNode super;
+
+    CStEnumTypeDeclNode* m_pDeclNode = nullptr;
+    stdstr m_strQualified;
+    stdstr m_strValue;
+    gint32 m_iIndex = -1;
+
+    CStEnumValueRef() : super()
+    { SetClassId( clsid( CStEnumValueRef ) ); }
+
+    bool IsSymbolResolved() const override
+    { return m_iIndex != -1; }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
+
+    std::string GetNodeInfo() const override;
+};
+
 /**
  * @brief Array type node
  */
@@ -633,65 +672,6 @@ struct CStStructTypeNode : public CStTypeNode
     virtual std::string GetNodeInfo() const override;
 };
 
-/**
- * @brief Enum type node
- */
-struct CStEnumTypeNode : public CStTypeNode
-{
-    typedef CStTypeNode super;
-
-    std::string m_strName;
-    std::string m_strTypeName;
-    ObjPtr m_pBaseType;
-    std::string m_strDefaultInit;
-    std::vector< ObjPtr > m_vecValues;  // Contains CStEnumValueNode
-
-    CStEnumTypeNode() : super()
-    { SetClassId( clsid( CStEnumTypeNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
-
-/**
- * @brief Enum value node - represents a single enum value
- *
- * Each enum value has a name and an optional explicit value.
- * When no explicit value is given, the compiler assigns the next
- * sequential value (auto-increment from last value or 0).
- */
-struct CStEnumValueNode : public CStAstNodeBase
-{
-    typedef CStAstNodeBase super;
-
-    std::string m_strName;      // Name of the enum value
-    ObjPtr m_pExplicitValue;    // Optional explicit value expression
-
-    CStEnumValueNode() : super()
-    { SetClassId( clsid( CStEnumValueNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
-
-/**
- * @brief Enum value list node - container for all enum values
- *
- * This node holds the list of enum values and can be used by
- * backends to process all values together.
- */
-struct CStEnumValueListNode : public CStAstNodeBase
-{
-    typedef CStAstNodeBase super;
-
-    // Temporary storage for enum type name during parsing
-    // This is extracted and stored in CStEnumTypeNode.m_strName later
-    std::string m_strTypeName;
-    std::vector< ObjPtr > m_vecValues;  // Contains CStEnumValueNode
-
-    CStEnumValueListNode() : super()
-    { SetClassId( clsid( CStEnumValueListNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
 
 /**
  * @brief type_decl wrapper node
@@ -729,6 +709,8 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     { return ( m_iDirectType != -1 ); }
 
     virtual std::string GetNodeInfo() const override;
+    virtual void ReplaceAmbiguousNode(
+        CStTypeDeclNode* pAmbiguous );
 };
 
 /**
@@ -798,11 +780,17 @@ struct CStEnumTypeDeclNode : public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
-    CStEnumTypeNode* m_pEnumType;
+    std::vector< stdstr > m_vecValNames;
+    std::vector< CStSymbol* > m_vecValSyms; 
+    gint32 m_dwInitIdx = -1;
 
-    CStEnumTypeDeclNode() : super(),
-        m_pEnumType(nullptr)
+    CStEnumTypeDeclNode() : super()
     { SetClassId( clsid( CStEnumTypeDeclNode ) ); }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
+
+    bool IsSymbolResolved() const override;
 };
 
 struct CStArrayTypeDeclNode : public CStAmbiguousTypeDeclNode
@@ -2101,9 +2089,7 @@ REGISTER_AST_NODE( CStIfBranchListNode );
 REGISTER_AST_NODE( CStConstValueNode );
 REGISTER_AST_NODE( CStArrayTypeNode );
 REGISTER_AST_NODE( CStStructTypeNode );
-REGISTER_AST_NODE( CStEnumTypeNode );
-REGISTER_AST_NODE( CStEnumValueNode );
-REGISTER_AST_NODE( CStEnumValueListNode );
+REGISTER_AST_NODE( CStEnumValueRef );
 REGISTER_AST_NODE( CStDataTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDefinitionBlockNode );

@@ -1669,7 +1669,7 @@ gint32 ReplaceAmbiguousNode(
 
         pNode.NewObj( iClsid );
         auto ptd = ( CStTypeDeclNode* )pNode;
-        ( *ptd ) = *patd;
+        ptd->ReplaceAmbiguousNode( patd );
         if( ptd->IsSymbolResolved() )
             ptd->m_pDtd.Clear();
 
@@ -1678,7 +1678,8 @@ gint32 ReplaceAmbiguousNode(
 }
 
 gint32 ResolveTypeDecl(
-    ObjPtr& pObj, void* pctx )
+    ObjPtr& pObj,
+    void* pctx )
 {
     gint32 ret = 0;
     do{
@@ -1699,12 +1700,15 @@ gint32 ResolveTypeDecl(
                 return 0;
 
             gint32 ret = 0;
-            auto pdtd = ( CStDataTypeDeclNode* )ptd->m_pDtd;
+            auto pdtd =
+                ( CStDataTypeDeclNode* )ptd->m_pDtd;
 
-            // The first attempt happens while the TYPE block is
-            // still being parsed, so its USING list is already
-            // pushed by the grammar (m_bPushed).  A retry runs
-            // after END_TYPE and has to push it again.
+            // The first attempt happens while the
+            // TYPE block is still being parsed,
+            // so its USING list is already pushed
+            // by the grammar (m_bPushed).  A
+            // retry runs after END_TYPE and has
+            // to push it again.
             bool bPushedHere = false;
             if( pdtd && !pdtd->m_bPushed &&
                 pdtd->m_pScope != nullptr &&
@@ -1715,7 +1719,8 @@ gint32 ResolveTypeDecl(
                 bPushedHere = true;
             }
 
-            ret = ptd->ResolveSymbol( pctx, symDataType );
+            ret = ptd->ResolveSymbol(
+                pctx, symDataType );
 
             if( SUCCEEDED( ret ) && ptd->GetClsid() ==
                 clsid( CStAmbiguousTypeDeclNode ) )
@@ -1723,12 +1728,15 @@ gint32 ResolveTypeDecl(
                 ObjPtr pNewNode;
                 auto pCtx = reinterpret_cast
                     < CStParseContext* >( pctx );
-                ReplaceAmbiguousNode( pCtx,
+                ret = ReplaceAmbiguousNode( pCtx,
                     pObj, ptd->m_iDirectType,
                     pNewNode );
+                if( SUCCEEDED( ret ) )
+                    pObj = pNewNode;
             }
             if( bPushedHere )
                 pdtd->m_pScope->PopUsingArr();
+
             return ret;
         });
         ret = func( pObj, pctx );

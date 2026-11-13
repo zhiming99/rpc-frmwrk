@@ -46,6 +46,14 @@ static std::string JoinStrings( const std::vector< std::string >& vec,
     return oss.str();
 }
 
+
+stdstr CStSymbolDeclNode::m_strEmpty;
+const stdstr& CStSymbolDeclNode::GetName() const
+{
+    if( m_pSymbol )
+        return m_pSymbol->m_strName;
+    return m_strEmpty;
+}
 // ========================================================================
 // CStRootNode Implementation
 // ========================================================================
@@ -83,31 +91,6 @@ std::string CStInitialValueNode::GetNodeInfo() const
         case initStruct: oss << "struct"; break;
     }
     oss << " }";
-    return oss.str();
-}
-
-// ========================================================================
-// CStEnumValueNode Implementation
-// ========================================================================
-
-std::string CStEnumValueNode::GetNodeInfo() const
-{
-    std::ostringstream oss;
-    oss << "EnumValue{ name: " << m_strName;
-    if( !m_pExplicitValue.IsEmpty() )
-        oss << ", explicit";
-    oss << " }";
-    return oss.str();
-}
-
-// ========================================================================
-// CStEnumValueListNode Implementation
-// ========================================================================
-
-std::string CStEnumValueListNode::GetNodeInfo() const
-{
-    std::ostringstream oss;
-    oss << "EnumValueList{ values: " << m_vecValues.size() << " }";
     return oss.str();
 }
 
@@ -223,6 +206,13 @@ gint32 CStTypeDeclNode::ResolveSymbol(
 
     }while( 0 );
     return ret;
+}
+
+void CStTypeDeclNode::ReplaceAmbiguousNode(
+    CStTypeDeclNode* pAmbiguous )
+{
+    *this = *pAmbiguous;
+    return;
 }
 
 bool CStSimpleTypeDeclNode::IsSymbolResolved() const
@@ -614,6 +604,83 @@ ObjPtr CStNamespaceDecl::ResolvePath(
         return ObjPtr();
     return pSym;
 }
+
+
+gint32 CStEnumTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+    if( iKind != symDataType )
+        return ERROR_FALSE;
+    if( pctx == nullptr )
+        return -EINVAL;
+    if( m_pTypeInit.IsEmpty() )
+        return 0;
+    CStPrimaryExprNode* pExpr = m_pTypeInit;
+    if( pExpr == nullptr )
+        return 0;
+    return pExpr->ResolveSymbol(
+        pctx, symEnumValue );
+}
+
+bool CStEnumTypeDeclNode::IsSymbolResolved() const
+{
+    return IsDirectType( m_iDirectType );
+}
+
+gint32 CStEnumValueRef::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+    if( iKind != symEnumValue )
+        return ERROR_FALSE;
+    if( pctx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        if( m_iIndex >= 0 )
+            break;
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto& ost = pCtx->m_oSymTab;
+        if( m_strQualified.size() )
+        {
+            std::vector< stdstr > vecComps =
+                ost.BreakdownQualified( m_strQualified );
+
+            auto pScope = ost.GetCurrentScope();
+            SymPtr pSym;
+            gint32 iType = -1;
+
+            ret = ResolveTypeToDirectType(
+                pCtx, vecComps, symDataType,
+                pScope, pSym, iType );
+            if( ERROR( ret ) )
+                break;
+
+            if( m_pDeclNode != pSym->m_pDeclNode )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+            CStEnumTypeDeclNode* petd = m_pDeclNode;
+            auto& vecNames = petd->m_vecValNames;
+            size_t i = 0;
+            for( ; i < vecNames.size(); i++ )
+            {
+                if( petd->m_vecValNames[ i ] ==
+                    m_strValue )
+                    break;
+            }
+            if( i < vecNames.size() )
+            {
+                m_iIndex = i;
+                break;
+            }
+            ret = ERROR_FALSE;
+        }
+    }while( 0 );
+    return ret;
+}
 // ========================================================================
 // Default implementations for AST nodes
 // These use base class dummy implementation via override
@@ -652,9 +719,9 @@ IMPL_GETNODEINFO( CStPointerMemberExpr )
 IMPL_GETNODEINFO( CStTypeNode )
 IMPL_GETSIGNATURE( CStTypeNode )
 IMPL_GETNODEINFO( CStConstValueNode )
+IMPL_GETNODEINFO( CStEnumValueRef )
 IMPL_GETNODEINFO( CStArrayTypeNode )
 IMPL_GETNODEINFO( CStStructTypeNode )
-IMPL_GETNODEINFO( CStEnumTypeNode )
 // CStDataTypeDeclNode has explicit implementation
 // CStTypeDeclNode has explicit implementation
 IMPL_GETNODEINFO( CStPointerTypeNode )

@@ -613,7 +613,8 @@ gint32 ReplaceAmbiguousNode(
     ObjPtr& pNode );
 
 gint32 ResolveTypeDecl(
-    ObjPtr& pObj, void* pctx );
+    ObjPtr& pObj,
+    void* pctx );
 
 }
 
