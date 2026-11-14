@@ -165,8 +165,16 @@ class CPythonInterfBase : public T
             case typeObj:
                 {
                     ObjPtr* val = ( ObjPtr*)pBuf->ptr();
+                    auto ppyObj= new ObjPtr( *val );
                     pObj = sipConvertFromNewType(
-                        val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+                        ppyObj, sipType_cpp_ObjPtr,
+                        SIP_NULLPTR );
+                    if( pObj == nullptr )
+                    {
+                        delete ppyObj;
+                        ret = -ENOMEM;
+                        break;
+                    }
                     break;
                 }
             case typeByteArr:
@@ -761,18 +769,17 @@ class CPythonInterfBase : public T
             }
         case typeByteArr:
             {
-                Py_buffer *view = (Py_buffer *)
-                    malloc(sizeof(*view));
+                Py_buffer view;
                 ret = PyObject_GetBuffer(
-                    pObject, view, GetBufFlags( true ) );
+                    pObject, &view, GetBufFlags( true ) );
                 if( ret < 0 )
                 {
                     ret = -ENOMEM;
                     break;
                 }
-                ret = pBuf->Append( ( char* )view->buf,
-                    ( guint32 )view->len);
-                PyBuffer_Release( view );
+                ret = pBuf->Append( ( char* )view.buf,
+                    ( guint32 )view.len);
+                PyBuffer_Release( &view );
                 break;
             }
         case typeObj:
@@ -792,6 +799,9 @@ class CPythonInterfBase : public T
                         break;
                     }
                     *pBuf = *pObj;
+                    sipReleaseType( pObj,
+                        sipType_cpp_ObjPtr,
+                        iState );
                 }
                 else
                 {
@@ -867,18 +877,17 @@ class CPythonInterfBase : public T
         case typeByteArr:
             {
                 BufPtr pBuf( true );
-                Py_buffer *view = (Py_buffer *)
-                    malloc(sizeof(*view));
+                Py_buffer view;
                 ret = PyObject_GetBuffer(
-                    pObject, view, GetBufFlags( true ) );
+                    pObject, &view, GetBufFlags( true ) );
                 if( ret < 0 )
                 {
                     ret = -ENOMEM;
                     break;
                 }
-                ret = pBuf->Append( ( char* )view->buf,
-                    ( guint32 )view->len);
-                PyBuffer_Release( view );
+                ret = pBuf->Append( ( char* )view.buf,
+                    ( guint32 )view.len);
+                PyBuffer_Release( &view );
                 oVar = pBuf;
                 break;
             }
@@ -899,6 +908,9 @@ class CPythonInterfBase : public T
                         break;
                     }
                     oVar = *pObj;
+                    sipReleaseType( pObj,
+                        sipType_cpp_ObjPtr,
+                        iState );
                 }
                 else
                 {
@@ -1057,13 +1069,16 @@ class CPythonInterfBase : public T
                 pCb, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyCb == nullptr ) )
             {
+                delete pCb;
+                delete pArgs;
                 ret = -ENOMEM;
                 break;
             }
             pPyParams = sipConvertFromNewType(
                 pArgs, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyParams == nullptr ) ) 
-            {           
+            {
+                delete pArgs;
                 ret = -ENOMEM;
                 break;
             }       
@@ -1102,8 +1117,9 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) || bNoReply ) 
                 break;
 
-            PyObject* pyRespArgs =
-                PyList_GetItem( listResp, 1 );
+            PyObject* pyRespArgs = nullptr;
+            if( PyList_Size( listResp ) > 1 )
+                pyRespArgs = PyList_GetItem( listResp, 1 );
             if( pyRespArgs == nullptr )
             {
                 // fine, no resp params
@@ -1177,20 +1193,37 @@ class CPythonInterfBase : public T
         if( ERROR( ret ) || pCb == nullptr )
             return ret;
 
-        PyObject* pPyCb = nullptr;
+        PyObject* pPyCb = ( PyObject* )pCb;
+        PyObject* pPyResp = nullptr;
+        PyObject* pPyBuf = nullptr;
+        PyObject* pArgs = nullptr;
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
         do{
-            PyObject* pPyResp = PyList_New( 2 );
+            pPyResp = PyList_New( 2 );
+            if( pPyResp == nullptr )
+            {
+                ret = -ENOMEM;
+                break;
+            }
 
             PyObject* pRet = PyLong_FromLong( iRet );
+            if( pRet == nullptr )
+            {
+                ret = -ENOMEM;
+                break;
+            }
             PyList_SetItem( pPyResp, 0, pRet );
-            PyObject* pArgs = PyList_New( 2 );
 
-            PyObject* pPyBuf = nullptr;
             ret = ConvertBufToPyObj( pBuf, pPyBuf );
             if( SUCCEEDED( ret ) )
             {
+                pArgs = PyList_New( 2 );
+                if( pArgs == nullptr )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
                 PyObject* pyHandle = nullptr;
                 if( sizeof( HANDLE ) ==
                     sizeof( gint64 ) )
@@ -1204,6 +1237,11 @@ class CPythonInterfBase : public T
                         PyLong_FromLong( hChannel );
                 }
 
+                if( pyHandle == nullptr )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
                 // Note: callback dose not to worry 
                 // the pPyBuf become invalid if pBuf is released.
                 // so we don't put pBuf to the list here.
@@ -1212,18 +1250,22 @@ class CPythonInterfBase : public T
                 // the callback returns
                 PyList_SetItem( pArgs, 0, pyHandle );
                 PyList_SetItem( pArgs, 1, pPyBuf );
+                pPyBuf = nullptr;
                 PyList_SetItem( pPyResp, 1, pArgs );
+                pArgs = nullptr;
             }
             else
             {
                 if( SUCCEEDED( iRet ) )
-                    PyList_SetItem( pPyResp,
-                        0, PyLong_FromLong( ret ) );
+                {
+                    PyObject* pErr =
+                        PyLong_FromLong( ret );
+                    if( pErr != nullptr )
+                        PyList_SetItem( pPyResp, 0, pErr );
+                }
                 Py_INCREF( Py_None );
                 PyList_SetItem( pPyResp, 1, Py_None );
             }
-
-            pPyCb = ( PyObject* )pCb;
 
             PyObject* pHost = nullptr;
             ret = GetPyHost( pHost );
@@ -1238,6 +1280,10 @@ class CPythonInterfBase : public T
                 Py_DECREF( pPyRet );
 
         }while( 0 );
+
+        Py_XDECREF( pArgs );
+        Py_XDECREF( pPyBuf );
+        Py_XDECREF( pPyResp );
 
         if( pPyCb != nullptr )
             Py_DECREF( pPyCb );
@@ -1257,6 +1303,8 @@ class CPythonInterfBase : public T
         CParamList oReqCtx( pCtx );
         PyObject* pPyBuf = nullptr; 
         PyObject* pPyCb = nullptr;
+        PyObject* pPyResp = nullptr;
+        PyObject* pPyArgs = nullptr;
         gint32 ret = 0;
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
@@ -1272,15 +1320,29 @@ class CPythonInterfBase : public T
                 break;
             pPyCb = ( PyObject* )pVal;
 
-            PyObject* pPyResp = PyList_New( 2 );
-            PyObject* pPyArgs = nullptr; 
+            pPyResp = PyList_New( 2 );
+            if( pPyResp == nullptr )
+            {
+                ret = -ENOMEM;
+                break;
+            }
 
             PyObject* pRet = PyLong_FromLong( iRet );
+            if( pRet == nullptr )
+            {
+                ret = -ENOMEM;
+                break;
+            }
             PyList_SetItem( pPyResp, 0, pRet );
 
             if( SUCCEEDED( iRet ) )
             {
                 pPyArgs = PyList_New( 2 );
+                if( pPyArgs == nullptr )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
                 PyObject* pyHandle = nullptr;
                 if( sizeof( HANDLE ) ==
                     sizeof( gint64 ) )
@@ -1294,6 +1356,12 @@ class CPythonInterfBase : public T
                         PyLong_FromLong( hChannel );
                 }
 
+                if( pyHandle == nullptr )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+
                 PyList_SetItem( pPyArgs, 0, pyHandle );
                 PyList_SetItem( pPyArgs, 1, pPyBuf );
                 pPyBuf = nullptr;
@@ -1301,9 +1369,15 @@ class CPythonInterfBase : public T
             else
             {
                 pPyArgs = PyList_New( 0 );
+                if( pPyArgs == nullptr )
+                {
+                    Py_INCREF( Py_None );
+                    pPyArgs = Py_None;
+                }
             }
 
             PyList_SetItem( pPyResp, 1, pPyArgs );
+            pPyArgs = nullptr;
 
             PyObject* pHost = nullptr;
             ret = GetPyHost( pHost );
@@ -1319,11 +1393,10 @@ class CPythonInterfBase : public T
 
         }while( 0 );
 
-        if( pPyBuf != nullptr )
-            Py_DECREF( pPyBuf );
-
-        if( pPyCb != nullptr )
-            Py_DECREF( pPyCb );
+        Py_XDECREF( pPyArgs );
+        Py_XDECREF( pPyBuf );
+        Py_XDECREF( pPyCb );
+        Py_XDECREF( pPyResp );
 
         PyGILState_Release( gstate );
         return ret;
@@ -2444,6 +2517,13 @@ class CPythonProxy :
 
     PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
+    if( pResp != nullptr )
+    {
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 0, Py_None );
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 1, Py_None );
+    }
 
     do{
 
@@ -2487,8 +2567,9 @@ class CPythonProxy :
 
     }while( 0 );
 
-    PyList_SetItem( pResp, 0,
-        PyLong_FromLong( ret ) );
+    if( pResp != nullptr )
+        PyList_SetItem( pResp, 0,
+            PyLong_FromLong( ret ) );
 
     %End
 
@@ -2551,6 +2632,13 @@ class CPythonProxy :
     %MethodCode
     PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
+    if( pResp != nullptr )
+    {
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 0, Py_None );
+        Py_INCREF( Py_None );
+        PyList_SetItem( pResp, 1, Py_None );
+    }
     gint32 ret = 0;
     do{
         auto* pImpl = dynamic_cast
@@ -2621,8 +2709,9 @@ class CPythonProxy :
 
     }while( 0 );
 
-    PyList_SetItem( pResp, 0,
-        PyLong_FromLong( ret ) );
+    if( pResp != nullptr )
+        PyList_SetItem( pResp, 0,
+            PyLong_FromLong( ret ) );
 
     %End
 

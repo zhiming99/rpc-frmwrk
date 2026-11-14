@@ -49,21 +49,30 @@ typedef enum
     DECL_CLSID( CStLValueNode ),
     DECL_CLSID( CStLValueExtNode ),
     DECL_CLSID( CStInstancePathNode ),
-    DECL_CLSID( CStFullExpressionNode ),
+    DECL_CLSID( CStExpressionNode ),
+    DECL_CLSID( CStPrimaryExprNode ),
     DECL_CLSID( CStSubrangeNode ),
     DECL_CLSID( CStSubrangeListNode ),
     DECL_CLSID( CStStmtListNode ),
     DECL_CLSID( CStIfBranchListNode ),
 
     // AST Type Nodes
-    DECL_CLSID( CStBasicTypeNode ),
+    DECL_CLSID( CStConstValueNode ),
     DECL_CLSID( CStArrayTypeNode ),
     DECL_CLSID( CStStructTypeNode ),
-    DECL_CLSID( CStEnumTypeNode ),
-    DECL_CLSID( CStEnumValueNode ),
-    DECL_CLSID( CStEnumValueListNode ),
-    DECL_CLSID( CStDataTypeSpecNode ),
-    DECL_CLSID( CStTypeSpecNode ),
+    DECL_CLSID( CStEnumValueRef ),
+    DECL_CLSID( CStNamedvalValueRef ),
+    DECL_CLSID( CStDataTypeDeclNode ),
+    DECL_CLSID( CStTypeDeclNode ),
+    DECL_CLSID( CStAmbiguousTypeDeclNode ),
+    DECL_CLSID( CStSimpleTypeDeclNode ),
+    DECL_CLSID( CStSubrangeTypeDeclNode ),
+    DECL_CLSID( CStArrayTypeDeclNode ),
+    DECL_CLSID( CStStructTypeDeclNode ),
+    DECL_CLSID( CStStringTypeDeclNode ),
+    DECL_CLSID( CStNamedvalTypeDeclNode ),
+    DECL_CLSID( CStEnumTypeDeclNode ),
+    DECL_CLSID( CStRefTypeDeclNode ),
     DECL_CLSID( CStTypeDefinitionBlockNode ),
     DECL_CLSID( CStPointerTypeNode ),
     DECL_CLSID( CStReferenceTypeNode ),
@@ -92,7 +101,6 @@ typedef enum
     // AST Other Declaration Nodes
     DECL_CLSID( CStNamespaceDecl ),
     DECL_CLSID( CStInterfaceDecl ),
-    DECL_CLSID( CStTypeDecl ),
     DECL_CLSID( CStVarConfigDecl ),
     DECL_CLSID( CStTaskConfigNode ),
     DECL_CLSID( CStTaskConfigListNode ),
@@ -128,6 +136,7 @@ typedef enum
 
     // Symbol table
     DECL_CLSID( CStSymbol ),
+    DECL_CLSID( CStScope ),
 
 }EnumSTParserClsid;
 

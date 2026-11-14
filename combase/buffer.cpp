@@ -596,12 +596,8 @@ gint32 CBuffer::Resize( guint32 dwSize )
         break;
     }
 
-    if( ERROR( ret ) )
-    {
-        std::string strMsg = DebugMsg( ret,
-            "Resizing buffer failed" );
-        throw std::runtime_error( strMsg );
-    }
+    if( ret == -ENOMEM )
+        throw std::bad_alloc();
 
     return ret;
 }

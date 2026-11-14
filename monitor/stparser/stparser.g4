@@ -61,6 +61,14 @@ options { tokenVocab=stlexer; }
     { m_bPass2 = bPass2; }
 }
 
+@parser::context {
+#include "rpc.h"
+//#include "astnodes.h"
+//#include "stsymtab.h"
+using namespace rpcf;
+#define GET_PARSER() static_cast< CStParser* >( this )
+}
+
 // ============================================================
 // Start Point
 // ============================================================
@@ -81,7 +89,41 @@ decl_set
     : namespace_element
     | config_decl
     | access_decl
-    | using_directive
+    | ( ud = using_directive 
+        {
+            auto pParser = GET_PARSER();
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+            auto pGlobal = ost.GetGlobalScope();
+
+            CStScope* pScope = pGlobal;
+            USINGS_ARR vecUsings = { $ud.pNode };
+            pScope->PushUsingArr( vecUsings );
+
+            auto pSym = pGlobal->m_pSymbol;
+            auto pNode = pSym->m_pDeclNode;
+            auto pnsd = ( CStNamespaceDecl* )pNode;
+            if( pnsd )
+            {
+                std::string strFullPath =
+                    GetReconstructedText(
+                        $ud.ctx, _input, 1, 1 );
+                DebugPrint( $ud.start->getLine(),
+                    "haha, added namespaces references to "
+                    "global namespace: %s",
+                    strFullPath.c_str() );
+                auto ret = pnsd->ResolveUsingNs( pCtx );
+                if( ERROR( ret ) )
+                {
+                    ost.AddUnsolved( pSym->m_pDeclNode,
+                    ([]( ObjPtr& pObj, void* pctx )->gint32
+                    {
+                        CStNamespaceDecl* pnsd = pObj;
+                        return pnsd->ResolveUsingNs( pctx );
+                    }));
+                }
+            }
+        })
     | TOK_PRAGMA
     ;
 
@@ -109,8 +151,70 @@ namespace_name
     ;
 
 namespace_decl
-    : TOK_NAMESPACE opt_internal namespace_name ( TOK_DOT namespace_name )*
-    using_directive_list? namespace_elements TOK_END_NAMESPACE
+    : TOK_NAMESPACE opt_internal
+        first=namespace_name ( TOK_DOT rest+=namespace_name )*
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto ret = pCtx->DeclareNamespace(
+                $first.text, $rest );
+            if( ERROR( ret ) )
+            {
+                pCtx->LogError( $first.start,
+                    "Declare namespace failed:'%s'(%d).",
+                    $first.text.c_str(), ret );
+            }
+        }}
+        (uds = using_directive_list
+        {{
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            std::string strNsName;
+            if( $rest.size() )
+                strNsName = $rest.back()->getText();
+            else
+                strNsName = $first.text;
+            auto pScope =
+                pCtx->m_oSymTab.GetCurrentScope();
+
+            auto& pSym = pScope->m_pSymbol;
+            if( pSym->m_strName != strNsName )
+            {
+                pCtx->LogError( $first.start,
+                    "wrong scope name:'%s'",
+                    $first.text.c_str() );
+            }
+            else
+            {
+                pScope->PushUsingArr( $uds.vecUsings );
+            }
+        }})?
+        namespace_elements
+        TOK_END_NAMESPACE
+        {{ 
+            int lineno = 
+                $TOK_END_NAMESPACE->getLine();
+            DebugPrint( 0, "Current line %d", lineno);
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto ost = pCtx->m_oSymTab;
+            auto pScope = ost.GetCurrentScope();
+            auto& pSym = pScope->m_pSymbol;
+            pSym->SetTokens(
+                $TOK_NAMESPACE, $TOK_END_NAMESPACE );
+            CStNamespaceDecl* pnsd = pSym->m_pDeclNode;
+            auto ret = pnsd->ResolveUsingNs( pCtx );
+            if( ERROR( ret ) )
+            {
+                ost.AddUnsolved( pSym->m_pDeclNode,
+                ([]( ObjPtr& pObj, void* pctx )->gint32
+                {
+                    CStNamespaceDecl* pnsd = pObj;
+                    return pnsd->ResolveUsingNs( pctx );
+                }));
+            }
+            pCtx->LeaveNamespace( $first.text, $rest );
+        }}
     ;
 
 namespace_global_name
@@ -132,16 +236,11 @@ config_name
 
 config_decl
     : TOK_CONFIGURATION config_name
-      opt_global_var_decls
+      global_var_decls?
       resource_decl
       opt_access_decls
       opt_config_init
       TOK_END_CONFIGURATION
-    ;
-
-opt_global_var_decls
-    : /* empty */
-    | global_var_decls
     ;
 
 resource_decl
@@ -155,7 +254,7 @@ resource_decl_list
 
 resource_declaration
     : TOK_RESOURCE identifier TOK_ON identifier
-      opt_global_var_decls
+      global_var_decls?
       single_resource_decl
       TOK_END_RESOURCE
     ;
@@ -331,7 +430,7 @@ subscript_list
     ;
 
 expr_list
-    : full_expression ( TOK_COMMA full_expression )*
+    : expression ( TOK_COMMA expression )*
     ;
 
 this_notation
@@ -355,50 +454,233 @@ global_name_space
 // Expression
 // ============================================================
 
-full_expression
-    : xor_expr (TOK_OR xor_expr)*
+const_expr returns [ ObjPtr pExpr ]
+    : expression
+    {
+        // TODO: evaluate the expression to obtain the
+        // value and value type.
+        $pExpr = $expression.pExpr;
+    }
     ;
 
-xor_expr
-    : and_expr ( TOK_XOR and_expr )*
+expression returns [ ObjPtr pExpr]
+    : xe1=xor_expr
+    {{
+        ObjPtr pExpr;
+        pExpr.NewObj( clsid( CStExpressionNode ) );
+        auto p = ( CStExpressionNode* )pExpr;
+        p->m_pSubExpr = $xe1.pExpr;
+        $pExpr = pExpr;
+    }}
+    ( TOK_OR xe2=xor_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $xe2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boOr;
+
+        ObjPtr pExpr;
+        pExpr.NewObj( clsid( CStExpressionNode ) );
+        auto p = ( CStExpressionNode* )pExpr;
+        p->m_pSubExpr = pObj;
+
+        $pExpr = pExpr;
+    }}
+    )*
     ;
 
-and_expr
-    : compare_expr ((TOK_AND | TOK_AND_OP )compare_expr)*
+xor_expr returns [ ObjPtr pExpr ]
+    : ae1=and_expr
+    {{
+        $pExpr = $ae1.pExpr;
+    }}
+    ( TOK_XOR ae2=and_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ae2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boXor;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-compare_expr
-    : equ_expr ( (TOK_EQUAL|TOK_NEQU) equ_expr)*
+and_expr returns [ ObjPtr pExpr ]
+    : ce1=compare_expr
+    {{
+        $pExpr = $ce1.pExpr;
+    }}
+    ( ( TOK_AND | TOK_AND_OP ) ce2=compare_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ce2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boAnd;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-equ_expr
-    : add_expr ( ( TOK_LT | TOK_LE | TOK_GT | TOK_NLE ) add_expr )*
+compare_expr returns [ ObjPtr pExpr ]
+    : ee1=equ_expr
+    {{
+        $pExpr = $ee1.pExpr;
+    }}
+    ( op=( TOK_EQUAL | TOK_NEQU ) ee2=equ_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ee2.pExpr;
+        pb->m_eOperator = ( $op.type == TOK_EQUAL ) ?
+            CStBinaryExpr::boEqual :
+            CStBinaryExpr::boNotEqual;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-add_expr
-    : term ( ( TOK_ADD | TOK_MINUS) term )*
+equ_expr returns [ ObjPtr pExpr ]
+    : ade1=add_expr
+    {{
+        $pExpr = $ade1.pExpr;
+    }}
+    ( op=( TOK_LT | TOK_LE | TOK_GT | TOK_NLE ) ade2=add_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ade2.pExpr;
+        switch( $op.type )
+        {
+        case TOK_LE:
+            pb->m_eOperator = CStBinaryExpr::boLessEqual;
+            break;
+        case TOK_GT:
+            pb->m_eOperator = CStBinaryExpr::boGreaterThan;
+            break;
+        case TOK_NLE:
+            pb->m_eOperator = CStBinaryExpr::boGreaterEqual;
+            break;
+        default:
+            pb->m_eOperator = CStBinaryExpr::boLessThan;
+            break;
+        }
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-term
-    : power_expr (( TOK_MUL | TOK_DIV | TOK_MOD ) power_expr )*
+add_expr returns [ ObjPtr pExpr ]
+    : t1=term
+    {{
+        $pExpr = $t1.pExpr;
+    }}
+    ( op=( TOK_ADD | TOK_MINUS ) t2=term
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $t2.pExpr;
+        pb->m_eOperator = ( $op.type == TOK_ADD ) ?
+            CStBinaryExpr::boAdd : CStBinaryExpr::boSub;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-power_expr
-    : unary_expr (TOK_POWER unary_expr)*
+term returns [ ObjPtr pExpr ]
+    : pe1=power_expr
+    {{
+        $pExpr = $pe1.pExpr;
+    }}
+    ( op=( TOK_MUL | TOK_DIV | TOK_MOD ) pe2=power_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $pe2.pExpr;
+        if( $op.type == TOK_DIV )
+            pb->m_eOperator = CStBinaryExpr::boDiv;
+        else if( $op.type == TOK_MOD )
+            pb->m_eOperator = CStBinaryExpr::boMod;
+        else
+            pb->m_eOperator = CStBinaryExpr::boMul;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-unary_expr
-    : ( TOK_NOT | TOK_ADD | TOK_MINUS | TOK_CARET )? primary_expr
+power_expr returns [ ObjPtr pExpr ]
+    : ue1=unary_expr
+    {{
+        $pExpr = $ue1.pExpr;
+    }}
+    ( TOK_POWER ue2=unary_expr
+    {{
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStBinaryExpr ) );
+        CStBinaryExpr* pb = pObj;
+        pb->m_pLeft = $pExpr;
+        pb->m_pRight = $ue2.pExpr;
+        pb->m_eOperator = CStBinaryExpr::boPower;
+        $pExpr = pObj;
+    }}
+    )*
     ;
 
-primary_expr
+unary_expr returns [ ObjPtr pExpr ]
+    : ( op=TOK_NOT | op=TOK_ADD | op=TOK_MINUS | op=TOK_CARET )? pe=primary_expr
+    {{
+        $pExpr = $pe.pExpr;
+        // unary '+' does not change the operand
+        if( $op.type != 0 && $op.type != TOK_ADD &&
+            !$pExpr.IsEmpty() )
+        {
+            ObjPtr pObj;
+            pObj.NewObj( clsid( CStUnaryExpr ) );
+            CStUnaryExpr* pu = pObj;
+            pu->m_pOperand = $pExpr;
+            if( $op.type == TOK_MINUS )
+                pu->m_eOperator = CStUnaryExpr::uoNeg;
+            else if( $op.type == TOK_NOT )
+                pu->m_eOperator = CStUnaryExpr::uoNot;
+            else
+                pu->m_eOperator = CStUnaryExpr::uoCaret;
+            $pExpr = pObj;
+        }
+    }}
+    ;
+
+// Only the parenthesized form produces an expression
+// node for now: constant, variable_access, enum_value,
+// namedval_value, func_call and invocation do not
+// return one yet.
+primary_expr returns [ ObjPtr pExpr ]
     : constant
+    {  $pExpr = $constant.pNode; }
     | variable_access
     | enum_value
+    {  $pExpr = $enum_value.pNode; }
     | namedval_value
+    {  $pExpr = $namedval_value.pNode; }
     | func_call
+    | invocation
     | ref_value
-    | TOK_LPAREN full_expression TOK_RPAREN
+    | TOK_LPAREN ec=expression TOK_RPAREN
+    {{
+        $pExpr = $ec.pExpr;
+    }}
     ;
 
 variable_access
@@ -417,46 +699,309 @@ derived_func_name
 // Constants
 // ============================================================
 
-constant
-    : numeric_literal
-    | string_literal
-    | time_literal
-    | bit_str_literal
-    | bool_literal
+constant returns [ ObjPtr pNode ]
+    : nl = numeric_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $nl.pair;
+        $pNode = pNode;
+    }}
+    | sl = string_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $sl.pair;
+        $pNode = pNode;
+    }}
+    | tl = time_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $tl.pair;
+        $pNode = pNode;
+    }}
+    | bl = bool_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $bl.pair;
+        $pNode = pNode;
+    }}
+    | bsl = bit_str_literal
+    {{
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStConstValueNode ) );
+        auto pConst = ( CStConstValueNode* )pNode;
+        pConst->m_oValue = $bsl.pair;
+        $pNode = pNode;
+    }}
     ;
 
-numeric_literal
-    : TOK_INT
-    | TOK_REAL
+numeric_literal returns [ std::pair< int, ObjPtr > pair ]
+    : td=TOK_INT
+    {{
+        $pair = ParseStNumericLiteral(
+            $td.text.c_str(), stparser::TOK_INT );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid numeric literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleNumeric_literal );
+        }
+    }}
+    | td=TOK_REAL
+    {{
+        $pair = ParseStNumericLiteral(
+            $td.text.c_str(), stparser::TOK_REAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid numeric literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleNumeric_literal );
+        }
+    }}
     ;
 
-time_literal
-    : TOK_DURATION
-    | TOK_TIME_OF_DAY
-    | TOK_DATE
-    | TOK_DATE_TIME
+time_literal returns [ std::pair< int, ObjPtr > pair ]
+    : td=TOK_DURATION
+    {{
+        $pair = ParseStDuration( $td.text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
+    }}
+    | td=TOK_TIME_OF_DAY
+    {{
+        $pair = ParseStTimeLiteral(
+            $td.text.c_str(), stparser::TOK_TIME_OF_DAY );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
+    }}
+    | td=TOK_DATE
+    {{
+        $pair = ParseStTimeLiteral(
+            $td.text.c_str(), stparser::TOK_DATE );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
+    }}
+    | td=TOK_DATE_TIME
+    {{
+        $pair = ParseStTimeLiteral(
+            $td.text.c_str(), stparser::TOK_DATE_TIME );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid time literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleTime_literal );
+        }
+    }}
     ;
 
-string_literal
-    : TOK_CHAR_LITERAL
-    | TOK_WCHAR_LITERAL
-    | TOK_UCHAR_LITERAL
+string_literal returns [ std::pair< int, ObjPtr > pair ]
+    : td=TOK_CHAR_LITERAL
+    {{
+        $pair = ParseStStringLiteral(
+            $td.text.c_str(), stparser::TOK_CHAR_LITERAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid string literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleString_literal );
+        }
+    }}
+    | td=TOK_WCHAR_LITERAL
+    {{
+        $pair = ParseStStringLiteral(
+            $td.text.c_str(), stparser::TOK_WCHAR_LITERAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid string literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleString_literal );
+        }
+    }}
+    | td=TOK_UCHAR_LITERAL
+    {{
+        $pair = ParseStStringLiteral(
+            $td.text.c_str(), stparser::TOK_UCHAR_LITERAL );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $td,
+                "Invalid string literal:'%s'.",
+                $td.text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleString_literal );
+        }
+    }}
     ;
 
 bool_value
-    : TOK_INT
+    : TOK_INT // value must be 0 or 1
     | TOK_TRUE
     | TOK_FALSE
     ;
 
-bool_literal
-    : bool_value
-    | bool_type_name TOK_PUNC bool_value
+bool_literal returns [ std::pair< int, ObjPtr > pair ]
+    : bv=bool_value
+    {{
+        $pair = ParseStBoolLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $bv.start,
+                "Invalid bool literal:'%s'.",
+                $text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleBool_literal );
+        }
+    }}
+    | bool_type_name TOK_PUNC bv=bool_value
+    {{
+        $pair = ParseStBoolLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $bv.start,
+                "Invalid bool literal:'%s'.",
+                $text.c_str() );
+        }
+        else
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )$pair.second );
+            oCfg.SetIntProp(
+                propStRuleId, RuleBool_literal );
+        }
+    }}
     ;
 
-bit_str_literal
-    : TOK_INT
-    | bit_str_type_name TOK_PUNC TOK_INT
+bit_str_literal returns [ std::pair< int, ObjPtr > pair ]
+    : v=TOK_INT
+    {{
+        $pair = ParseStBitStrLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $v,
+                "Invalid bit string literal:'%s'.",
+                $text.c_str() );
+        }
+    }}
+    | bit_str_type_name TOK_PUNC v=TOK_INT
+    {{
+        $pair = ParseStBitStrLiteral( $text.c_str() );
+        if( $pair.second.IsEmpty() )
+        {
+            auto pParser = static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            pCtx->LogError( $v,
+                "Invalid bit string literal:'%s'.",
+                $text.c_str() );
+        }
+    }}
     ;
 
 bool_type_name
@@ -554,7 +1099,7 @@ case_list
 
 case_list_elem
     : subrange
-    | expression
+    | const_expr
     ;
 
 iteration_statement
@@ -586,10 +1131,6 @@ repeat_statement
     : TOK_REPEAT stmt_list
       TOK_UNTIL expression
       TOK_END_REPEAT
-    ;
-
-expression
-    : full_expression
     ;
 
 ref_assign:
@@ -648,13 +1189,62 @@ fb_name
 
 std_fb_name: identifier;
 
-using_directive_list
-    : using_directive+
+using_directive_list returns [ std::vector<ObjPtr> vecUsings ]
+    : ( ud = using_directive
+        {
+            if( !$ud.pNode.IsEmpty() )
+                $vecUsings.push_back( $ud.pNode );
+        }
+    )+
     ;
 
-using_directive
-    : TOK_USING instance_path (TOK_COMMA instance_path)* semicolons
-    ;
+using_directive returns [rpcf::ObjPtr pNode]
+    : TOK_USING first = namespace_hierarchy (TOK_COMMA rest+=namespace_hierarchy)* semicolons
+      {
+          int lineno = $first.start->getLine();
+          DebugPrint( 0, "Current line %d", lineno);
+
+          std::string strPath = $first.ctx->getText();
+          auto& pctx = $first.ctx;
+          pctx->stop->getText();
+
+          rpcf::ObjPtr pObj;
+          pObj.NewObj( clsid( CStUsingDirective ) );
+          CStUsingDirective* pud = pObj;
+          if( !pud->AddNamespace( strPath, ObjPtr() ) )
+          {
+            auto pParser =
+                static_cast<CStParser*>(this);
+              CStParseContext* pCtx =
+                pParser->GetParseContext();
+              pCtx->LogError( $first.start,
+                  "Duplicate path in USING directive:'%s'",
+                  strPath.c_str() );
+              $pNode = ObjPtr();
+          }
+          else
+              $pNode = pObj;
+
+          // Skip processing if initial path failed
+          if (!$rest.empty()) 
+          {
+              CStUsingDirective* pud = $pNode;
+              auto pCurCtx = $rest.back();
+              std::string strPath = pCurCtx->getText();
+              if( !pud->AddNamespace(
+                  strPath, ObjPtr()))
+              {
+                  auto pParser = 
+                      static_cast<CStParser*>(this);
+                  CStParseContext* pCtx =
+                    pParser->GetParseContext();
+                  pCtx->LogError( pCurCtx->start, 
+                      "Duplicate path in USING directive '%s'.",
+                      strPath.c_str());
+              }
+          }
+      }
+      ;
 
 extends_clause
     :TOK_EXTENDS instance_path
@@ -796,11 +1386,15 @@ other_var_decls
     ;
 
 retain_var_decls
-    : TOK_VAR TOK_RETAIN access_spec? var_decls TOK_END_VAR
+    : TOK_VAR TOK_RETAIN access_spec? 
+    ( var_decls_init_set semicolons )*
+    TOK_END_VAR
     ;
 
 no_retain_var_decls
-    : TOK_VAR TOK_NON_RETAIN access_spec? var_decls TOK_END_VAR
+    : TOK_VAR TOK_NON_RETAIN access_spec?
+    ( var_decls_init_set semicolons )*
+    TOK_END_VAR
     ;
 
 retain
@@ -917,36 +1511,240 @@ func_body
 // ============================================================
 
 data_type_decl
-    : TOK_TYPE opt_override using_directive_list? type_decls TOK_END_TYPE
+    : TOK_TYPE
+    {
+        auto pParser =
+            static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        auto& ost = pCtx->m_oSymTab;
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStDataTypeDeclNode ) );
+        auto pdtd = ( CStDataTypeDeclNode* )pObj;
+        auto pScope = ost.GetCurrentScope();
+        pdtd->m_pScope = pScope;
+    }
+    opt_internal
+    (uds = using_directive_list
+    {{
+        pdtd->m_vecUsings = $uds.vecUsings;
+        auto ret = pdtd->ResolveUsingNs( pCtx );
+        if( ERROR( ret ) )
+        {
+            ost.AddUnsolved( pObj,
+            ([]( ObjPtr& pObj, void* pctx )->gint32
+            {
+                auto pdtd = ( CStDataTypeDeclNode* )pObj;
+                return pdtd->ResolveUsingNs( pctx );
+            }));
+        }
+        else
+        {
+            pScope->PushUsingArr( pdtd->m_vecUsings );
+            pdtd->m_bPushed = true;
+        }
+    }})?
+    tds = type_decls
+    {
+        auto& vecDecls = $tds.vecTypeDecls;
+        for( auto& pType : vecDecls )
+        {
+            CStTypeDeclNode* ptd = pType;             
+            if( !ptd || ptd->IsSymbolResolved() )
+                continue;
+            ptd->m_pDtd = pObj;
+        }
+    }
+    TOK_END_TYPE
+    {
+        if( pdtd->m_bPushed )
+        {
+            pScope->PopUsingArr();
+            pdtd->m_bPushed = false;
+        }
+    }
     ;
 
-type_decls
-    : type_decl ( semicolons type_decl )* opt_semicolons
+type_decls returns [ std::vector< ObjPtr > vecTypeDecls ]
+    : first=type_decl
+    {
+        if (!$first.pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back($first.pTypeDecl);
+    }
+    ( semicolons rest+=type_decl 
+    {
+        auto* pCtx = $rest.back();
+        if (pCtx != nullptr && !pCtx->pTypeDecl.IsEmpty())
+            $vecTypeDecls.push_back(pCtx->pTypeDecl);
+    })*
+    opt_semicolons
     ;
 
-type_decl
-    : simple_type_decl
-    | subrange_type_decl
-    | enum_type_decl
-    | namedval_spec_init
-    | array_type_decl
-    | struct_type_decl
-    | string_type_decl
-    | ref_type_decl
-    | ambiguous_type_decl
+type_decl returns [ ObjPtr pTypeDecl ]
+    : st = simple_type_decl
+    {
+        ResolveTypeDecl( $st.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | subt = subrange_type_decl
+    {
+        ResolveTypeDecl( $subt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | et = enum_type_decl
+    {
+        ResolveTypeDecl( $et.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | nt = namedval_type_decl
+    {
+        ResolveTypeDecl( $nt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | at = array_type_decl
+    {
+        ResolveTypeDecl( $at.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | stru = struct_type_decl_init
+    {
+        ResolveTypeDecl( $stru.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | str = string_type_decl
+    {
+        ResolveTypeDecl( $str.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | rt = ref_type_decl
+    {
+        ResolveTypeDecl( $rt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
+    | ambt = ambiguous_type_decl
+    {
+        ResolveTypeDecl( $ambt.pTypeDecl,
+            GET_PARSER()->GetParseContext() );
+    }
     ;
 
-simple_type_decl
-    : simple_type_name TOK_COLON simple_spec_init
+simple_type_decl returns [ ObjPtr pTypeDecl ]
+    : st=simple_type_name TOK_COLON si=simple_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser = GET_PARSER();
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$si.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+
+            ret = initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+
+            initInfo.GetObjPtr(
+                propStTypeData, pTypeData );
+
+            initInfo.GetObjPtr(
+                propStTypeInit, pTypeInit );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->spec->getText().c_str(),
+                    ret );
+            }
+            else if( iType == RuleDerived_type_access
+                && pTypeInit.IsEmpty() )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else 
+            {
+                ret = pNode.NewObj(
+                    clsid( CStSimpleTypeDeclNode ) );
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            CStTypeDeclNode* ptd = pNode;
+            ptd->m_pTypeInit = pTypeInit;
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = iType;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare( $st.ctx->getText(),
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $st.start, $si.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-simple_spec_init
-    : simple_spec ( TOK_ASSIGN expression )?
+simple_spec_init returns [ ObjPtr pTypeInfo ]
+    : spec=simple_spec ( TOK_ASSIGN expr=const_expr )?
+    {
+        
+        $pTypeInfo = $spec.pTypeInfo;
+        CParamList oParams(
+            ( IConfigDb* )$pTypeInfo );
+        if( $expr.ctx != nullptr )
+            oParams.SetObjPtr(
+                propStTypeInit, $expr.pExpr );
+    }
     ;
 
-simple_spec
-    : elem_type_name
-    | simple_type_access
+simple_spec returns [ ObjPtr pTypeInfo ]
+    : etn = elem_type_name
+    {{ 
+        if( $etn.pTypeInfo.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams.Push( $etn.ctx->getText() );
+            oParams.Push(
+                ( guint32 )$etn.start->getType() );
+
+            oParams.SetIntProp(
+                propStRuleId, RuleElem_type_name );
+            $pTypeInfo = oParams.GetCfg();
+        }
+        else
+        {
+            $pTypeInfo = $etn.pTypeInfo;
+        }
+    }}
+    | sta = simple_type_access
+    {{ 
+        CParamList oParams;
+        oParams.Push( $sta.ctx->getText() );
+        oParams.Push(
+            ( guint32 )RuleDerived_type_access );
+        oParams.SetIntProp(
+            propStRuleId, RuleSimple_type_access );
+        $pTypeInfo = oParams.GetCfg();
+    }}
     ;
 
 date_type_name
@@ -959,10 +1757,11 @@ time_type_name
     | TOK_LDATE_TYPE
     ;
 
-elem_type_name
+elem_type_name returns [ ObjPtr pTypeInfo ]
     : numeric_type_name
     | bit_str_type_name
-    | string_simple_type
+    | string_spec
+    { $pTypeInfo = $string_spec.pTypeInfo; }
     | date_type_name
     | time_type_name
     ;
@@ -984,7 +1783,7 @@ simple_type_access
     : instance_path
     ;
 
-subrange_type_decl
+subrange_type_decl returns [ ObjPtr pTypeDecl ]
     : subrange_type_name TOK_COLON subrange_spec_init
     ;
 
@@ -1010,25 +1809,167 @@ int_type_name
     | unsigned_int_name
     ;
 
-subrange
-    : expression TOK_RANGE expression
+subrange returns [ ObjPtr pSubrange ]
+    : s=const_expr TOK_RANGE e=const_expr
+    {
+        ObjPtr pNode;
+        gint32 ret = pNode.NewObj(
+            clsid( CStSubrangeNode ) );
+        if( SUCCEEDED( ret ) )
+        {
+            CStSubrangeNode* psr = pNode;
+            psr->m_pStart = $s.pExpr;
+            psr->m_pEnd = $e.pExpr;
+            $pSubrange = pNode;
+        }
+    }
     ;
 
 enum_type_name
     : identifier
     ;
 
-enum_type_decl
-    : enum_type_name TOK_COLON enum_spec_init
+enum_type_decl returns [ ObjPtr pTypeDecl ]
+    : etn = enum_type_name TOK_COLON si = enum_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser = GET_PARSER();
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$si.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType = $etn.ctx->getText();
+            gint32 iType = RuleEnum_type_decl;
+
+            initInfo.GetObjPtr(
+                propStTypeData, pTypeData );
+
+            initInfo.GetObjPtr(
+                propStTypeInit, pTypeInit );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->getText().c_str(),
+                    ret );
+            }
+            ret = pNode.NewObj(
+                clsid( CStEnumTypeDeclNode ) );
+
+            if( ERROR( ret ) )
+                break;
+
+            CStTypeDeclNode* ptd = pNode;
+            CStEnumValueRef* pRef = pTypeInit;
+
+            if( !pTypeInit.IsEmpty() )
+                ptd->m_pTypeInit = pTypeInit;
+
+            if( pRef )
+                pRef->m_pDeclNode = pNode;
+
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = iType;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare( strType,
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $etn.start, $si.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+
+            $pTypeDecl = pNode;
+
+            // declare the symbols for each each value
+            if( pTypeData.IsEmpty() )
+                break;
+            ObjVecPtr pvecValues = pTypeData;
+            if( pvecValues.IsEmpty() )
+                break;
+            auto& vecValues = ( *pvecValues )();
+            for( auto pVal : vecValues )
+            {
+                CCfgOpener oCfg( ( IConfigDb* )pVal );
+                stdstr strName;
+                oCfg.GetStrProp( 0, strName );
+                if( strName.empty() )
+                    continue;
+                auto pValSym = ost.Declare( strName,
+                    symEnumValue, pNode, strType,
+                    ( CStVarDeclNode::enumVarCategory )0 );
+                if( pSym.IsEmpty() )
+                    break;
+                pSym->m_pDeclNode = pNode;
+                antlr4::Token *pStart = nullptr;
+                antlr4::Token *pStop = nullptr;
+                oCfg.GetIntPtr( 1, ( guint32*& )pStart );
+                oCfg.GetIntPtr( 2, ( guint32*& )pStop );
+                if( pStart && pStop )
+                    pSym->SetTokens( pStart, pStop );
+            }
+
+        }while( 0 );
+    }
     ;
 
-enum_spec_init
-    : TOK_LPAREN ( identifier ( TOK_COMMA identifier )* ) TOK_RPAREN
-    ( TOK_ASSIGN enum_value )?
+enum_spec_init returns [ ObjPtr pTypeInfo ]
+    : TOK_LPAREN ( id1=identifier ( TOK_COMMA idRest+=identifier )* ) TOK_RPAREN ( TOK_ASSIGN initval=enum_value )?
+    {
+        ObjVecPtr pvecIds( true );
+        CCfgOpener oCfg;
+        oCfg.SetStrProp( 0, $id1.ctx->getText() );
+        oCfg.SetIntPtr( 1, ( guint32* )$id1.start );
+        oCfg.SetIntPtr( 2, ( guint32* )$id1.stop );
+
+        ( *pvecIds )().push_back(
+            ObjPtr( oCfg.GetCfg() ) );
+
+        for( auto& elem : $idRest )
+        {
+            CCfgOpener oCfg1;
+            oCfg1.SetStrProp( 0, elem->getText() );
+            oCfg1.SetIntPtr( 1, ( guint32* )elem->start );
+            oCfg1.SetIntPtr( 2, ( guint32* )elem->stop );
+            ( *pvecIds )().push_back(
+                ObjPtr( oCfg1.GetCfg() ) );
+        }
+
+        CCfgOpener oCfg2;
+        oCfg2.SetObjPtr( propStTypeData, pvecIds );
+        if( $initval.ctx )
+            oCfg2.SetObjPtr(
+                propStTypeInit, $initval.pNode );
+        $pTypeInfo = oCfg2.GetCfg();
+    }
     ;
 
-enum_value
-    : ( enum_type_access TOK_PUNC )? identifier
+enum_value returns [ ObjPtr pNode ]
+    : ( eta=enum_type_access TOK_PUNC )? val=identifier
+    {
+        stdstr strQualified;
+        if( $eta.ctx )
+            strQualified = $eta.ctx->getText();
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStEnumValueRef ) );
+        CStEnumValueRef* pVal = pNode;
+        pVal->m_strQualified = strQualified;
+        pVal->m_strValue = $val.ctx->getText();
+        pVal->SetTokens( $eta.start, $val.stop );
+        $pNode = pNode;
+    }
     ;
 
 enum_type_access
@@ -1039,7 +1980,7 @@ namedval_type_name
     : identifier
     ;
 
-namedval_type_decl
+namedval_type_decl returns [ ObjPtr pTypeDecl ]
     : namedval_type_name TOK_COLON namedval_type namedval_spec_init
     ;
 
@@ -1049,7 +1990,7 @@ namedval_type
     ;
 
 namedval_spec_init
-    : TOK_LPAREN namedval_spec_list TOK_RPAREN ( TOK_ASSIGN expression )?
+    : TOK_LPAREN namedval_spec_list TOK_RPAREN ( TOK_ASSIGN const_expr )?
     ;
 
 namedval_spec_list
@@ -1057,28 +1998,142 @@ namedval_spec_list
     ;
 
 namedval_spec
-    : identifier TOK_ASSIGN expression
+    : identifier TOK_ASSIGN const_expr
     ;
 
-namedval_value
-    : ( namedval_type_access TOK_PUNC )? identifier
+namedval_value returns [ ObjPtr pNode ]
+    : ( nta=namedval_type_access TOK_PUNC )? val=identifier
+    {
+        stdstr strQualified;
+        if( $nta.ctx )
+            strQualified = $nta.ctx->getText();
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStNamedvalValueRef ) );
+        CStNamedvalValueRef* pVal = pNode;
+        pVal->m_strQualified = strQualified;
+        pVal->m_strValue = $val.ctx->getText();
+        pVal->SetTokens( $nta.start, $val.stop );
+        $pNode = pNode;
+    }
     ;
 
 namedval_type_access
     : instance_path
     ;
     
-array_type_decl
-    : array_type_name TOK_COLON array_spec_init
+array_type_decl returns [ ObjPtr pTypeDecl ]
+    : atn=array_type_name TOK_COLON asi=array_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$asi.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+
+            ret = initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr(
+                propStTypeInit, pTypeInit );
+
+            initInfo.GetObjPtr(
+                propStTypeData, pTypeData );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $asi.start,
+                    "Unknown type:'%s'(%d).",
+                    $asi.ctx->spec->getText().c_str(),
+                    ret );
+            }
+            else if( iType == RuleDerived_type_access
+                && pTypeInit.IsEmpty() )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else
+            {
+                ret = pNode.NewObj(
+                    clsid( CStArrayTypeDeclNode ) );
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            CStTypeDeclNode* ptd = pNode;
+            ptd->m_pTypeInit = pTypeInit;
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = iType;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare( $atn.text,
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $atn.start, $asi.stop );
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-array_spec_init
-    : array_spec (TOK_ASSIGN array_init)?
+array_spec_init returns [ ObjPtr pTypeInfo ]
+    : spec=array_spec (TOK_ASSIGN ai=array_init)?
+    {
+        $pTypeInfo = $spec.pTypeInfo;
+        CParamList oParams(
+            ( IConfigDb* )$pTypeInfo );
+        // The array initializer is not built yet, keep the
+        // slot consistently as simple_spec_init does.
+        if( $ai.ctx )
+            oParams.SetObjPtr(
+                propStTypeInit, $ai.pTypeInit );
+    }
     ;
 
-array_spec
-    : TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF data_type_access
-    | array_type_access
+array_spec returns [ ObjPtr pTypeInfo ]
+    : TOK_ARRAY TOK_LBRACKET rl=range_list TOK_RBRACKET
+      TOK_OF dta=data_type_access
+    {
+        CParamList oParams;
+        oParams.Push( $dta.typePair.first );
+        oParams.Push( $dta.typePair.second );
+        if( !$rl.pRangeList.IsEmpty() )
+            oParams.SetObjPtr(
+                propStTypeData, $rl.pRangeList );
+        oParams.SetIntProp( propStRuleId,
+            RuleArray_spec );
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | ata=array_type_access
+    {
+        CParamList oParams;
+        oParams.Push( $ata.ctx->getText() );
+        oParams.Push(
+            ( guint32 )RuleDerived_type_access );
+        oParams.SetIntProp( propStRuleId,
+            RuleArray_type_access );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 array_type_access
@@ -1089,11 +2144,34 @@ array_var_decl_init
     : variable_list TOK_COLON array_spec_init
     ;
 
-range_list
-    : subrange ( TOK_COMMA subrange )*
+range_list returns [ ObjPtr pRangeList ]
+    : first=subrange ( TOK_COMMA rest+=subrange )*
+    {
+        ObjPtr pList;
+        gint32 ret = pList.NewObj(
+            clsid( CStSubrangeListNode ) );
+        if( SUCCEEDED( ret ) )
+        {
+            CStSubrangeListNode* prl = pList;
+            if( !$first.pSubrange.IsEmpty() )
+                prl->m_vecRanges.push_back(
+                    $first.pSubrange );
+            for( size_t i = 0;
+                i < $rest.size(); i++ )
+            {
+                auto* pCtx = $rest[ i ];
+                if( pCtx == nullptr ||
+                    pCtx->pSubrange.IsEmpty() )
+                    continue;
+                prl->m_vecRanges.push_back(
+                    pCtx->pSubrange );
+            }
+            $pRangeList = pList;
+        }
+    }
     ;
 
-array_init
+array_init returns [ ObjPtr pTypeInit ]
     : TOK_LBRACKET array_elem_init_list TOK_RBRACKET
     ;
 
@@ -1107,8 +2185,9 @@ array_elem_init
     ;
 
 array_elem_init_value
-    : expression 
-    | enum_value
+    : const_expr 
+    // SPEC Bug: enum_value is already covered by const_expr
+    // | enum_value
     | struct_init
     | array_init
     ;
@@ -1117,8 +2196,8 @@ struct_type_decl
     : struct_type_name TOK_COLON struct_decl
     ;
 
-struct_type_decl_init
-    : struct_spec
+struct_type_decl_init returns [ ObjPtr pTypeDecl ]
+    : struct_type_name TOK_COLON struct_spec
     ;
 
 struct_spec_init
@@ -1134,6 +2213,7 @@ struct_elem_init_list
     ;
 struct_elem_init_value
     : array_elem_init_value
+    | ref_value
     ;
 
 struct_elem_init
@@ -1141,12 +2221,84 @@ struct_elem_init
     | struct_elem_name TOK_ASSIGN ref_value
     ;
 
-string_type_decl
-    : string_type_name TOK_COLON string_spec_init
+string_type_decl returns [ ObjPtr pTypeDecl ]
+    : stn=string_type_name TOK_COLON si=string_spec_init
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$si.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+
+            initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr(
+                propStTypeData, pTypeData );
+
+            if( IsElementaryType( iType ) )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStStringTypeDeclNode ) );
+            }
+            else
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->getText().c_str(),
+                    ret );
+            }
+            if( ERROR( ret ) )
+                break;
+            CStTypeDeclNode* ptd = pNode;
+            CParamList oTypeInit;
+            ret = oTypeInit.CopyProp(
+                propStTypeInit, $si.pTypeInfo );
+            if( SUCCEEDED( ret ) )
+                ptd->m_pTypeInit = oTypeInit.GetCfg();
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = iType;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
+
+            ptd->m_iDirectType = iType;
+
+            auto pSym = ost.Declare(
+                $stn.ctx->getText(),
+                symDataType, pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $stn.start, $si.stop );
+            pSym->m_pDeclNode = pNode;
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-string_spec_init
-    : string_spec (TOK_ASSIGN string_literal)?
+string_spec_init returns [ ObjPtr pTypeInfo ]
+    : sp=string_spec (TOK_ASSIGN sl=string_literal)?
+    {
+        CParamList oParams(
+            ( IConfigDb* ) $sp.pTypeInfo );
+        if( $sl.ctx )
+            oParams.SetStrProp(
+                propStTypeInit, $sl.ctx->getText() );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 string_type_name
@@ -1161,30 +2313,147 @@ ref_type_name
     : identifier
     ;
 
-ref_type_decl
-    : ref_type_name TOK_COLON ref_spec_init TOK_SEMICOLON
+ref_type_decl returns [ ObjPtr pTypeDecl ]
+    : rtn=ref_type_name TOK_COLON rsi=ref_spec_init 
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            CParamList initInfo(
+                ( IConfigDb* )$rsi.pTypeInfo );
+
+            ObjPtr pNode;
+            ObjPtr pTypeInit;
+            ObjPtr pTypeData;
+            stdstr strType;
+            gint32 iType = -1;
+
+            ret = initInfo.GetIntProp(
+                1, ( guint32& )iType );
+            initInfo.GetStrProp( 0, strType );
+            initInfo.GetObjPtr(
+                propStTypeInit , pTypeInit );
+
+            initInfo.GetObjPtr(
+                propStTypeData, pTypeData );
+
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                pCtx->LogError( $rsi.start,
+                    "Unknown type:'%s'(%d).",
+                    $rsi.ctx->rs->getText().c_str(),
+                    ret );
+            }
+            else if( iType == RuleDerived_type_access
+                && pTypeInit.IsEmpty() )
+            {
+                ret = pNode.NewObj(
+                    clsid( CStAmbiguousTypeDeclNode ) );
+            }
+            else 
+            {
+                ret = pNode.NewObj(
+                    clsid( CStRefTypeDeclNode ) );
+            }
+
+            if( ERROR( ret ) )
+                break;
+
+            CStRefTypeDeclNode* ptd = pNode;
+            if( !pTypeInit.IsEmpty() )
+                ptd->m_pTypeInit = pTypeInit;
+
+            ptd->m_oTypeRef = { strType, nullptr };
+            ptd->m_iTypeId = TOK_REF_TO;
+
+            if( !pTypeData.IsEmpty() )
+                ptd->m_pTypeData = pTypeData;
+
+            if( IsDirectType( iType ) )
+                ptd->m_iDirectType = iType;
+
+            if( !pTypeData.IsEmpty() )
+            {
+                CParamList oTypeData( pTypeData );
+                gint32 iRank = 0;
+                ret = oTypeData.GetIntProp(
+                    propStRefRank, ( guint32& )iRank );
+                if( SUCCEEDED( ret ) )
+                    ptd->m_iRefRank = iRank;
+            }
+
+            auto pSym = ost.Declare(
+                $rtn.text, symDataType,
+                pNode, strType,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( pSym.IsEmpty() )
+                break;
+            pSym->SetTokens( $rtn.start, $rsi.stop );
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-ref_spec_init
-    : ref_spec (TOK_ASSIGN ref_value)?
+ref_spec_init returns [ ObjPtr pTypeInfo ]
+    : rs=ref_spec (TOK_ASSIGN v=ref_value)?
+    {
+        CParamList oParams(
+            ( IConfigDb* )$rs.pTypeInfo );
+        if( $v.ctx )
+        {
+            CParamList oTypeInit;
+            oTypeInit.Push( $v.ctx->getText() );
+            oParams.SetObjPtr(
+                propStTypeInit, oTypeInit.GetCfg() );
+        }
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
-ref_spec
-    : TOK_REF_TO+ data_type_access
+ref_spec returns [ ObjPtr pTypeInfo ]
+    : (tok+=TOK_REF_TO)+ dta=data_type_access
+    {
+        CParamList oParams;
+        oParams.Push( $dta.typePair.first );
+        oParams.Push( $dta.typePair.second );
+        CParamList oTypeData;
+        oTypeData.SetIntProp(
+            propStRefRank, $tok.size() );
+        oParams.SetObjPtr(
+            propStTypeData, oTypeData.GetCfg() );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 ref_type_access:
     instance_path
     ;
 
-ref_value
+ref_value returns [ stdstr strVal ]
     : ref_addr
+    { $strVal = $ref_addr.strVal; }
     | TOK_NULL
+    { $strVal = "NULL"; }
     ;
 
-ref_addr
+ref_addr returns [ stdstr strVal ]
     : TOK_REF TOK_LPAREN
-    ( symbolic_variable | fb_instance_name | class_instance_name )
+    ( sv=symbolic_variable | fb=fb_instance_name | cls=class_instance_name )
+    {
+        if( $sv.ctx )
+            $strVal = $sv.ctx->getText();
+        else if( $fb.ctx )
+            $strVal = $fb.ctx->getText();
+        else if( $cls.ctx )
+            $strVal = $cls.ctx->getText();
+    }
     TOK_RPAREN
     ;
 
@@ -1200,8 +2469,8 @@ caret_list
     : TOK_CARET (TOK_CARET)*
     ;
 
-ambiguous_type_decl
-    : variable_list TOK_COLON instance_path (TOK_ASSIGN spec_type_accesses)?
+ambiguous_type_decl returns [ ObjPtr pTypeDecl ]
+    : identifier TOK_COLON instance_path
     ;
 
 spec_type_accesses
@@ -1213,8 +2482,12 @@ spec_type_accesses
 // Class Declaration
 // ============================================================
 
+class_type_name
+    : identifier
+    ;
+
 class_decl
-    : TOK_CLASS class_modifier identifier
+    : TOK_CLASS opt_internal class_modifier class_type_name
       extends_clause?
       implements_clause?
       class_var_decls_list?
@@ -1283,9 +2556,11 @@ property_prototype
 // Data Type Access
 // ============================================================
 
-data_type_access
-    : elem_type_name
-    | derived_type_access
+data_type_access returns [ std::pair< stdstr, int > typePair ]
+    : etn=elem_type_name
+    { $typePair = {$etn.start->getText(), $etn.start->getType()};}
+    | dta=derived_type_access
+    { $typePair = {$dta.ctx->getText(), RuleDerived_type_access};}
     ;
 
 derived_type_access
@@ -1477,7 +2752,7 @@ std_func_name
     ;
 
 func_access
-    : derived_func_name
+    : ( namespace_hierarchy TOK_DOT )? derived_func_name
     ;
 
 // Global var decl
@@ -1490,7 +2765,7 @@ global_var_name
     ;
 
 global_var_spec
-    : global_var_name ( TOK_SEMICOLON global_var_name )*
+    : global_var_name ( TOK_COMMA global_var_name )*
     | global_var_name locate_at
     ;
 
@@ -1519,8 +2794,9 @@ class_method_or_property_decl
 
 // Method decl
 method_decl
-    : TOK_METHOD identifier
-        opt_data_type_access
+    : TOK_METHOD access_spec? opt_fb_modifier opt_override
+        method_name opt_data_type_access
+        // SPEC bug: missing using directive?
         using_directive_list?
         method_var_decls*
         func_body
@@ -1659,8 +2935,7 @@ opt_fb_inst_or_class_inst
 // Optional FB modifier
 opt_fb_modifier
     : /* empty */
-    | TOK_ABSTRACT
-    | TOK_FINAL
+    | fb_modifier
     ;
 
 // Optional in-out var decl list
@@ -1705,7 +2980,7 @@ opt_temp_var_member_list
 // Optional var decls init set
 opt_var_decls_init
     : /* empty */
-    | var_decls_init_set semicolons (var_decls_init_set semicolons)*
+    | (var_decls_init_set semicolons)+
     ;
 
 // Param assignment
@@ -1789,12 +3064,55 @@ string_list
     ;
 
 // String spec
-string_spec
-    : ( TOK_STRING_TYPE | TOK_WSTRING_TYPE | TOK_USTRING_TYPE )
-        ( TOK_LBRACKET TOK_INT TOK_RBRACKET )?
-    | TOK_CHAR_TYPE
-    | TOK_WCHAR_TYPE
-    | TOK_UCHAR_TYPE
+string_spec returns [ ObjPtr pTypeInfo ]
+    : ( t1=TOK_STRING_TYPE | t2=TOK_WSTRING_TYPE | t3=TOK_USTRING_TYPE )
+        ( TOK_LBRACKET const_expr TOK_RBRACKET )?
+    {
+        CParamList oParams;
+        if( $t1 )
+        {
+            oParams.Push( $t1.text );
+            oParams.Push( TOK_STRING_TYPE );
+        }
+        else if( $t2 )
+        {
+            oParams.Push( $t2.text );
+            oParams.Push( TOK_WSTRING_TYPE );
+        }
+        else if( $t3 )
+        {
+            oParams.Push( $t3.text );
+            oParams.Push( TOK_USTRING_TYPE );
+        }
+        
+        if( $const_expr.ctx != nullptr )
+        {
+            oParams.SetObjPtr( propStTypeData,
+                $const_expr.pExpr );
+        }
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | t4=TOK_CHAR_TYPE
+    {
+        CParamList oParams;
+        oParams.Push( $t4.text );
+        oParams.Push( TOK_CHAR_TYPE );
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | t5=TOK_WCHAR_TYPE
+    {
+        CParamList oParams;
+        oParams.Push( $t5.text );
+        oParams.Push( TOK_WCHAR_TYPE );
+        $pTypeInfo = oParams.GetCfg();
+    }
+    | t6=TOK_UCHAR_TYPE
+    {
+        CParamList oParams;
+        oParams.Push( $t6.text );
+        oParams.Push( TOK_UCHAR_TYPE );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 // Struct decl
@@ -1908,10 +3226,6 @@ var_member_init
 
 keywords
     : TOK_SINGLE | TOK_INTERVAL | TOK_PRIORITY 
-    | TOK_USING | TOK_INCLUDE | TOK_OVERLAP
-    | TOK_REGION | TOK_NAMESPACE 
-    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
-    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     | TOK_EXTERNAL
     ;
 
@@ -1943,5 +3257,9 @@ keywords1
     | TOK_END_REGION | TOK_END_NAMESPACE
     | TOK_TRUE | TOK_FALSE | TOK_RETURN | TOK_CONTINUE | TOK_EXIT
     | TOK_LWORD
+    | TOK_USING | TOK_NAMESPACE 
+    | TOK_REGION | TOK_INCLUDE | TOK_OVERLAP
+    | TOK_CONFIGURATION | TOK_TASK | TOK_RESOURCE
+    | TOK_INTERFACE | TOK_CLASS | TOK_PROGRAM | TOK_AT 
     ;
     
