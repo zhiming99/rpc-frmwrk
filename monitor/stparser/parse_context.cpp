@@ -1670,8 +1670,7 @@ gint32 ReplaceAmbiguousNode(
         pNode.NewObj( iClsid );
         auto ptd = ( CStTypeDeclNode* )pNode;
         ptd->ReplaceAmbiguousNode( patd );
-        if( ptd->IsSymbolResolved() )
-            ptd->m_pDtd.Clear();
+        ptd->m_pDtd.Clear();
 
     }while( 0 );
     return ret;

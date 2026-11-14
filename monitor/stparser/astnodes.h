@@ -230,6 +230,9 @@ struct CStBinaryExpr : public CStExprNode
         m_eOperator(boAdd)
     { SetClassId( clsid( CStBinaryExpr ) ); }
 
+    virtual bool IsSymbolResolved() const override;
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
     virtual std::string GetNodeInfo() const override;
 };
 
@@ -254,6 +257,9 @@ struct CStUnaryExpr : public CStExprNode
     { SetClassId( clsid( CStUnaryExpr ) ); }
 
     virtual std::string GetNodeInfo() const override;
+    virtual bool IsSymbolResolved() const override;
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 };
 
 /**
@@ -459,22 +465,6 @@ struct CStInstancePathNode : public CStAstNodeBase
  * Expression-internal consumers (parenthesized factors, array indices,
  * subrange bounds) unwrap it via UnwrapFullExpression().
  */
-struct CStExpressionNode : public CStExprNode
-{
-    typedef CStExprNode super;
-
-    ObjPtr m_pExpression;
-
-    CStExpressionNode() : super()
-    { SetClassId( clsid( CStExpressionNode ) ); }
-
-    virtual bool IsSymbolResolved() const
-    { return false; }
-
-    virtual std::string GetNodeInfo() const override;
-    virtual std::string GetSignature() const override;
-};
-
 struct CStPrimaryExprNode : public CStExprNode
 {
     typedef CStExprNode super;
@@ -489,6 +479,23 @@ struct CStPrimaryExprNode : public CStExprNode
     { return ""; }
     virtual std::string GetSignature() const override
     { return ""; }
+};
+
+struct CStExpressionNode : public CStPrimaryExprNode
+{
+    typedef CStPrimaryExprNode super;
+
+    ObjPtr m_pSubExpr;
+
+    CStExpressionNode() : super()
+    { SetClassId( clsid( CStExpressionNode ) ); }
+
+    virtual bool IsSymbolResolved() const override;
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
+
+    virtual std::string GetNodeInfo() const override;
+    virtual std::string GetSignature() const override;
 };
 
 /**
@@ -584,11 +591,11 @@ struct CStConstValueNode : public CStPrimaryExprNode
     CStConstValueNode() : super()
     { SetClassId( clsid( CStConstValueNode ) ); }
 
-    virtual bool IsSymbolResolved() const
+    virtual bool IsSymbolResolved() const override
     { return true; }
 
     virtual gint32 ResolveSymbol(
-        void* pctx, enumSymKind iKind )
+        void* pctx, enumSymKind iKind ) override
     { return 0; }
 
     virtual std::string GetNodeInfo() const override;
@@ -606,6 +613,28 @@ struct CStEnumValueRef : public CStPrimaryExprNode
 
     CStEnumValueRef() : super()
     { SetClassId( clsid( CStEnumValueRef ) ); }
+
+    bool IsSymbolResolved() const override
+    { return m_iIndex != -1; }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
+
+    std::string GetNodeInfo() const override;
+};
+
+class CStNamedvalTypeDeclNode;
+struct CStNamedvalValueRef : public CStPrimaryExprNode
+{
+    typedef CStPrimaryExprNode super;
+
+    CStNamedvalTypeDeclNode* m_pDeclNode = nullptr;
+    stdstr m_strQualified;
+    stdstr m_strValue;
+    gint32 m_iIndex = -1;
+
+    CStNamedvalValueRef() : super()
+    { SetClassId( clsid( CStNamedvalValueRef ) ); }
 
     bool IsSymbolResolved() const override
     { return m_iIndex != -1; }
@@ -828,6 +857,10 @@ struct CStRefTypeDeclNode : public CStAmbiguousTypeDeclNode
 struct CStNamedvalTypeDeclNode : public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
+
+    std::vector< stdstr > m_vecValNames;
+    std::vector< CStSymbol* > m_vecValSyms;
+    gint32 m_dwInitIdx = -1;
 
     CStNamedvalTypeDeclNode() : super()
     { SetClassId( clsid( CStNamedvalTypeDeclNode ) ); }
@@ -2090,6 +2123,7 @@ REGISTER_AST_NODE( CStConstValueNode );
 REGISTER_AST_NODE( CStArrayTypeNode );
 REGISTER_AST_NODE( CStStructTypeNode );
 REGISTER_AST_NODE( CStEnumValueRef );
+REGISTER_AST_NODE( CStNamedvalValueRef );
 REGISTER_AST_NODE( CStDataTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDefinitionBlockNode );

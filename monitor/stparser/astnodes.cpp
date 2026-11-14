@@ -340,7 +340,7 @@ std::string CStExpressionNode::GetNodeInfo() const
 {
     std::ostringstream oss;
     oss << "FullExpr{ ";
-    if( !m_pExpression.IsEmpty() )
+    if( !m_pSubExpr.IsEmpty() )
         oss << "expr set";
     else
         oss << "no expr";
@@ -350,12 +350,227 @@ std::string CStExpressionNode::GetNodeInfo() const
 
 std::string CStExpressionNode::GetSignature() const
 {
-    CStExprNode* pInner = m_pExpression;
+    CStExprNode* pInner = m_pSubExpr;
     if( pInner != nullptr )
         return pInner->GetSignature();
     return std::string();
 }
 
+bool CStExpressionNode::IsSymbolResolved() const
+{
+    if( m_pSubExpr.IsEmpty() )
+        return false;
+    ObjPtr pCurExpr = m_pSubExpr;
+    if( true )
+    {
+        CStUnaryExpr* pue;
+        CStBinaryExpr* pbe;
+        CStPrimaryExprNode* ppe;
+        pue = pCurExpr;
+        if( pue )
+            return pue->IsSymbolResolved();
+
+        pbe = pCurExpr;
+        if( pbe )
+            return pbe->IsSymbolResolved();
+
+        ppe = pCurExpr;
+        if( ppe )
+            return ppe->IsSymbolResolved();
+    }
+    return false;
+}
+
+bool CStUnaryExpr::IsSymbolResolved() const
+{
+    if( m_pOperand.IsEmpty() )
+        return false;
+    ObjPtr pCurExpr = m_pOperand;
+    if( true )
+    {
+        CStUnaryExpr* pue;
+        CStBinaryExpr* pbe;
+        CStPrimaryExprNode* ppe;
+        pue = pCurExpr;
+        if( pue )
+            return pue->IsSymbolResolved();
+
+        pbe = pCurExpr;
+        if( pbe )
+            return pbe->IsSymbolResolved();
+
+        ppe = pCurExpr;
+        if( ppe )
+            return ppe->IsSymbolResolved();
+    }
+    return false;
+}
+
+bool CStBinaryExpr::IsSymbolResolved() const
+{
+    if( m_pLeft.IsEmpty() || m_pRight.IsEmpty() )
+        return false;
+    ObjPtr pCurExpr = m_pLeft;
+    do{
+        bool ret;
+        CStUnaryExpr* pue;
+        CStBinaryExpr* pbe;
+        CStPrimaryExprNode* ppe;
+        pue = pCurExpr;
+        if( pue )
+        {
+            ret = pue->IsSymbolResolved();
+            if( !ret )
+                return ret;
+            if( m_pRight->GetObjId() ==
+                pCurExpr->GetObjId() )
+                break;
+            pCurExpr = m_pRight;
+            continue;
+        }
+        pbe = pCurExpr;
+        if( pbe )
+        {
+            ret = pbe->IsSymbolResolved();
+            if( !ret )
+                return ret;
+            if( m_pRight->GetObjId() ==
+                pCurExpr->GetObjId() )
+                break;
+            pCurExpr = m_pRight;
+            continue;
+        }
+
+        ppe = pCurExpr;
+        if( ppe )
+        {
+            ret = ppe->IsSymbolResolved();
+            if( !ret )
+                return ret;
+            if( m_pRight->GetObjId() ==
+                pCurExpr->GetObjId() )
+                break;
+            pCurExpr = m_pRight;
+            continue;
+        }
+        break;
+    }while( 1 );
+    return false;
+}
+
+
+gint32 CStUnaryExpr::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+    if( m_pOperand.IsEmpty() )
+        return ERROR_FALSE;
+    if( true )
+    {
+        CStUnaryExpr* pue;
+        CStBinaryExpr* pbe;
+        CStPrimaryExprNode* ppe;
+        pue = m_pOperand;
+        if( pue )
+            return pue->ResolveSymbol(
+                pctx, iKind);
+
+        pbe = m_pOperand;
+        if( pbe )
+            return pbe->ResolveSymbol(
+                pctx, iKind);
+
+        ppe = m_pOperand;
+        if( ppe )
+            return ppe->ResolveSymbol(
+                pctx, iKind);
+    }
+    return false;
+}
+
+gint32 CStBinaryExpr::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+    if( m_pLeft.IsEmpty() || m_pRight.IsEmpty() )
+        return false;
+    ObjPtr pCurExpr = m_pLeft;
+    do{
+        bool ret;
+        CStUnaryExpr* pue;
+        CStBinaryExpr* pbe;
+        CStPrimaryExprNode* ppe;
+        pue = pCurExpr;
+        if( pue )
+        {
+            ret = pue->ResolveSymbol(
+                pctx, iKind );
+            if( !ret )
+                return ret;
+            if( m_pRight->GetObjId() ==
+                pCurExpr->GetObjId() )
+                break;
+            pCurExpr = m_pRight;
+            continue;
+        }
+        pbe = pCurExpr;
+        if( pbe )
+        {
+            ret = pbe->ResolveSymbol(
+                pctx, iKind );
+            if( !ret )
+                return ret;
+            if( m_pRight->GetObjId() ==
+                pCurExpr->GetObjId() )
+                break;
+            pCurExpr = m_pRight;
+            continue;
+        }
+
+        ppe = pCurExpr;
+        if( ppe )
+        {
+            ret = ppe->ResolveSymbol(
+                pctx, iKind );
+            if( !ret )
+                return ret;
+            if( m_pRight->GetObjId() ==
+                pCurExpr->GetObjId() )
+                break;
+            pCurExpr = m_pRight;
+            continue;
+        }
+        break;
+    }while( 1 );
+    return false;
+}
+
+gint32 CStExpressionNode::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+    if( m_pSubExpr.IsEmpty() )
+        return ERROR_FALSE;
+    ObjPtr pCurExpr = m_pSubExpr;
+    if( true )
+    {
+        CStUnaryExpr* pue;
+        CStBinaryExpr* pbe;
+        CStPrimaryExprNode* ppe;
+        pue = pCurExpr;
+        if( pue )
+            return pue->ResolveSymbol(
+                pctx, iKind);
+
+        pbe = pCurExpr;
+        if( pbe )
+            return pbe->ResolveSymbol(
+                pctx, iKind);
+
+        ppe = pCurExpr;
+        if( ppe )
+            return ppe->ResolveSymbol(
+                pctx, iKind);
+    }
+    return false;
+}
 // ========================================================================
 // CStSubrangeNode Implementation
 // ========================================================================
@@ -624,7 +839,14 @@ gint32 CStEnumTypeDeclNode::ResolveSymbol(
 
 bool CStEnumTypeDeclNode::IsSymbolResolved() const
 {
-    return IsDirectType( m_iDirectType );
+    if( !IsDirectType( m_iDirectType ) )
+        return false;
+    if( m_pTypeInit.IsEmpty() )
+        return true;
+    CStPrimaryExprNode* pExpr = m_pTypeInit;
+    if( pExpr == nullptr )
+        return true;
+    return pExpr->IsSymbolResolved();
 }
 
 gint32 CStEnumValueRef::ResolveSymbol(
@@ -637,7 +859,7 @@ gint32 CStEnumValueRef::ResolveSymbol(
 
     gint32 ret = 0;
     do{
-        if( m_iIndex >= 0 )
+        if( IsSymbolResolved() )
             break;
         auto pCtx = reinterpret_cast
             < CStParseContext* >( pctx );
@@ -671,12 +893,67 @@ gint32 CStEnumValueRef::ResolveSymbol(
                     m_strValue )
                     break;
             }
-            if( i < vecNames.size() )
+            if( i == vecNames.size() )
             {
-                m_iIndex = i;
+                ret = ERROR_FALSE;
                 break;
             }
-            ret = ERROR_FALSE;
+            m_iIndex = i;
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CStNamedvalValueRef::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+    if( iKind != symNamedValue )
+        return ERROR_FALSE;
+    if( pctx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        if( IsSymbolResolved() )
+            break;
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto& ost = pCtx->m_oSymTab;
+        if( m_strQualified.size() )
+        {
+            std::vector< stdstr > vecComps =
+                ost.BreakdownQualified( m_strQualified );
+
+            auto pScope = ost.GetCurrentScope();
+            SymPtr pSym;
+            gint32 iType = -1;
+
+            ret = ResolveTypeToDirectType(
+                pCtx, vecComps, symDataType,
+                pScope, pSym, iType );
+            if( ERROR( ret ) )
+                break;
+
+            if( m_pDeclNode != pSym->m_pDeclNode )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+            CStNamedvalTypeDeclNode* pntd = m_pDeclNode;
+            auto& vecNames = pntd->m_vecValNames;
+            size_t i = 0;
+            for( ; i < vecNames.size(); i++ )
+            {
+                if( pntd->m_vecValNames[ i ] ==
+                    m_strValue )
+                    break;
+            }
+            if( i == vecNames.size() )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
+            m_iIndex = i;
         }
     }while( 0 );
     return ret;
@@ -720,6 +997,7 @@ IMPL_GETNODEINFO( CStTypeNode )
 IMPL_GETSIGNATURE( CStTypeNode )
 IMPL_GETNODEINFO( CStConstValueNode )
 IMPL_GETNODEINFO( CStEnumValueRef )
+IMPL_GETNODEINFO( CStNamedvalValueRef )
 IMPL_GETNODEINFO( CStArrayTypeNode )
 IMPL_GETNODEINFO( CStStructTypeNode )
 // CStDataTypeDeclNode has explicit implementation

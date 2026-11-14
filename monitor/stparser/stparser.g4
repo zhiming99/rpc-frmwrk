@@ -466,7 +466,11 @@ const_expr returns [ ObjPtr pExpr ]
 expression returns [ ObjPtr pExpr]
     : xe1=xor_expr
     {{
-        $pExpr = $xe1.pExpr;
+        ObjPtr pExpr;
+        pExpr.NewObj( clsid( CStExpressionNode ) );
+        auto p = ( CStExpressionNode* )pExpr;
+        p->m_pSubExpr = $xe1.pExpr;
+        $pExpr = pExpr;
     }}
     ( TOK_OR xe2=xor_expr
     {{
@@ -476,7 +480,13 @@ expression returns [ ObjPtr pExpr]
         pb->m_pLeft = $pExpr;
         pb->m_pRight = $xe2.pExpr;
         pb->m_eOperator = CStBinaryExpr::boOr;
-        $pExpr = pObj;
+
+        ObjPtr pExpr;
+        pExpr.NewObj( clsid( CStExpressionNode ) );
+        auto p = ( CStExpressionNode* )pExpr;
+        p->m_pSubExpr = pObj;
+
+        $pExpr = pExpr;
     }}
     )*
     ;
@@ -663,6 +673,7 @@ primary_expr returns [ ObjPtr pExpr ]
     | enum_value
     {  $pExpr = $enum_value.pNode; }
     | namedval_value
+    {  $pExpr = $namedval_value.pNode; }
     | func_call
     | invocation
     | ref_value
@@ -1990,8 +2001,20 @@ namedval_spec
     : identifier TOK_ASSIGN const_expr
     ;
 
-namedval_value
-    : ( namedval_type_access TOK_PUNC )? identifier
+namedval_value returns [ ObjPtr pNode ]
+    : ( nta=namedval_type_access TOK_PUNC )? val=identifier
+    {
+        stdstr strQualified;
+        if( $nta.ctx )
+            strQualified = $nta.ctx->getText();
+        ObjPtr pNode;
+        pNode.NewObj( clsid( CStNamedvalValueRef ) );
+        CStNamedvalValueRef* pVal = pNode;
+        pVal->m_strQualified = strQualified;
+        pVal->m_strValue = $val.ctx->getText();
+        pVal->SetTokens( $nta.start, $val.stop );
+        $pNode = pNode;
+    }
     ;
 
 namedval_type_access
@@ -2163,7 +2186,8 @@ array_elem_init
 
 array_elem_init_value
     : const_expr 
-    | enum_value
+    // SPEC Bug: enum_value is already covered by const_expr
+    // | enum_value
     | struct_init
     | array_init
     ;
@@ -2772,6 +2796,7 @@ class_method_or_property_decl
 method_decl
     : TOK_METHOD access_spec? opt_fb_modifier opt_override
         method_name opt_data_type_access
+        // SPEC bug: missing using directive?
         using_directive_list?
         method_var_decls*
         func_body

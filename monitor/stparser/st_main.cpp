@@ -97,6 +97,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStArrayTypeNode );
     INIT_MAP_ENTRY( CStStructTypeNode );
     INIT_MAP_ENTRY( CStEnumValueRef );
+    INIT_MAP_ENTRY( CStNamedvalValueRef );
     INIT_MAP_ENTRY( CStDataTypeDeclNode );
     INIT_MAP_ENTRY( CStTypeDeclNode );
     INIT_MAP_ENTRY( CStAmbiguousTypeDeclNode );
