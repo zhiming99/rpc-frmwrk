@@ -852,7 +852,8 @@ bool CStEnumTypeDeclNode::IsSymbolResolved() const
 gint32 CStEnumValueRef::ResolveSymbol(
     void* pctx, enumSymKind iKind )
 {
-    if( iKind != symEnumValue )
+    if( iKind != symEnumValue &&
+        iKind != symNamedValue )
         return ERROR_FALSE;
     if( pctx == nullptr )
         return -EINVAL;
@@ -998,6 +999,7 @@ IMPL_GETSIGNATURE( CStTypeNode )
 IMPL_GETNODEINFO( CStConstValueNode )
 IMPL_GETNODEINFO( CStEnumValueRef )
 IMPL_GETNODEINFO( CStNamedvalValueRef )
+IMPL_GETNODEINFO( CStAmbiguousValueRef )
 IMPL_GETNODEINFO( CStArrayTypeNode )
 IMPL_GETNODEINFO( CStStructTypeNode )
 // CStDataTypeDeclNode has explicit implementation

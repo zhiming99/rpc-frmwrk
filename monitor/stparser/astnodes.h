@@ -645,6 +645,37 @@ struct CStNamedvalValueRef : public CStPrimaryExprNode
     std::string GetNodeInfo() const override;
 };
 
+struct CStAmbiguousValueRef: public CStPrimaryExprNode
+{
+    typedef CStPrimaryExprNode super;
+
+    /*stdstr m_strQualified;
+    stdstr m_strValue;
+    bool m_bHasHash = false;
+    bool m_bSimple = false;
+    // variable chain parsed for the reference, if any
+    ObjPtr m_pVarNode;
+    // the node built once the name is visible*/
+    ObjPtr m_pResolved;
+    CfgPtr m_pRefInfo;
+
+    CStAmbiguousValueRef() : super()
+    { SetClassId( clsid( CStAmbiguousValueRef) ); }
+
+    bool IsSymbolResolved() const override
+    { return !m_pResolved.IsEmpty(); }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override
+    { return ERROR_NOT_IMPL; }
+
+    //! the resolved node, or an empty object while unresolved
+    ObjPtr GetResolved() const
+    { return m_pResolved; }
+
+    std::string GetNodeInfo() const override;
+};
+
 /**
  * @brief Array type node
  */
@@ -805,7 +836,8 @@ struct CStSubrangeTypeDeclNode :
     { SetClassId( clsid( CStSubrangeTypeDeclNode ) ); }
 };
 
-struct CStEnumTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStEnumTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
@@ -822,7 +854,8 @@ struct CStEnumTypeDeclNode : public CStAmbiguousTypeDeclNode
     bool IsSymbolResolved() const override;
 };
 
-struct CStArrayTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStArrayTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
@@ -830,7 +863,8 @@ struct CStArrayTypeDeclNode : public CStAmbiguousTypeDeclNode
     { SetClassId( clsid( CStArrayTypeDeclNode ) ); }
 };
 
-struct CStStructTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStStructTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
@@ -838,7 +872,8 @@ struct CStStructTypeDeclNode : public CStAmbiguousTypeDeclNode
     { SetClassId( clsid( CStStructTypeDeclNode ) ); }
 };
 
-struct CStStringTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStStringTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
@@ -846,7 +881,8 @@ struct CStStringTypeDeclNode : public CStAmbiguousTypeDeclNode
     { SetClassId( clsid( CStStringTypeDeclNode ) ); }
 };
 
-struct CStRefTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStRefTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
@@ -854,11 +890,13 @@ struct CStRefTypeDeclNode : public CStAmbiguousTypeDeclNode
     { SetClassId( clsid( CStRefTypeDeclNode ) ); }
 };
 
-struct CStNamedvalTypeDeclNode : public CStAmbiguousTypeDeclNode
+struct CStNamedvalTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
 {
     typedef CStAmbiguousTypeDeclNode super;
 
     std::vector< stdstr > m_vecValNames;
+    std::vector< ObjPtr > m_vecValInit;
     std::vector< CStSymbol* > m_vecValSyms;
     gint32 m_dwInitIdx = -1;
 
@@ -872,7 +910,8 @@ struct CStNamedvalTypeDeclNode : public CStAmbiguousTypeDeclNode
  * Contains all type declarations within a TYPE ... END_TYPE block.
  * This wraps the type_assignments to provide a uniform container.
  */
-struct CStTypeDefinitionBlockNode : public CStAstNodeBase
+struct CStTypeDefinitionBlockNode :
+    public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
@@ -2124,6 +2163,7 @@ REGISTER_AST_NODE( CStArrayTypeNode );
 REGISTER_AST_NODE( CStStructTypeNode );
 REGISTER_AST_NODE( CStEnumValueRef );
 REGISTER_AST_NODE( CStNamedvalValueRef );
+REGISTER_AST_NODE( CStAmbiguousValueRef );
 REGISTER_AST_NODE( CStDataTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDefinitionBlockNode );

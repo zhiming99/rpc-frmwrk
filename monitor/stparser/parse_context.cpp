@@ -1463,6 +1463,7 @@ bool IsCompositeType( gint32 iType )
     static gint32 arrTypes[] = {
         stparser::RuleSubrange_type_decl,
         stparser::RuleEnum_type_decl,
+        stparser::RuleNamedval_type_decl,
         stparser::RuleString_type_decl,
         stparser::TOK_STRUCT,
         stparser::TOK_CLASS,

@@ -669,11 +669,115 @@ unary_expr returns [ ObjPtr pExpr ]
 primary_expr returns [ ObjPtr pExpr ]
     : constant
     {  $pExpr = $constant.pNode; }
-    | variable_access
-    | enum_value
-    {  $pExpr = $enum_value.pNode; }
-    | namedval_value
-    {  $pExpr = $namedval_value.pNode; }
+    | ev=enum_value
+    {
+        CStEnumValueRef* pref = $ev.pNode;
+        auto pParser = static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        auto& ost = pCtx->m_oSymTab;
+        if( pref->m_strQualified.size() )
+        {
+            // enum_value covers both enum and namedval.
+            // we need to descriminate betwwen enum and
+            // namedval
+            std::vector< stdstr > vecComps =
+                ost.BreakdownQualified(
+                    pref->m_strQualified );
+
+            auto pScope = ost.GetCurrentScope();
+            SymPtr pSym;
+            gint32 iType = -1;
+
+            auto ret = ResolveTypeToDirectType(
+                pCtx, vecComps, symDataType,
+                pScope, pSym, iType );
+
+            if( ERROR( ret ) )
+            {
+                // TODO: add an CStAmbiguousValueRef
+                break;
+            }
+
+            if( iType == RuleEnum_type_decl )
+            {
+                pref->m_pDeclNode = pSym->m_pDeclNode;
+                CStEnumTypeDeclNode* petd =
+                    pSym->m_pDeclNode;
+
+                auto& vecNames = petd->m_vecValNames;
+                size_t i = 0;
+                for( ; i < vecNames.size(); i++ )
+                {
+                    if( vecNames[ i ] ==
+                        pref->m_strValue )
+                        break;
+                }
+                if( i < vecNames.size() )
+                {
+                    pref->m_iIndex = i;
+                    $pExpr = pref;
+                }
+                else
+                {
+                    // TODO: emit error
+                }
+            }
+            else if( iType == RuleNamedval_type_decl  )
+            {
+                // replace with CStNamedvalValueRef
+                ObjPtr pObj;
+                pObj.NewObj(
+                    clsid( CStNamedvalValueRef ) );
+
+                CStNamedvalValueRef* pnref = pObj; 
+                CStNamedvalTypeDeclNode* pntd =
+                    pSym->m_pDeclNode;
+                auto& vecNames =
+                    pntd->m_vecValNames;
+
+                pnref->m_strValue = pref->m_strValue;
+                pnref->m_strQualified =
+                    pref->m_strQualified;
+
+                pnref->SetTokens(
+                    pref->m_pStart, pref->m_pStop );
+
+                size_t i = 0;
+                for( ; i < vecNames.size(); i++ )
+                {
+                    if( vecNames[ i ] ==
+                        pref->m_strValue )
+                        break;
+                }
+                if( i < vecNames.size() )
+                {
+                    pnref->m_iIndex = i;
+                    $pExpr = pnref;
+                }
+                else
+                {
+                    // TODO: emit error
+                }
+            }
+            else
+            {
+                pCtx->LogError( $ev.start,
+                    "Error resolving type for '%s'.",
+                    $ev.ctx->getText().c_str() );
+            }
+        }
+        else
+        {
+            // a single identifer
+            std::vector< stdstr > vecComps =
+                ost.BreakdownQualified( pref->m_strValue );
+            SymPtr pSym = ost.LookupQualified( vecComps );
+        }
+    }
+    | va=variable_access
+    // namedval_value is covered by enum_value
+    // | namedval_value
+    // {  $pExpr = $namedval_value.pNode; }
     | func_call
     | invocation
     | ref_value
@@ -1689,11 +1793,17 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             if( IsDirectType( iType ) )
                 ptd->m_iDirectType = iType;
 
-            auto pSym = ost.Declare( $st.ctx->getText(),
-                symDataType, pNode, strType,
+            SymPtr pSym;
+            ret = ost.Declare( $st.ctx->getText(),
+                symDataType, pNode, pSym, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );
-            if( pSym.IsEmpty() )
+            if( ERROR( ret ) )
+            {
+                pCtx->LogError( $st.start,
+                    "Error: '%s' already defined",
+                    $st.ctx->getText().c_str() );
                 break;
+            }
             pSym->SetTokens( $st.start, $si.stop );
             pSym->m_pDeclNode = pNode;
             ptd->m_pSymbol = pSym;
@@ -1882,10 +1992,11 @@ enum_type_decl returns [ ObjPtr pTypeDecl ]
             if( IsDirectType( iType ) )
                 ptd->m_iDirectType = iType;
 
-            auto pSym = ost.Declare( strType,
-                symDataType, pNode, strType,
+            SymPtr pSym;
+            ret = ost.Declare( strType,
+                symDataType, pNode, pSym, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );
-            if( pSym.IsEmpty() )
+            if( ERROR( ret ) )
                 break;
             pSym->SetTokens( $etn.start, $si.stop );
             pSym->m_pDeclNode = pNode;
@@ -1907,10 +2018,11 @@ enum_type_decl returns [ ObjPtr pTypeDecl ]
                 oCfg.GetStrProp( 0, strName );
                 if( strName.empty() )
                     continue;
-                auto pValSym = ost.Declare( strName,
-                    symEnumValue, pNode, strType,
+                SymPtr pValSym;
+                ret = ost.Declare( strName,
+                    symEnumValue, pNode, pValSym, strType,
                     ( CStVarDeclNode::enumVarCategory )0 );
-                if( pSym.IsEmpty() )
+                if( ERROR( ret ) )
                     break;
                 pSym->m_pDeclNode = pNode;
                 antlr4::Token *pStart = nullptr;
@@ -2083,10 +2195,11 @@ array_type_decl returns [ ObjPtr pTypeDecl ]
             if( IsDirectType( iType ) )
                 ptd->m_iDirectType = iType;
 
-            auto pSym = ost.Declare( $atn.text,
-                symDataType, pNode, strType,
+            SymPtr pSym;
+            ret = ost.Declare( $atn.text,
+                symDataType, pNode, pSym, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );
-            if( pSym.IsEmpty() )
+            if( ERROR( ret ) )
                 break;
             pSym->SetTokens( $atn.start, $asi.stop );
             ptd->m_pSymbol = pSym;
@@ -2274,11 +2387,11 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
 
             ptd->m_iDirectType = iType;
 
-            auto pSym = ost.Declare(
-                $stn.ctx->getText(),
-                symDataType, pNode, strType,
+            SymPtr pSym;
+            ret = ost.Declare( $stn.ctx->getText(),
+                symDataType, pNode, pSym, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );
-            if( pSym.IsEmpty() )
+            if( ERROR( ret ) )
                 break;
             pSym->SetTokens( $stn.start, $si.stop );
             pSym->m_pDeclNode = pNode;
@@ -2387,11 +2500,11 @@ ref_type_decl returns [ ObjPtr pTypeDecl ]
                     ptd->m_iRefRank = iRank;
             }
 
-            auto pSym = ost.Declare(
-                $rtn.text, symDataType,
-                pNode, strType,
+            SymPtr pSym;
+            ret = ost.Declare( $rtn.text,
+                symDataType, pNode, pSym, strType,
                 ( CStVarDeclNode::enumVarCategory )0 );
-            if( pSym.IsEmpty() )
+            if( ERROR( ret ) )
                 break;
             pSym->SetTokens( $rtn.start, $rsi.stop );
             ptd->m_pSymbol = pSym;

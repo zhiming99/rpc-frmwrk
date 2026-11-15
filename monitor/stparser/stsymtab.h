@@ -457,16 +457,17 @@ public:
      * @param pDeclNode the AST declaration node, kept as back link
      * @param strTypeName the declared data type name, see
      *                    CStSymbol::m_strTypeName
-     * @return the new symbol, or a null SymPtr on a duplicate name
-     *         (functions may overload functions)
+     * @param pSym the new symbol, or a null SymPtr on a duplicate name
+     * @return 0 on success, or -EEXIST if name duplicated, with pSym for the duplicated name.
+     *         
      */
-    SymPtr Declare(
+    gint32 Declare(
         const std::string& strName,
         enumSymKind eKind,
         ObjPtr pDeclNode,
+        SymPtr& pSym,
         const std::string& strTypeName = std::string(),
-        CStVarDeclNode::enumVarCategory eCategory =
-            CStVarDeclNode::vcLocal );
+        CStVarDeclNode::enumVarCategory eCategory = CStVarDeclNode::vcLocal );
 
     /**
      * @brief Declare a symbol that opens a scope of
@@ -520,14 +521,15 @@ public:
      */
     SymPtr LookupQualified(
         const std::vector< std::string >& vecNames,
-        bool bAbsolute = false );
-
-    std::vector<std::string> BreakdownQualified(
-        const std::string& strFullName);
+        bool bAbsolute = false ) const;
 
     SymPtr LookupQualified(
         const std::string& strFullName,
-        bool bAbsolute = false );
+        bool bAbsolute = false ) const;
+
+    std::vector<std::string>
+        BreakdownQualified(
+        const std::string& strFullName) const;
 
     //! symbols of a kind in one scope (default: the current scope)
     void FindByKind(

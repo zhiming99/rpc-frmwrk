@@ -61,7 +61,7 @@ gint32 CStScope::AddSymbol( SymPtr pSymbol )
         pSym->m_pScope = this;
         vec.push_back( pSymbol );
     }while( 0 );
-    return 0;
+    return ret;
 }
 
 ScopePtr CStSymbolTable::NewScopeInternal(
@@ -192,27 +192,34 @@ void CStSymbolTable::DumpScope( CStScope* pScope,
     return;
 }
 
-SymPtr CStSymbolTable::Declare(
+gint32 CStSymbolTable::Declare(
     const std::string& strName,
     enumSymKind eKind,
     ObjPtr pDeclNode,
+    SymPtr& pSymRet,
     const std::string& strTypeName,
     CStVarDeclNode::enumVarCategory eCategory )
 {
     CStScope* pScope = GetCurrentScope();
     if( pScope == nullptr || strName.empty() )
-        return SymPtr();
+        return -EINVAL;
     SymPtr pSym( true );
     pSym->m_strName = strName;
     pSym->m_eKind = eKind;
     pSym->m_eCategory = eCategory;
     pSym->m_strTypeName = strTypeName;
     pSym->m_pDeclNode = pDeclNode;
-    if( ERROR( pScope->AddSymbol( pSym ) ) )
-        return SymPtr();
+    gint32 ret = 0;
+    ret = pScope->AddSymbol( pSym );
+    if( ret == -EEXIST )
+    {
+        pSymRet = pScope->LookupLocal( strName );
+        return ret;
+    }
     pSym->m_iSeqNo = this->m_iSeqNo++;
     this->m_vecSymSeq.push_back( pSym );
-    return pSym;
+    pSymRet = pSym;
+    return ret;
 }
 
 SymPtr CStSymbolTable::DeclareScopeOwner(
@@ -221,8 +228,18 @@ SymPtr CStSymbolTable::DeclareScopeOwner(
     const std::string& strName,
     ObjPtr pDeclNode )
 {
-    SymPtr pSymbol = Declare(
-        strName, eKind, pDeclNode );
+    SymPtr pSymbol;
+    gint32 ret = Declare( strName,
+        eKind, pDeclNode, pSymbol );
+    if( ret == -EEXIST &&
+        eKind == symNamespace )
+    {
+        // reenter a namespace
+        PushScope( eScopeKind, strName );
+        return pSymbol;
+    }
+    else if( ERROR( ret ) )
+        return SymPtr();
     CStSymbol* pSym = pSymbol;
     if( pSym == nullptr )
         return pSymbol;
@@ -273,7 +290,8 @@ void CStSymbolTable::AddSolved(
     }
 }
 
-SymPtr CStSymbolTable::Lookup( const std::string& strName ) const
+SymPtr CStSymbolTable::Lookup(
+    const std::string& strName ) const
 {
     for( auto i = ( gint32 )m_stackScopes.size() - 1;
         i >= 0; --i )
@@ -335,7 +353,7 @@ SymPtr CStSymbolTable::LookupLocal(
 
 SymPtr CStSymbolTable::LookupQualified(
     const std::vector< std::string >& vecNames,
-    bool bAbsolute )
+    bool bAbsolute ) const
 {
     if( vecNames.empty() )
         return SymPtr();
@@ -354,9 +372,22 @@ SymPtr CStSymbolTable::LookupQualified(
     return pSym;
 }
 
+SymPtr CStSymbolTable::LookupQualified(
+    const std::string& strFullName,
+    bool bAbsolute ) const
+{
+    auto vecComps = BreakdownQualified(
+        strFullName );
+    if( vecComps.empty() )
+        return SymPtr();
+    return LookupQualified(
+        vecComps, bAbsolute );
+}
+
+
 std::vector<std::string>
 CStSymbolTable::BreakdownQualified(
-    const std::string& strFullName)
+    const std::string& strFullName) const
 {
     std::vector<std::string> vecComponents;
     if (strFullName.empty())
@@ -401,18 +432,6 @@ CStSymbolTable::BreakdownQualified(
     return vecComponents;
 }
 
-
-SymPtr CStSymbolTable::LookupQualified(
-    const std::string& strFullName,
-    bool bAbsolute )
-{
-    auto vecComps = BreakdownQualified(
-        strFullName );
-    if( vecComps.empty() )
-        return SymPtr();
-    return LookupQualified(
-        vecComps, bAbsolute );
-}
 
 void CStSymbolTable::FindByKind(
     enumSymKind eKind,
