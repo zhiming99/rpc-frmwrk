@@ -768,10 +768,9 @@ primary_expr returns [ ObjPtr pExpr ]
         }
         else
         {
-            // a single identifer
-            std::vector< stdstr > vecComps =
-                ost.BreakdownQualified( pref->m_strValue );
-            SymPtr pSym = ost.LookupQualified( vecComps );
+            // TODO: discriminate a single identifer
+            // between enum/named/variable
+
         }
     }
     | va=variable_access

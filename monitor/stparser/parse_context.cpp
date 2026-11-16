@@ -1200,6 +1200,18 @@ gint32 ResolveUsingNs(
     return ret;
 }
 
+// symUnknown acts as a wildcard so the same lookup engine can
+// serve both typed references and untyped symbolic references.
+static bool IsSymbolKindMatch(
+    CStSymbol* pSym, enumSymKind eKind )
+{
+    if( pSym == nullptr )
+        return false;
+    if( eKind == symUnknown )
+        return true;
+    return pSym->m_eKind == eKind;
+}
+
 gint32 ResolveTypeRef( CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
@@ -1267,7 +1279,7 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
                 strName, pScope, vecOut );
             for( auto elem : vecOut )
             {
-                if( elem->m_eKind == eKind &&
+                if( IsSymbolKindMatch( elem, eKind ) &&
                     elem->m_strName == strName )
                 {
                     pSym = elem;
@@ -1390,7 +1402,7 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
                         strName, pNsScope, vecOut );
                     for( auto pOut : vecOut )
                     {
-                        if( pOut->m_eKind == eKind &&
+                        if( IsSymbolKindMatch( pOut, eKind ) &&
                             pOut->m_strName == strName )
                         {
                             pSym = pOut;
@@ -1439,7 +1451,7 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
                 strName, pRunScope, vecOut );
             for( auto elem : vecOut )
             {
-                if( elem->m_eKind == eKind &&
+                if( IsSymbolKindMatch( elem, eKind ) &&
                     elem->m_strName == strName )
                 {
                     pSym = elem;
@@ -1456,6 +1468,218 @@ gint32 ResolveTypeRef( CStParseContext* pCtx,
     }
 
     return -ENOENT;
+}
+
+enum enumRefMatch
+{
+    refMatchNone = 0,
+    refMatchFull,
+    refMatchPartial,   // a prefix bound, the rest are members
+};
+
+// Resolve vecNames[uStart..] against one scope, descending into
+// the scope opened by each matched symbol. When a component is
+// not a scope declaration (a member of a struct/FB instance),
+// the scan stops and reports a partial match: pSym is the last
+// component that resolved and iOffset the index of the first
+// unresolved one.
+static enumRefMatch ResolvePathInScope(
+    CStSymbolTable& ost,
+    const std::vector<std::string>& vecNames,
+    size_t uStart,
+    CStScope* pScope,
+    SymPtr& pSym, gint32& iOffset )
+{
+    pSym.Clear();
+    iOffset = -1;
+
+    for( size_t i = uStart; i < vecNames.size(); i++ )
+    {
+        const std::string& strName = vecNames[ i ];
+        if( strName.empty() )
+            break;
+
+        SymVector vecOut;
+        ost.LookupAllLocal( strName, pScope, vecOut );
+
+        CStSymbol* pFound = nullptr;
+        for( auto pOut : vecOut )
+        {
+            if( pOut->m_strName != strName )
+                continue;
+            if( pFound == nullptr )
+                pFound = pOut;
+            // prefer the symbol that opens a scope
+            if( pOut->m_pDefScope != nullptr )
+            {
+                pFound = pOut;
+                break;
+            }
+        }
+
+        if( pFound == nullptr )
+        {
+            // the prefix bound in this scope, but this
+            // component is not a declaration: it is a member
+            if( pSym.IsEmpty() )
+                return refMatchNone;
+            iOffset = ( gint32 )i;
+            return refMatchPartial;
+        }
+
+        pSym = pFound;
+        if( i + 1 == vecNames.size() )
+            return refMatchFull;
+
+        if( pFound->m_pDefScope == nullptr )
+        {
+            // a value-like symbol: the remaining components
+            // are members of its type
+            iOffset = ( gint32 )( i + 1 );
+            return refMatchPartial;
+        }
+        pScope = pFound->m_pDefScope;
+    }
+
+    return refMatchNone;
+}
+
+gint32 ResolveSymbolicRef( CStParseContext* pCtx,
+    const std::vector<std::string>& vecNames,
+    SymPtr& pSym, gint32& iOffset, CStScope* pCurScope )
+{
+    pSym.Clear();
+    iOffset = -1;
+    if( pCtx == nullptr || vecNames.empty() )
+        return -EINVAL;
+
+    auto& ost = pCtx->m_oSymTab;
+
+    bool bAbsolute = ( vecNames[ 0 ] == GLOBAL_SCOPE_MARK );
+    if( bAbsolute && vecNames.size() == 1 )
+        return -EINVAL;
+    size_t uStart = bAbsolute ? 1 : 0;
+
+    if( bAbsolute )
+    {
+        ScopePtr pGlobal = ost.GetGlobalScope();
+        if( pGlobal.IsEmpty() )
+            return -ENOENT;
+        enumRefMatch eMatch = ResolvePathInScope(
+            ost, vecNames, uStart, pGlobal, pSym, iOffset );
+        // refMatchPartial leaves the last matched symbol and
+        // the first unresolved component in pSym/iOffset
+        if( eMatch == refMatchFull )
+            return 0;
+        return -ENOENT;
+    }
+
+    ScopePtr pScope = ( pCurScope == nullptr ?
+        ost.GetCurrentScope() : ScopePtr( pCurScope ) );
+
+    while( !pScope.IsEmpty() )
+    {
+        // 1. the declarations of this scope
+        enumRefMatch eMatch = ResolvePathInScope(
+            ost, vecNames, uStart, pScope, pSym, iOffset );
+        if( eMatch == refMatchFull )
+            return 0;
+        if( eMatch == refMatchPartial )
+            return -ENOENT;
+
+        // 2. the names this scope imports
+        for( auto& vecUsings : GetUsingsArr( pScope ) )
+        {
+            for( auto pObj : vecUsings )
+            {
+                CStUsingDirective* pud = pObj;
+                if( pud == nullptr )
+                    continue;
+                for( auto& elem : pud->m_vecNamespaces )
+                {
+                    ScopePtr pNsScope;
+                    if( !elem.second.IsEmpty() )
+                    {
+                        SymPtr pNs( elem.second );
+                        if( pNs.IsEmpty() ||
+                            pNs->m_eKind != symNamespace )
+                            continue;
+                        pNsScope = pNs->m_pDefScope;
+                    }
+                    else
+                    {
+                        auto vecComps =
+                            ost.BreakdownQualified( elem.first );
+                        if( vecComps.empty() )
+                            continue;
+
+                        size_t iPos = 0;
+                        enumPathStop eStop =
+                            pathStopUnresolved;
+                        ObjPtr pObjNs = ResolveNsPrefix(
+                            vecComps, pCtx, iPos, eStop, pScope );
+                        if( pObjNs.IsEmpty() ||
+                            eStop != pathStopResolved )
+                            continue;
+
+                        SymPtr pNs( pObjNs );
+                        if( pNs.IsEmpty() ||
+                            pNs->m_eKind != symNamespace ||
+                            pNs->m_pDefScope == nullptr )
+                            continue;
+
+                        // cache the resolved namespace for
+                        // the retries and other references
+                        elem.second = pObjNs;
+                        pNsScope = pNs->m_pDefScope;
+                    }
+
+                    if( pNsScope.IsEmpty() )
+                        continue;
+
+                    SymPtr pUsingSym;
+                    gint32 iUsingOffset = -1;
+                    eMatch = ResolvePathInScope( ost, vecNames,
+                        uStart, pNsScope,
+                        pUsingSym, iUsingOffset );
+                    if( eMatch == refMatchFull )
+                    {
+                        pSym = pUsingSym;
+                        iOffset = iUsingOffset;
+                        return 0;
+                    }
+                    if( eMatch == refMatchPartial )
+                    {
+                        pSym = pUsingSym;
+                        iOffset = iUsingOffset;
+                        return -ENOENT;
+                    }
+                }
+            }
+        }
+
+        pScope = pScope->m_pParent;
+    }
+
+    return -ENOENT;
+}
+
+gint32 ResolveSymbolicRef( CStParseContext* pCtx,
+    const std::string& strName,
+    SymPtr& pSym, gint32& iOffset, CStScope* pCurScope )
+{
+    pSym.Clear();
+    iOffset = -1;
+    if( pCtx == nullptr || strName.empty() )
+        return -EINVAL;
+
+    std::vector< std::string > vecNames =
+        pCtx->m_oSymTab.BreakdownQualified( strName );
+    if( vecNames.empty() )
+        return -EINVAL;
+
+    return ResolveSymbolicRef( pCtx, vecNames,
+        pSym, iOffset, pCurScope );
 }
 
 bool IsCompositeType( gint32 iType )

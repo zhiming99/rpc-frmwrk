@@ -594,6 +594,52 @@ gint32 ResolveTypeRef( CStParseContext* pctx,
     CStScope* pCurScope,
     SymPtr& pSym );
 
+/**
+ * @brief Resolve an identifier or qualified name to a symbol
+ *
+ * Uses the same lookup order as ResolveTypeRef(): an absolute
+ * name (leading '_') starts at the global scope, while a
+ * relative name is searched level by level from pCurScope (or
+ * the current scope) up to the global scope, trying each
+ * scope's own declarations first and its USING lists right
+ * after.  Unlike ResolveTypeRef(), no symbol kind is filtered:
+ * the first match is returned, and the caller inspects
+ * CStSymbol::m_eKind to decide what it is (variable, enum
+ * value, named value, data type, ...).
+ *
+ * A qualified name may run into a member access: 'fb.speed'
+ * binds 'fb' in the scope, but 'speed' belongs to fb's type and
+ * cannot be found by a scope lookup.  The name is then not
+ * fully bound, so -ENOENT is returned; iOffset is the index of
+ * the first name component that could not be resolved from the
+ * scopes (the member part begins there) and pSym is the last
+ * component that did resolve.  The two cases are distinguishable
+ * by the outputs: a partial match has a non-empty pSym and
+ * iOffset >= 0, while a complete miss has an empty pSym and
+ * iOffset == -1.
+ *
+ * @param pCtx      the parse context carrying the symbol table
+ * @param strName   the identifier or qualified name
+ * @param pSym      [out] the resolved symbol, or the last
+ *                  component resolved on a partial match
+ * @param iOffset   [out] index of the first unresolved
+ *                  component on a partial match, -1 otherwise
+ * @param pCurScope the scope to start from, nullptr for the
+ *                  current scope
+ * @return 0 on success, -ENOENT when the name is not fully
+ *         bound (see pSym/iOffset for a partial match),
+ *         -EINVAL on invalid arguments
+ */
+gint32 ResolveSymbolicRef( CStParseContext* pCtx,
+    const std::string& strName,
+    SymPtr& pSym, gint32& iOffset,
+    CStScope* pCurScope = nullptr );
+
+gint32 ResolveSymbolicRef( CStParseContext* pCtx,
+    const std::vector<std::string>& vecNames,
+    SymPtr& pSym, gint32& iOffset,
+    CStScope* pCurScope = nullptr );
+
 bool IsElementaryType( gint32 iType );
 
 bool IsCompoundType( gint32 iType );

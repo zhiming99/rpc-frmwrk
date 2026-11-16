@@ -34,7 +34,8 @@ namespace rpcf
 {
 
 // Helper function to join vector of strings
-static std::string JoinStrings( const std::vector< std::string >& vec,
+static std::string JoinStrings(
+    const std::vector< std::string >& vec,
     const std::string& strSep )
 {
     std::ostringstream oss;
