@@ -34,6 +34,8 @@
 #include "pragma_expr/pragma_exprParser.h"
 #include "pragma_expr/pragma_exprLexer.h"
 
+namespace rpcf
+{
 std::any CStPragmaEvaluator::visitPragma_condition(
     pragma_exprParser::Pragma_conditionContext* ctx)
 {
@@ -572,3 +574,4 @@ bool CPragmaRecoveryStrategy::EvaluateInclude(
     return false;
 }
 
+}

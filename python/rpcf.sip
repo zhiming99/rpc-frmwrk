@@ -485,18 +485,20 @@ namespace cpp
         gint32 ret = 0;
         PyObject* pPyResp = PyList_New( 3 );
         sipRes = pPyResp;
-        Py_buffer *view =
-            (Py_buffer *)calloc(1,sizeof(*view));
+        Py_buffer view;
+        memset( &view, 0, sizeof( view ) );
+        bool bRelease = false;
         do{
             ret = PyObject_GetBuffer(
-                a0, view, GetBufFlags( true ));
+                a0, &view, GetBufFlags( true ));
             if( ret < 0 )
             {
                 break;
             }
             else
             {
-                char* pBuf = ( char* )view->buf + a1;
+                bRelease = true;
+                char* pBuf = ( char* )view.buf + a1;
                 guint32 dwClsid = 0;
                 memcpy( &dwClsid, pBuf, sizeof( dwClsid ) );
                 dwClsid = ntohl( dwClsid );
@@ -519,7 +521,7 @@ namespace cpp
                     if( ERROR( ret ) )
                         break;
 
-                    if( ( guint32 )( view->len - a1 ) < dwSize )
+                    if( ( guint32 )( view.len - a1 ) < dwSize )
                     {
                         ret = -ERANGE;
                         break;
@@ -555,8 +557,8 @@ namespace cpp
         PyObject* pPyRet = PyLong_FromLong( ret );
         PyList_SetItem( pPyResp, 0, pPyRet );
 
-        if( view != nullptr )
-            PyBuffer_Release( view );
+        if( bRelease )
+            PyBuffer_Release( &view );
         %End
 
     };
@@ -638,21 +640,20 @@ namespace cpp
         gint32 CopyToPython( PyObject* pPyObj );
         %MethodCode
             gint32 ret = 0;
-            Py_buffer *view = (Py_buffer *)
-                malloc(sizeof(*view));
+            Py_buffer view;
             ret = PyObject_GetBuffer(
-                a0, view, GetBufFlags( false ));
+                a0, &view, GetBufFlags( false ));
             if( ret < 0 )
                 sipRes = -ENOMEM;
             else
             {
                 BufPtr& pBuf = *sipCpp;
                 guint32 dwSize = std::min(
-                    ( guint32 )view->len,
+                    ( guint32 )view.len,
                     pBuf->size() );
-                memcpy( view->buf,
+                memcpy( view.buf,
                     pBuf->ptr(), dwSize );
-                PyBuffer_Release( view );
+                PyBuffer_Release( &view );
                 sipRes = 0;
             }
         %End
@@ -660,41 +661,39 @@ namespace cpp
         gint32 CopyFromPython( PyObject* pPyObj );
         %MethodCode
             gint32 ret = 0;
-            Py_buffer *view = (Py_buffer *)
-                malloc(sizeof(*view));
+            Py_buffer view;
             ret = PyObject_GetBuffer(
-                a0, view, GetBufFlags( true ));
+                a0, &view, GetBufFlags( true ));
             if( ret < 0 )
                 sipRes = -ENOMEM;
             else
             {
                 BufPtr& pBuf = *sipCpp;
-                pBuf->Resize( view->len );
+                pBuf->Resize( view.len );
                 memcpy( pBuf->ptr(),
-                    ( char* )view->buf,
-                    ( guint32 )view->len);
+                    ( char* )view.buf,
+                    ( guint32 )view.len);
                 sipRes = 0;
-                PyBuffer_Release( view );
+                PyBuffer_Release( &view );
             }
         %End
 
         gint32 AppendBytes( PyObject* pPyObj );
         %MethodCode
             gint32 ret = 0;
-            Py_buffer *view = (Py_buffer *)
-                malloc(sizeof(*view));
+            Py_buffer view;
             ret = PyObject_GetBuffer(
-                a0, view, GetBufFlags( true ));
+                a0, &view, GetBufFlags( true ));
             if( ret < 0 )
                 sipRes = -ENOMEM;
             else
             {
                 BufPtr& pBuf = *sipCpp;
                 pBuf->Append(
-                    ( char* )view->buf,
-                    ( guint32 )view->len);
+                    ( char* )view.buf,
+                    ( guint32 )view.len);
                 sipRes = 0;
-                PyBuffer_Release( view );
+                PyBuffer_Release( &view );
             }
         %End
 

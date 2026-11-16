@@ -40,8 +40,6 @@ struct CStAstNodeBase :
     // -1 means the file to parse.
     gint32 m_iFileIdx = -1;
     
-    std::vector< CStAstNodeBase > m_vecChildren;
-
     inline void SetParent(
         CStAstNodeBase* pParent )
     {

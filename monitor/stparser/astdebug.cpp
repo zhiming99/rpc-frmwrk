@@ -203,7 +203,7 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "LValueExtNode";
     if( eClsid == clsid( CStInstancePathNode ) )
         return "InstancePathNode";
-    if( eClsid == clsid( CStFullExpressionNode ) )
+    if( eClsid == clsid( CStExpressionNode ) )
         return "FullExpressionNode";
     if( eClsid == clsid( CStSubrangeNode ) )
         return "SubrangeNode";
@@ -269,9 +269,9 @@ std::string GetNodeTypeName( EnumClsid eClsid )
         return "ReferenceTypeNode";
     if( eClsid == clsid( CStDerivedTypeNode ) )
         return "DerivedTypeNode";
-    if( eClsid == clsid( CStDataTypeSpecNode ) )
+    if( eClsid == clsid( CStDataTypeDeclNode ) )
         return "DataTypeSpecNode";
-    if( eClsid == clsid( CStTypeSpecNode ) )
+    if( eClsid == clsid( CStTypeDeclNode ) )
         return "TypeSpecNode";
     if( eClsid == clsid( CStTypeDefinitionBlockNode ) )
         return "TypeDefinitionBlockNode";
@@ -425,7 +425,7 @@ std::string GetNodeDebugInfo( const ObjPtr& pNode )
         if( p )
             oss << "path=" << p->GetDottedName();
     }
-    else if( eClsid == clsid( CStFullExpressionNode ) )
+    else if( eClsid == clsid( CStExpressionNode ) )
     {
         oss << "full_expr";
     }
@@ -879,9 +879,9 @@ void DumpAstTree(
         if( p )
             DumpAstTree( p->m_pExpression, os, iDepth + 1, strIndent );
     }
-    else if( eClsid == clsid( CStFullExpressionNode ) )
+    else if( eClsid == clsid( CStExpressionNode ) )
     {
-        CStFullExpressionNode* p = dynamic_cast< CStFullExpressionNode* >( pBase );
+        CStExpressionNode* p = dynamic_cast< CStExpressionNode* >( pBase );
         if( p )
             DumpAstTree( p->m_pExpression, os, iDepth + 1, strIndent );
     }
@@ -1149,17 +1149,17 @@ void DumpAstTree(
             DumpAstTree( p->m_pTargetType, os, iDepth + 1, strIndent );
         }
     }
-    else if( eClsid == clsid( CStDataTypeSpecNode ) )
+    else if( eClsid == clsid( CStDataTypeDeclNode ) )
     {
-        CStDataTypeSpecNode* p = dynamic_cast< CStDataTypeSpecNode* >( pBase );
+        CStDataTypeDeclNode* p = dynamic_cast< CStDataTypeDeclNode* >( pBase );
         if( p )
         {
             DumpAstTree( p->m_pTypeSpec, os, iDepth + 1, strIndent );
         }
     }
-    else if( eClsid == clsid( CStTypeSpecNode ) )
+    else if( eClsid == clsid( CStTypeDeclNode ) )
     {
-        CStTypeSpecNode* p = dynamic_cast< CStTypeSpecNode* >( pBase );
+        CStTypeDeclNode* p = dynamic_cast< CStTypeDeclNode* >( pBase );
         if( p )
         {
             DumpAstTree( p->m_pType, os, iDepth + 1, strIndent );

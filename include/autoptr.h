@@ -488,6 +488,13 @@ namespace std
         }
     };
 
+    template<>
+    struct hash<ObjPtr>
+    {
+        size_t operator()( const ObjPtr& p ) const
+        { return p->GetObjId(); }
+    };
+
 };
 
 namespace rpcf

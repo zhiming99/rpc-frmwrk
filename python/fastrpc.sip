@@ -510,6 +510,15 @@ gint32 CPythonServerRosImpl::SendEvent(
             Py_INCREF( pCallback );
 
             PyObject* listResp = PyList_New( 2 );
+            if( listResp != nullptr )
+            {
+                // element 0 is always set when the
+                // response is delivered. element 1
+                // must hold a valid object even when
+                // there are no response parameters.
+                Py_INCREF( Py_None );
+                PyList_SetItem( listResp, 1, Py_None );
+            }
             oReqCtx.Push( ( intptr_t )listResp );
             bDec = true;
         }

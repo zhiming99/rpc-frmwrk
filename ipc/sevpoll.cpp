@@ -288,26 +288,31 @@ gint32 CSimpleEvPoll::WriteAsyncData(
 {
     gint32 ret = 0;
     guint8* ptr = pData;
-    do{
-        ret = write( m_iPipew, ptr, iSize );
-        if( ret == iSize )
-            break;
-        if( ret < iSize )
+    gint32 iLeft = iSize;
+    while( iLeft > 0 )
+    {
+        ret = write( m_iPipew, ptr, iLeft );
+        if( ret < 0 )
         {
-            // the write is interrupted
-            ptr += ret;
-            iSize -= ret;
-            continue;
+            if( errno == EINTR )
+                continue;
+            if( errno == EAGAIN ||
+                errno == EWOULDBLOCK )
+            {
+                // pipe is full: a wakeup is
+                // already pending.  Do NOT spin
+                // here (the caller holds the
+                // lock).
+                return -EAGAIN;
+            }
+            return -errno;
         }
-        if( ret == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-        break;
+        if( ret == 0 )
+            return -EIO;
 
-    }while( 1 );
-
+        ptr += ret;
+        iLeft -= ret;
+    }
     return ret;
 }
 
@@ -411,8 +416,8 @@ gint32 CSimpleEvPoll::UpdateTimeMaps(
     std::multimap< guint64, HANDLE >& mapActTimers )
 {
     gint32 ret = 0;
-    std::map< HANDLE, CEvLoop::SOURCE_HEADER* >* pMap =
-        m_pLoop->GetMap( srcTimer );
+    std::map< HANDLE, CEvLoop::SOURCE_HEADER* >
+        *pMap = m_pLoop->GetMap( srcTimer );
 
     if( m_bTimeAdd )
     {
@@ -423,12 +428,28 @@ gint32 CSimpleEvPoll::UpdateTimeMaps(
             if( pSrc->GetState() == srcsReady )
             {
                 guint64 qwAbsTime = pSrc->m_qwAbsTimeUs;
-                if( mapActTimers.find( qwAbsTime ) ==
-                    mapActTimers.end() )
+                auto pairEnds =
+                    mapActTimers.equal_range( qwAbsTime );
+                if( pairEnds.first == pairEnds.second )
                 {
                     mapActTimers.insert( 
                     std::pair< guint64, HANDLE >
                     ( qwAbsTime, elem.first ) );
+                }
+                else 
+                {
+                    auto itr = pairEnds.first;
+                    while( itr != pairEnds.second )
+                    {
+                        if( itr->second == elem.first )
+                            break;
+                        ++itr;
+                    }
+                    if( itr == pairEnds.second )
+                        mapActTimers.insert( 
+                        std::pair< guint64, HANDLE >
+                        ( qwAbsTime, elem.first ) );
+
                 }
             }
         }
@@ -721,7 +742,7 @@ gint32 CSimpleEvPoll::RunLoop()
     oLock.Unlock();
 
     BufPtr pBuf( true );
-    pBuf->Resize( sizeof( pollfd ) * iFdCount );
+    ret = pBuf->Resize( sizeof( pollfd ) * iFdCount );
     if( ERROR( ret ) )
         return ret;
 
@@ -731,9 +752,12 @@ gint32 CSimpleEvPoll::RunLoop()
         gint32 iCount = 0;
         if( iFdCount < ( gint32 )mapActFds.size() )
         {
-            iFdCount = mapActFds.size() + 4; 
-            pBuf->Resize(
-                sizeof( pollfd ) * iFdCount );
+            gint32 iNewCount = mapActFds.size() + 4; 
+            ret = pBuf->Resize(
+                sizeof( pollfd ) * iNewCount );
+            if( ERROR( ret ) )
+                return ret;
+            iFdCount = iNewCount;
             pPollInfo = ( pollfd* )pBuf->ptr();
         }
         ret = BuildPollFds(
@@ -742,18 +766,22 @@ gint32 CSimpleEvPoll::RunLoop()
             break;
 
         NowUs();
-        ret = CalcWaitTime( mapActTimers,
-            dwIntervalMs );
+        ret = CalcWaitTime(
+            mapActTimers, dwIntervalMs );
         if( ret == -ENOENT )
             dwIntervalMs = 1000;
         else if( ret == -ETIMEDOUT )
         {
             HandleTimeout( mapActTimers );
+            dwIntervalMs = 0;
             // continue;
         }
 
         gint32 iReadyCount = 0;
         do{
+            guint64 qwDeadLine =
+                NowUsFast() + ( guint64 )dwIntervalMs * 1000;
+
             ret = poll( pPollInfo,
                 iCount, dwIntervalMs );
             if( ret >= 0 )
@@ -765,6 +793,12 @@ gint32 CSimpleEvPoll::RunLoop()
             if( errno == EAGAIN ||
                 errno == EINTR )
             {
+                guint64 qwNow = NowUs();
+                guint32 dwRemain = 0;
+                if( qwNow < qwDeadLine )
+                    dwRemain = ( guint32 )
+                        ( ( qwDeadLine - qwNow + 999 ) / 1000 );
+                dwIntervalMs = dwRemain;               
                 ret = 0;
                 continue;
             }
@@ -781,6 +815,8 @@ gint32 CSimpleEvPoll::RunLoop()
             //
             DebugPrint( ret,
                 "Fatal error in mainloop" );
+            // avoid a busy loop on persistent errors
+            usleep( 100 * 1000 ); 
         }
 
         HandleIoEvents( mapActFds,

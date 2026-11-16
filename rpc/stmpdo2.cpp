@@ -945,13 +945,10 @@ gint32 CTcpStreamPdo2::OnReceive(
         }
         else if( ret == -1 )
         {
-            if( errno == ENOTCONN ||
-                errno == ECONNRESET ||
-                errno == EIO ||
-                errno == ENXIO )
+            if( errno != EPIPE )
                 ret = -ENOTCONN;
             else
-                ret = -errno;
+                ret = -EPIPE;
             break;
         }
         else if( ret != ( gint32 )dwBytes )
