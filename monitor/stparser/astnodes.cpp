@@ -711,10 +711,10 @@ std::string CStProgConfigNode::GetNodeInfo() const
     return oss.str();
 }
 
-std::string CStSymbolicVarNode::GetNodeInfo() const
+std::string CStSymbolicVariableRef::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "SymbolicVar{ this: " << ( m_bIsThisNotation ? "yes" : "no" ) << " }";
+    oss << "SymbolicVar{ this: " << ( m_bThis ? "yes" : "no" ) << " }";
     return oss.str();
 }
 
@@ -960,6 +960,7 @@ gint32 CStNamedvalValueRef::ResolveSymbol(
     }while( 0 );
     return ret;
 }
+
 // ========================================================================
 // Default implementations for AST nodes
 // These use base class dummy implementation via override

@@ -99,6 +99,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStEnumValueRef );
     INIT_MAP_ENTRY( CStNamedvalValueRef );
     INIT_MAP_ENTRY( CStAmbiguousValueRef );
+    INIT_MAP_ENTRY( CStSymbolicVariableRef );
+
     INIT_MAP_ENTRY( CStDataTypeDeclNode );
     INIT_MAP_ENTRY( CStTypeDeclNode );
     INIT_MAP_ENTRY( CStAmbiguousTypeDeclNode );
@@ -163,7 +165,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStVarConfigListNode );
     INIT_MAP_ENTRY( CStProgConfigListNode );
     INIT_MAP_ENTRY( CStProgConfigNode );
-    INIT_MAP_ENTRY( CStSymbolicVarNode );
     INIT_MAP_ENTRY( CStFbTaskNode );
     INIT_MAP_ENTRY( CStProgCnxnNode );
     INIT_MAP_ENTRY( CStProgConfElemNode );

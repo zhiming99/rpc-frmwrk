@@ -390,19 +390,41 @@ global_var_access
     : opt_tokid_dot identifier opt_dot_tokid
     ;
 
-symbolic_variable
-    : ( this_notation | instance_path TOK_DOT )? var_access_or_multi_elem
+symbolic_variable returns [ ObjPtr pExpr ]
+    : ( has_this=this_notation | nh=namespace_hierarchy TOK_DOT )? va = var_access_or_multi_elem
+    {
+        auto psvr = ( CStSymbolicVariableRef*)$va.pExpr;
+        if( $has_this.ctx )
+            psvr->m_bThis = true;
+        if( $nh.ctx )
+            psvr->m_strQualified = $nh.ctx->getText();
+        $pExpr = $va.pExpr;
+    }
     ;
 
-var_access_or_multi_elem
+var_access_or_multi_elem returns [ ObjPtr pExpr ]
     // equivalent to the spec's rule
     // ( var_access | multi_elem_var )
-    : var_access multi_elem_chain?
+    : va=var_access melc=multi_elem_chain?
+    {
+        auto psvr = ( CStSymbolicVariableRef*)$va.pExpr;
+        psvr->m_vecMultiElemChain = ( *ObjVecPtr( $melc.pvecMec ))();
+        $pExpr = $va.pExpr;
+    }
     ;
 
-var_access
+var_access returns [ObjPtr pExpr]
     : ref_deref
+    { $pExpr = $ref_deref.pExpr; }
     | variable_name
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStSymbolicVariableRef ) );
+        auto psv = ( CStSymbolicVariableRef* )pObj;
+        psv->m_strVarName =
+            $variable_name.ctx->getText();
+        $pExpr = pObj;
+    }
     ;
 
 variable_name
@@ -413,24 +435,57 @@ keywords_var_name
     : keywords
     ;
 
-multi_elem_chain
-    : ( subscript_list | struct_variable )+
+multi_elem_chain returns [ ObjPtr pvecMec ]
+    : me+= multi_elem_item+
+    {{
+        ObjVecPtr pvecMec( true );
+        auto& vecMec = ( *pvecMec )();
+        for( auto* pe : $me )
+        {
+            if( pe != nullptr && !pe->pItem.IsEmpty() )
+                vecMec.push_back( pe->pItem );
+        }
+        $pvecMec = pvecMec;
+    }}
     ;
 
-struct_variable
-    : TOK_DOT struct_elem_select
+multi_elem_item returns [ ObjPtr pItem ]
+    : sl =subscript_list
+    {
+        // returns an ObjVecPtr
+        $pItem = $sl.pExprList;
+    }
+    | sv =struct_variable
+    {
+        // returns a CStSymbolicVariableRef
+        $pItem = $sv.pExpr;
+    }
     ;
 
-struct_elem_select
+struct_variable returns [ ObjPtr pExpr ]
+    : TOK_DOT ses=struct_elem_select
+    { $pExpr = $ses.pExpr; }
+    ;
+
+struct_elem_select returns [ ObjPtr pExpr ]
     : var_access
+    { $pExpr = $var_access.pExpr; }
     ;
 
-subscript_list
+subscript_list returns [ ObjPtr pExprList ]
     : TOK_LBRACKET expr_list TOK_RBRACKET
     ;
 
-expr_list
-    : expression ( TOK_COMMA expression )*
+expr_list returns [ ObjPtr pExprList ]
+    : e1=expression ( TOK_COMMA e2+=expression )*
+    {
+        ObjVecPtr pvecObjs;
+        pvecObjs.NewObj();
+        (*pvecObjs)().push_back( $e1.pExpr );
+        for( auto& elem : $e2 )
+            (*pvecObjs)().push_back( elem->pExpr );
+        $pExprList = pvecObjs;
+    }
     ;
 
 this_notation
@@ -670,113 +725,18 @@ primary_expr returns [ ObjPtr pExpr ]
     : constant
     {  $pExpr = $constant.pNode; }
     | ev=enum_value
-    {
-        CStEnumValueRef* pref = $ev.pNode;
+    {{
         auto pParser = static_cast< CStParser* >( this );
-        auto pCtx = pParser->GetParseContext();
-        auto& ost = pCtx->m_oSymTab;
-        if( pref->m_strQualified.size() )
-        {
-            // enum_value covers both enum and namedval.
-            // we need to descriminate betwwen enum and
-            // namedval
-            std::vector< stdstr > vecComps =
-                ost.BreakdownQualified(
-                    pref->m_strQualified );
-
-            auto pScope = ost.GetCurrentScope();
-            SymPtr pSym;
-            gint32 iType = -1;
-
-            auto ret = ResolveTypeToDirectType(
-                pCtx, vecComps, symDataType,
-                pScope, pSym, iType );
-
-            if( ERROR( ret ) )
-            {
-                // TODO: add an CStAmbiguousValueRef
-                break;
-            }
-
-            if( iType == RuleEnum_type_decl )
-            {
-                pref->m_pDeclNode = pSym->m_pDeclNode;
-                CStEnumTypeDeclNode* petd =
-                    pSym->m_pDeclNode;
-
-                auto& vecNames = petd->m_vecValNames;
-                size_t i = 0;
-                for( ; i < vecNames.size(); i++ )
-                {
-                    if( vecNames[ i ] ==
-                        pref->m_strValue )
-                        break;
-                }
-                if( i < vecNames.size() )
-                {
-                    pref->m_iIndex = i;
-                    $pExpr = pref;
-                }
-                else
-                {
-                    // TODO: emit error
-                }
-            }
-            else if( iType == RuleNamedval_type_decl  )
-            {
-                // replace with CStNamedvalValueRef
-                ObjPtr pObj;
-                pObj.NewObj(
-                    clsid( CStNamedvalValueRef ) );
-
-                CStNamedvalValueRef* pnref = pObj; 
-                CStNamedvalTypeDeclNode* pntd =
-                    pSym->m_pDeclNode;
-                auto& vecNames =
-                    pntd->m_vecValNames;
-
-                pnref->m_strValue = pref->m_strValue;
-                pnref->m_strQualified =
-                    pref->m_strQualified;
-
-                pnref->SetTokens(
-                    pref->m_pStart, pref->m_pStop );
-
-                size_t i = 0;
-                for( ; i < vecNames.size(); i++ )
-                {
-                    if( vecNames[ i ] ==
-                        pref->m_strValue )
-                        break;
-                }
-                if( i < vecNames.size() )
-                {
-                    pnref->m_iIndex = i;
-                    $pExpr = pnref;
-                }
-                else
-                {
-                    // TODO: emit error
-                }
-            }
-            else
-            {
-                pCtx->LogError( $ev.start,
-                    "Error resolving type for '%s'.",
-                    $ev.ctx->getText().c_str() );
-            }
-        }
-        else
-        {
-            // TODO: discriminate a single identifer
-            // between enum/named/variable
-
-        }
-    }
+        $pExpr = rpcf::primary_expr::BuildStValueRefNode(
+            pParser->GetParseContext(), $ev.pNode,
+            $ev.ctx->getText().c_str(),
+            $ev.start, $ev.stop );
+    }}
+    | namedval_value
+     {  /* unreachable alternative */ }
     | va=variable_access
-    // namedval_value is covered by enum_value
-    // | namedval_value
-    // {  $pExpr = $namedval_value.pNode; }
+    { $pExpr = $va.pExpr; }
+
     | func_call
     | invocation
     | ref_value
@@ -786,8 +746,21 @@ primary_expr returns [ ObjPtr pExpr ]
     }}
     ;
 
-variable_access
-    : symbolic_variable multibit_part_access?
+variable_access returns [ ObjPtr pExpr ]
+    : sv=symbolic_variable mpa=multibit_part_access?
+    {
+        auto psvr = ( CStSymbolicVariableRef*)$sv.pExpr;
+        if( $mpa.ctx )
+        {
+            psvr->m_oMbaVar = $mpa.oVar;
+            psvr->SetTokens( $sv.start, $mpa.stop );
+        }
+        else
+        {
+            psvr->SetTokens( $sv.start, $sv.stop );
+        }
+        $pExpr = $sv.pExpr;
+    }
     ;
 
 func_call
@@ -1977,6 +1950,7 @@ enum_type_decl returns [ ObjPtr pTypeDecl ]
                 break;
 
             CStTypeDeclNode* ptd = pNode;
+            CStEnumTypeDeclNode* petd = pNode;
             CStEnumValueRef* pRef = pTypeInit;
 
             if( !pTypeInit.IsEmpty() )
@@ -2023,13 +1997,18 @@ enum_type_decl returns [ ObjPtr pTypeDecl ]
                     ( CStVarDeclNode::enumVarCategory )0 );
                 if( ERROR( ret ) )
                     break;
-                pSym->m_pDeclNode = pNode;
+
+                // record the value for reference resolution
+                petd->m_vecValNames.push_back( strName );
+                petd->m_vecValSyms.push_back( pValSym );
+
+                pValSym->m_pDeclNode = pNode;
                 antlr4::Token *pStart = nullptr;
                 antlr4::Token *pStop = nullptr;
                 oCfg.GetIntPtr( 1, ( guint32*& )pStart );
                 oCfg.GetIntPtr( 2, ( guint32*& )pStop );
                 if( pStart && pStop )
-                    pSym->SetTokens( pStart, pStop );
+                    pValSym->SetTokens( pStart, pStop );
             }
 
         }while( 0 );
@@ -2521,7 +2500,7 @@ ref_spec_init returns [ ObjPtr pTypeInfo ]
         if( $v.ctx )
         {
             CParamList oTypeInit;
-            oTypeInit.Push( $v.ctx->getText() );
+            oTypeInit.Push( $v.pExpr );
             oParams.SetObjPtr(
                 propStTypeInit, oTypeInit.GetCfg() );
         }
@@ -2548,37 +2527,54 @@ ref_type_access:
     instance_path
     ;
 
-ref_value returns [ stdstr strVal ]
+ref_value returns [ ObjPtr pExpr ]
     : ref_addr
-    { $strVal = $ref_addr.strVal; }
+    { $pExpr = $ref_addr.pExpr; }
     | TOK_NULL
-    { $strVal = "NULL"; }
+    { 
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStSymbolicVariableRef ) );
+        auto psv = ( CStSymbolicVariableRef* )pObj;
+        psv->m_bIsRef = true;
+        psv->m_iRefRank = 0;
+        psv->m_bConstant = true;
+        $pExpr = pObj;
+    }
     ;
 
-ref_addr returns [ stdstr strVal ]
+ref_addr returns [ ObjPtr pExpr ]
     : TOK_REF TOK_LPAREN
     ( sv=symbolic_variable | fb=fb_instance_name | cls=class_instance_name )
-    {
-        if( $sv.ctx )
-            $strVal = $sv.ctx->getText();
-        else if( $fb.ctx )
-            $strVal = $fb.ctx->getText();
-        else if( $cls.ctx )
-            $strVal = $cls.ctx->getText();
-    }
+    {{
+        if( !$sv.ctx )
+        do{
+            $pExpr = $sv.pExpr;
+
+        }while( 0 );
+    }}
     TOK_RPAREN
     ;
 
-ref_deref
+ref_deref returns [ ObjPtr pExpr ]
     : ref_name caret_list
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStSymbolicVariableRef ) );
+        auto psv = ( CStSymbolicVariableRef* )pObj;
+        psv->m_bIsRef = true;
+        psv->m_iRefRank = $caret_list.iCount;
+        psv->m_strVarName = $ref_name.ctx->getText();
+        $pExpr = pObj;
+    }
     ;
 
 ref_name
     : identifier
     ;
 
-caret_list
-    : TOK_CARET (TOK_CARET)*
+caret_list returns [ int iCount ]
+    : TOK_CARET (tc+=TOK_CARET)*
+    { $iCount = $tc.size() + 1; }
     ;
 
 ambiguous_type_decl returns [ ObjPtr pTypeDecl ]
@@ -2979,9 +2975,30 @@ multibits_type_name
     ;
 
 // Multi-part access
-multibit_part_access 
+multibit_part_access returns [ Variant oVar ]
     : TOK_DOT TOK_INT
-    | TOK_DOT TOK_MULTPART_ACCESS
+    {
+        do{
+            auto initValue = ParseStNumericLiteral(
+                $TOK_INT.text.c_str(), TOK_INT );
+            auto& pValue = initValue.second;
+            if( pValue.IsEmpty() )
+            {
+                //TODO: emit error
+                break;
+            }
+            CCfgOpener oCfg( ( IConfigDb* )pValue );
+            guint64 qwVal = 0;
+            oCfg.GetQwordProp( propStNumValue, qwVal );
+            guint32 dwVal = ( guint32 )qwVal;
+            $oVar = dwVal;
+
+        }while( 0 );
+    }
+    | TOK_DOT tma=TOK_MULTPART_ACCESS
+    {
+        $oVar = $tma.text;
+    }
     ;
 
 // Instance specific init

@@ -64,6 +64,7 @@ class CStVarDeclNode;
 class CStSymbol;
 class CStScope;
 class CStSymbol;
+struct CStParseContext;
 
 struct CStSymbolDeclNode : public CStAstNodeBase
 {
@@ -675,6 +676,79 @@ struct CStAmbiguousValueRef: public CStPrimaryExprNode
 
     std::string GetNodeInfo() const override;
 };
+
+// Helpers for the primary_expr rule. They live in their own
+// namespace so the grammar actions stay small.
+namespace primary_expr
+{
+
+/**
+ * @brief Build the node for an enum/named-value reference
+ *
+ * Resolves the type named by 'Type#name', or the symbol bound
+ * to the unqualified 'name', and fills in m_pDeclNode/m_iIndex
+ * of the returned CStEnumValueRef or CStNamedvalValueRef.
+ * Returns a CStAmbiguousValueRef when the type is not visible
+ * yet, or an empty ObjPtr after logging an error.
+ *
+ * @param pCtx      the parse context carrying the symbol table
+ * @param pRef      the CStEnumValueRef produced by enum_value
+ * @param szRefText the literal source text, for diagnostics
+ */
+ObjPtr BuildStValueRefNode( CStParseContext* pCtx, ObjPtr pRef,
+    const char* szRefText,
+    antlr4::Token* pStart, antlr4::Token* pStop );
+
+}
+
+struct CStSymbolicVariableRef: public CStPrimaryExprNode
+{
+    typedef CStPrimaryExprNode super;
+
+    ObjPtr m_pDeclNode;
+    stdstr m_strQualified;
+    stdstr m_strVarName;
+    std::vector< ObjPtr > m_vecMultiElemChain;
+
+    // the trailing multi-bit access
+    Variant m_oMbaVar;
+    bool m_bThis = false;
+    bool m_bIsRef = false;
+    gint32 m_iRefRank = 0;
+    bool m_bConstant = false;
+    
+
+    CStSymbolicVariableRef() : super()
+    { SetClassId( clsid( CStSymbolicVariableRef) ); }
+
+    bool IsFbInstance() const
+    { return false; }
+
+    bool IsClassInstance() const
+    { return false; }
+
+    bool IsReference() const
+    { return m_bIsRef; }
+
+    bool IsLvalue() const
+    { return false; }
+
+    bool IsConstant() const
+    { return m_bConstant; }
+
+    gint32 GetRefRank() const
+    { return m_iRefRank; }
+
+    bool IsSymbolResolved() const override
+    { return false; }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override
+    { return ERROR_NOT_IMPL; }
+
+    std::string GetNodeInfo() const override;
+};
+
 
 /**
  * @brief Array type node
@@ -1953,27 +2027,6 @@ struct CStProgConfigNode : public CStAstNodeBase
 };
 
 /**
- * @brief Symbolic variable reference node
- *
- * Represents a symbolic variable reference in a prog_cnxn context,
- * e.g., 'input1' in 'input1 := sensor1 OUTPUT_ASSIGN actuator1'.
- * Can be a simple identifier, array access, or this.member access.
- */
-struct CStSymbolicVarNode : public CStAstNodeBase
-{
-    typedef CStAstNodeBase super;
-
-    ObjPtr m_pVarPath;       // The instance_path (identifier or member access)
-    ObjPtr m_pSubscript;    // Optional array subscript
-    bool m_bIsThisNotation; // Whether using 'this' notation
-
-    CStSymbolicVarNode() : super(), m_bIsThisNotation( false )
-    { SetClassId( clsid( CStSymbolicVarNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
-
-/**
  * @brief FB Task node
  *
  * Represents a function block task reference in a PROGRAM configuration,
@@ -2164,6 +2217,7 @@ REGISTER_AST_NODE( CStStructTypeNode );
 REGISTER_AST_NODE( CStEnumValueRef );
 REGISTER_AST_NODE( CStNamedvalValueRef );
 REGISTER_AST_NODE( CStAmbiguousValueRef );
+REGISTER_AST_NODE( CStSymbolicVariableRef );
 REGISTER_AST_NODE( CStDataTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDefinitionBlockNode );
@@ -2211,7 +2265,6 @@ REGISTER_AST_NODE( CStCaseBranchListNode );
 REGISTER_AST_NODE( CStVarConfigListNode );
 REGISTER_AST_NODE( CStProgConfigListNode );
 REGISTER_AST_NODE( CStProgConfigNode );
-REGISTER_AST_NODE( CStSymbolicVarNode );
 REGISTER_AST_NODE( CStFbTaskNode );
 REGISTER_AST_NODE( CStProgCnxnNode );
 REGISTER_AST_NODE( CStProgConfElemNode );
