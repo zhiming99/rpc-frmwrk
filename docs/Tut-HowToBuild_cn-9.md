@@ -57,7 +57,7 @@
     * 国内的用户需要先配置docker使用国内的docker加速镜像，如腾讯云。
     * 先拉取QEMU虚拟机`sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes`
     * 然后在[`tools`](../tools)目录下运行`sudo docker buildx build --platform linux/armhf -t armhf/rpcf:latest -f Dockerfile.arm .`，建立docker镜像.
-    * `Dokerfile.arm`会自动构建armhf的rpc-frmwrk镜像。这是一个32bit的代码，可以更改`armhf`为`aarch64`，以生成64bit的代码。
+    * `Dokerfile.arm`会自动构建armhf的rpc-frmwrk镜像。`armhf`是32bit的架构，如果要生成64bit代码，须把Dockerfile.arm中的`armhf`替换为`aarch64`。
     * 运行这个Docker镜像的命令为`sudo docker run -it --rm --platform linux/armhf --device /dev/fuse --privileged armhf/rpcf:latest /bin/bash`。
     * 这个方法不算传统的交叉编译，但是亦可以在x86的机器上完美生成arm架构的代码。缺点是速度稍微慢一些。
 
