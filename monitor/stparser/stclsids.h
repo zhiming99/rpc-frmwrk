@@ -58,7 +58,6 @@ typedef enum
 
     // AST Type Nodes
     DECL_CLSID( CStConstValueNode ),
-    DECL_CLSID( CStArrayTypeNode ),
     DECL_CLSID( CStStructTypeNode ),
     DECL_CLSID( CStEnumValueRef ),
     DECL_CLSID( CStNamedvalValueRef ),

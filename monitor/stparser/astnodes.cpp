@@ -576,6 +576,48 @@ gint32 CStExpressionNode::ResolveSymbol(
 // CStSubrangeNode Implementation
 // ========================================================================
 
+bool CStSubrangeNode::IsSymbolResolved() const
+{ 
+    if( m_pStart.IsEmpty() && m_pEnd.IsEmpty() )
+        return true;
+
+    CStExpressionNode* pExprS = m_pStart;
+    CStExpressionNode* pExprE = m_pEnd;
+    if( pExprS )
+        if( !pExprS->IsSymbolResolved() )
+            return false;
+    if( pExprE )
+        if( !pExprE->IsSymbolResolved() )
+            return false;
+    return true;
+}
+
+bool CStSubrangeNode::ResolveSymbol(
+        void* pctx, enumSymKind iKind )
+{
+    if( m_pStart.IsEmpty() && m_pEnd.IsEmpty() )
+        return true;
+
+    gint32 ret = 0;
+    CStExpressionNode* pExprS = m_pStart;
+    CStExpressionNode* pExprE = m_pEnd;
+    if( pExprS )
+    {
+        ret = pExprS->ResolveSymbol(
+            pctx, iKind );
+        if( ERROR( ret ) )
+            return ret;
+    }
+    if( pExprE )
+    {
+        ret = pExprE->ResolveSymbol(
+            pctx, iKind );
+        if( ERROR( ret ) )
+            return ret;
+    }
+    return ret;
+}
+
 std::string CStSubrangeNode::GetNodeInfo() const
 {
     std::ostringstream oss;
@@ -597,11 +639,68 @@ std::string CStSubrangeNode::GetNodeInfo() const
 // CStSubrangeListNode Implementation
 // ========================================================================
 
+bool CStSubrangeListNode::IsSymbolResolved() const
+{ 
+    if( m_vecRanges.empty() )
+        return true;
+    for( auto& elem : m_vecRanges )
+    {
+        auto pSubRange = ( CStSubrangeNode* )elem;
+        if( !pSubRange )
+            continue;
+        if( !pSubRange->IsSymbolResolved() )
+            return false;
+    }
+    return true;
+}
+
+gint32 CStSubrangeListNode::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{ 
+    if( m_vecRanges.empty() )
+        return 0;
+    gint32 ret = 0;
+    for( auto& elem : m_vecRanges )
+    {
+        auto pSubRange = ( CStSubrangeNode* )elem;
+        if( !pSubRange )
+            continue;
+        ret = pSubRange->ResolveSymbol(
+            pctx, iKind );
+        if( ERROR( ret ) )
+            return ret;
+    }
+    return ret;
+}
+
 std::string CStSubrangeListNode::GetNodeInfo() const
 {
     std::ostringstream oss;
     oss << "SubrangeList{ dims: " << m_vecRanges.size() << " }";
     return oss.str();
+}
+
+bool CStArrayTypeDeclNode::IsSymbolResolved() const
+{
+    if( !IsDirectType( m_iDirectType ) )
+        return false;
+    if( m_pTypeData.IsEmpty() &&
+        m_pTypeInit.IsEmpty() )
+        return true;
+    if( !m_pTypeData.IsEmpty() )    
+    {
+        CStSubrangeListNode* psrl = m_pTypeData;
+        if( !psrl->IsSymbolResolved() )    
+            return false;
+    }
+    if( !m_pTypeInit.IsEmpty() )
+    {
+    }
+}
+gint32 CStArrayTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+
 }
 
 // ========================================================================
@@ -1002,7 +1101,7 @@ IMPL_GETNODEINFO( CStConstValueNode )
 IMPL_GETNODEINFO( CStEnumValueRef )
 IMPL_GETNODEINFO( CStNamedvalValueRef )
 IMPL_GETNODEINFO( CStAmbiguousValueRef )
-IMPL_GETNODEINFO( CStArrayTypeNode )
+IMPL_GETNODEINFO( CStArrayTypeDeclNode )
 IMPL_GETNODEINFO( CStStructTypeNode )
 // CStDataTypeDeclNode has explicit implementation
 // CStTypeDeclNode has explicit implementation

@@ -518,6 +518,11 @@ struct CStSubrangeNode : public CStAstNodeBase
     CStSubrangeNode() : super()
     { SetClassId( clsid( CStSubrangeNode ) ); }
 
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind );
+
     virtual std::string GetNodeInfo() const override;
 };
 
@@ -539,6 +544,12 @@ struct CStSubrangeListNode : public CStAstNodeBase
 
     CStSubrangeListNode() : super()
     { SetClassId( clsid( CStSubrangeListNode ) ); }
+
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind )
+    { return 0; }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -703,6 +714,7 @@ ObjPtr BuildStValueRefNode( CStParseContext* pCtx, ObjPtr pRef,
 
 struct CStSymbolicVariableRef: public CStPrimaryExprNode
 {
+    // this class contains info from variable_access
     typedef CStPrimaryExprNode super;
 
     ObjPtr m_pDeclNode;
@@ -710,10 +722,14 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     stdstr m_strVarName;
     std::vector< ObjPtr > m_vecMultiElemChain;
 
-    // the trailing multi-bit access
-    Variant m_oMbaVar;
+    // the trailing multi-bit access 'first' is
+    // type id, and 'second' is a cfgPtr with two
+    // properties, one is the value, the other the
+    // base of the int value.
+    std::pair< int, ObjPtr > m_oMbaValue;
     bool m_bThis = false;
-    bool m_bIsRef = false;
+    bool m_bRef = false;
+    bool m_bNull = false;
     gint32 m_iRefRank = 0;
     bool m_bConstant = false;
     
@@ -728,13 +744,16 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     { return false; }
 
     bool IsReference() const
-    { return m_bIsRef; }
+    { return m_bRef; }
 
     bool IsLvalue() const
     { return false; }
 
     bool IsConstant() const
     { return m_bConstant; }
+
+    bool IsNull() const
+    { return m_bNull; }
 
     gint32 GetRefRank() const
     { return m_iRefRank; }
@@ -749,36 +768,6 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     std::string GetNodeInfo() const override;
 };
 
-
-/**
- * @brief Array type node
- */
-struct CStArrayTypeNode : public CStTypeNode
-{
-    typedef CStTypeNode super;
-
-    // Array dimension
-    struct CArrayDim
-    {
-        // Evaluated bounds, filled in by the semantic phase once the
-        // bound expressions are resolved against the variable tables
-        // (named constants, enum values, arithmetic). The parser
-        // does not evaluate them; they stay 0 here.
-        gint32 m_iStart = 0;
-        gint32 m_iEnd = 0;
-        // The bound expressions as parsed (start..end)
-        ObjPtr m_pStart;
-        ObjPtr m_pEnd;
-    };
-
-    ObjPtr m_pElementType;
-    std::vector< CArrayDim > m_vecDims;
-
-    CStArrayTypeNode() : super()
-    { SetClassId( clsid( CStArrayTypeNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
 
 /**
  * @brief Struct type node
@@ -935,6 +924,12 @@ struct CStArrayTypeDeclNode :
 
     CStArrayTypeDeclNode() : super()
     { SetClassId( clsid( CStArrayTypeDeclNode ) ); }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
+
+    bool IsSymbolResolved() const override;
+    virtual std::string GetNodeInfo() const override;
 };
 
 struct CStStructTypeDeclNode :
@@ -972,7 +967,6 @@ struct CStNamedvalTypeDeclNode :
     std::vector< stdstr > m_vecValNames;
     std::vector< ObjPtr > m_vecValInit;
     std::vector< CStSymbol* > m_vecValSyms;
-    gint32 m_dwInitIdx = -1;
 
     CStNamedvalTypeDeclNode() : super()
     { SetClassId( clsid( CStNamedvalTypeDeclNode ) ); }
@@ -1899,6 +1893,11 @@ struct CStArrayInitNode : public CStAstNodeBase
     CStArrayInitNode() : super()
     { SetClassId( clsid( CStArrayInitNode ) ); }
 
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind );
+
     virtual std::string GetNodeInfo() const override;
 };
 
@@ -2212,7 +2211,7 @@ REGISTER_AST_NODE( CStSubrangeListNode );
 REGISTER_AST_NODE( CStStmtListNode );
 REGISTER_AST_NODE( CStIfBranchListNode );
 REGISTER_AST_NODE( CStConstValueNode );
-REGISTER_AST_NODE( CStArrayTypeNode );
+REGISTER_AST_NODE( CStArrayTypeDeclNode )
 REGISTER_AST_NODE( CStStructTypeNode );
 REGISTER_AST_NODE( CStEnumValueRef );
 REGISTER_AST_NODE( CStNamedvalValueRef );
