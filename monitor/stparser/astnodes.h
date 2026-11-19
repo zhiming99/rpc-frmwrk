@@ -58,7 +58,7 @@ enum enumSymKind {
 // Forward declarations
 class CStDeclNode;
 class CStStmtNode;
-struct CStExprNode;
+struct CStExprBase;
 class CStTypeNode;
 class CStVarDeclNode;
 class CStSymbol;
@@ -91,11 +91,11 @@ struct CStSymbolDeclNode : public CStAstNodeBase
 /**
  * @brief Base class for all expression nodes
  */
-struct CStExprNode : public CStAstNodeBase
+struct CStExprBase : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    CStExprNode() : super()
+    CStExprBase() : super()
     {}
 
     virtual bool IsSymbolResolved() const
@@ -119,15 +119,14 @@ struct CStExprNode : public CStAstNodeBase
 
     antlr4::Token* Stop()
     { return m_pStop; }
-
 };
 
 /**
  * @brief Literal expression (numbers, strings, booleans, etc.)
  */
-struct CStLiteralExpr : public CStExprNode
+struct CStLiteralExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumLiteralType {
         ltNumber,
@@ -154,9 +153,9 @@ struct CStLiteralExpr : public CStExprNode
 /**
  * @brief Identifier expression (variable or function name)
  */
-struct CStIdentifierExpr : public CStExprNode
+struct CStIdentifierExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     std::string m_strName;
 
@@ -185,9 +184,9 @@ struct CStIdentifierExpr : public CStExprNode
  *  - m_pIndex:     the index expression of the indexed form
  *                  '%IW[expr]', empty if not indexed
  */
-struct CStDirectAddressNode : public CStExprNode
+struct CStDirectAddressNode : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumAddrType
     {
@@ -213,9 +212,9 @@ struct CStDirectAddressNode : public CStExprNode
 /**
  * @brief Binary expression (arithmetic, logical, comparison)
  */
-struct CStBinaryExpr : public CStExprNode
+struct CStBinaryExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumBinaryOp {
         boAdd, boSub, boMul, boDiv, boMod,
@@ -240,9 +239,9 @@ struct CStBinaryExpr : public CStExprNode
 /**
  * @brief Unary expression (NOT, -)
  */
-struct CStUnaryExpr : public CStExprNode
+struct CStUnaryExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumUnaryOp {
         uoNot,
@@ -266,9 +265,9 @@ struct CStUnaryExpr : public CStExprNode
 /**
  * @brief Function call expression
  */
-struct CStCallExpr : public CStExprNode
+struct CStCallExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     struct CNamedArg
     {
@@ -312,16 +311,15 @@ struct CStArgListNode : public CStAstNodeBase
 /**
  * @brief Array access expression
  */
-struct CStArrayAccessExpr : public CStExprNode
+struct CStSubscriptList : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
-    ObjPtr m_pArray;
-    ObjPtr m_pIndex;
+    // ObjPtr m_pIndex;
     std::vector< ObjPtr > m_vecIndices;
 
-    CStArrayAccessExpr() : super()
-    { SetClassId( clsid( CStArrayAccessExpr ) ); }
+    CStSubscriptList() : super()
+    { SetClassId( clsid( CStSubscriptList ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -329,22 +327,28 @@ struct CStArrayAccessExpr : public CStExprNode
 /**
  * @brief Member access expression (dot operator)
  */
-struct CStMemberAccessExpr : public CStExprNode
+struct CStMemberAccessExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
-    enum enumAccessType {
-        atDot,
-        atArrow
-    };
 
-    enumAccessType m_eAccessType;
-    ObjPtr m_pObject;
+    // struct declare node
+    ObjPtr m_pDeclNode;
     std::string m_strMember;
+    gint32 m_iRefRank = 0;
 
-    CStMemberAccessExpr() : super(),
-        m_eAccessType(atDot)
+    CStMemberAccessExpr() : super()
     { SetClassId( clsid( CStMemberAccessExpr ) ); }
+
+    bool IsRef() const
+    { return m_iRefRank == 0; }
+
+    bool IsArray() const
+    { return false; }
+
+    virtual bool IsSymbolResolved() const override;
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -352,9 +356,9 @@ struct CStMemberAccessExpr : public CStExprNode
 /**
  * @brief Dereference expression (*ptr)
  */
-struct CStDereferenceExpr : public CStExprNode
+struct CStDereferenceExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     ObjPtr m_pPointer;
 
@@ -367,9 +371,9 @@ struct CStDereferenceExpr : public CStExprNode
 /**
  * @brief Pointer member access (->)
  */
-struct CStPointerMemberExpr : public CStExprNode
+struct CStPointerMemberExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     ObjPtr m_pPointer;
     std::string m_strMember;
@@ -456,25 +460,12 @@ struct CStInstancePathNode : public CStAstNodeBase
     virtual std::string GetNodeInfo() const override;
 };
 
-/**
- * @brief Boundary wrapper for a full expression
- *
- * Marks the root of an expression used in statement position (conditions,
- * loop bounds, case selectors, initializers, call arguments). Like the
- * l-value boundary nodes, it gives the semantic checker a uniform handle
- * on 'a complete expression' and a place to hang result-type info.
- * Expression-internal consumers (parenthesized factors, array indices,
- * subrange bounds) unwrap it via UnwrapFullExpression().
- */
-struct CStPrimaryExprNode : public CStExprNode
+struct CStPrimaryExprNode : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     CStPrimaryExprNode() : super()
     { SetClassId( clsid( CStPrimaryExprNode ) ); }
-
-    virtual bool IsSymbolResolved() const
-    { return false; }
 
     virtual std::string GetNodeInfo() const override
     { return ""; }
@@ -482,6 +473,20 @@ struct CStPrimaryExprNode : public CStExprNode
     { return ""; }
 };
 
+/**
+ * @brief Boundary wrapper for a full expression
+ *
+ * Marks the root of an expression used in
+ * statement position (conditions, loop bounds,
+ * case selectors, initializers, call arguments).
+ * Like the l-value boundary nodes, it gives the
+ * semantic checker a uniform handle on 'a
+ * complete expression' and a place to hang
+ * result-type info.  Expression-internal
+ * consumers (parenthesized factors, array
+ * indices, subrange bounds) unwrap it via
+ * UnwrapFullExpression().
+ */
 struct CStExpressionNode : public CStPrimaryExprNode
 {
     typedef CStPrimaryExprNode super;
@@ -548,8 +553,7 @@ struct CStSubrangeListNode : public CStAstNodeBase
     bool IsSymbolResolved() const;
 
     gint32 ResolveSymbol(
-        void* pctx, enumSymKind iKind )
-    { return 0; }
+        void* pctx, enumSymKind iKind );
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -723,13 +727,19 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     std::vector< ObjPtr > m_vecMultiElemChain;
 
     // the trailing multi-bit access 'first' is
-    // type id, and 'second' is a cfgPtr with two
-    // properties, one is the value, the other the
-    // base of the int value.
-    std::pair< int, ObjPtr > m_oMbaValue;
+    // type id, and 'second' is a Variant,
+    // containing either a cfgptr or a string.  if
+    // first is int, the variant is a cfgptr with
+    // two properties, one is the value, the other
+    // the base of the int value. if typeid is
+    // multipart_access, the variant is a string
+    std::pair< int, Variant > m_oMbaValue;
+
     bool m_bThis = false;
     bool m_bRef = false;
     bool m_bNull = false;
+    bool m_bClass = false;
+    bool m_bFb = false;
     gint32 m_iRefRank = 0;
     bool m_bConstant = false;
     
@@ -738,10 +748,10 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     { SetClassId( clsid( CStSymbolicVariableRef) ); }
 
     bool IsFbInstance() const
-    { return false; }
+    { return m_bFb; }
 
     bool IsClassInstance() const
-    { return false; }
+    { return m_bClass; }
 
     bool IsReference() const
     { return m_bRef; }
@@ -758,15 +768,26 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     gint32 GetRefRank() const
     { return m_iRefRank; }
 
-    bool IsSymbolResolved() const override
-    { return false; }
+    bool IsSymbolResolved() const override;
 
     gint32 ResolveSymbol(
-        void* pctx, enumSymKind iKind ) override
-    { return ERROR_NOT_IMPL; }
+        void* pctx, enumSymKind iKind ) override;
 
     std::string GetNodeInfo() const override;
 };
+
+namespace primary_expr
+{
+/**
+ * @brief Resolve a symbolic variable/reference node
+ *
+ * Looks the node's qualified name up in the enclosing scopes
+ * and USING lists. On success the declaration node is stored
+ * and the m_bFb/m_bClass flags are set from the symbol kind.
+ */
+gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
+    CStSymbolicVariableRef* pRef, enumSymKind iKind );
+}
 
 
 /**
@@ -782,6 +803,8 @@ struct CStStructTypeNode : public CStTypeNode
         std::string m_strName;
         ObjPtr m_pType;
         ObjPtr m_pInitialValue;
+        // for locate_at 
+        std::pair< int, Variant > m_oMbaValue;
     };
 
     std::string m_strName;
@@ -815,6 +838,7 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     gint32 m_iTypeId = -1;
     gint32 m_iDirectType = -1;
     gint32 m_iRefRank = 0;
+    ObjPtr m_pDirectType;
 
     // pointer to CStDataTypeDeclNode
     ObjPtr m_pDtd; 
@@ -897,6 +921,11 @@ struct CStSubrangeTypeDeclNode :
 
     CStSubrangeTypeDeclNode() : super()
     { SetClassId( clsid( CStSubrangeTypeDeclNode ) ); }
+
+    bool IsSymbolResolved() const override;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 };
 
 struct CStEnumTypeDeclNode :
@@ -1924,6 +1953,11 @@ struct CStArrayRepeatNode : public CStAstNodeBase
         m_iCount( 0 )
     { SetClassId( clsid( CStArrayRepeatNode ) ); }
 
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind );
+
     virtual std::string GetNodeInfo() const override;
 };
 
@@ -2198,7 +2232,7 @@ REGISTER_AST_NODE( CStBinaryExpr );
 REGISTER_AST_NODE( CStUnaryExpr );
 REGISTER_AST_NODE( CStCallExpr );
 REGISTER_AST_NODE( CStArgListNode );
-REGISTER_AST_NODE( CStArrayAccessExpr );
+REGISTER_AST_NODE( CStSubscriptList );
 REGISTER_AST_NODE( CStMemberAccessExpr );
 REGISTER_AST_NODE( CStDereferenceExpr );
 REGISTER_AST_NODE( CStPointerMemberExpr );
@@ -2208,6 +2242,7 @@ REGISTER_AST_NODE( CStInstancePathNode );
 REGISTER_AST_NODE( CStExpressionNode );
 REGISTER_AST_NODE( CStSubrangeNode );
 REGISTER_AST_NODE( CStSubrangeListNode );
+REGISTER_AST_NODE( CStSubrangeTypeDeclNode );
 REGISTER_AST_NODE( CStStmtListNode );
 REGISTER_AST_NODE( CStIfBranchListNode );
 REGISTER_AST_NODE( CStConstValueNode );

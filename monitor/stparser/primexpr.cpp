@@ -75,6 +75,7 @@ ObjPtr BuildStValueRefNode( CStParseContext* pCtx, ObjPtr pRef,
     gint32 iType = -1;
     gint32 ret = 0;
 
+    ObjPtr pDirectType;
     if( !pref->m_strQualified.empty() )
     {
         // 'Type#name': the qualifier must name a data type
@@ -82,7 +83,8 @@ ObjPtr BuildStValueRefNode( CStParseContext* pCtx, ObjPtr pRef,
             ost.BreakdownQualified( pref->m_strQualified );
         auto pScope = ost.GetCurrentScope();
         ret = ResolveTypeToDirectType( pCtx, vecComps,
-            symDataType, pScope, pSym, iType );
+            symDataType, pScope, pSym, iType,
+            pDirectType );
         if( ERROR( ret ) || pSym.IsEmpty() )
             return MakeStAmbiguousValueRef(
                 szRefText, pStart, pStop );
@@ -166,6 +168,49 @@ ObjPtr BuildStValueRefNode( CStParseContext* pCtx, ObjPtr pRef,
     pCtx->LogError( pStart, "Error unknown type for '%s'.",
         szRefText != nullptr ? szRefText : "" );
     return ObjPtr();
+}
+
+gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
+    CStSymbolicVariableRef* pRef, enumSymKind iKind )
+{
+    ( void )iKind;
+    if( pCtx == nullptr || pRef == nullptr )
+        return -EINVAL;
+
+    // 'NULL' is a constant reference and needs no lookup
+    if( pRef->m_bNull || pRef->m_bConstant )
+        return 0;
+
+    std::string strName;
+    if( !pRef->m_strQualified.empty() )
+    {
+        strName = pRef->m_strQualified;
+        if( !pRef->m_strVarName.empty() )
+            strName += "." + pRef->m_strVarName;
+    }
+    else
+        strName = pRef->m_strVarName;
+
+    if( strName.empty() )
+        return -EINVAL;
+
+    SymPtr pSym;
+    gint32 iOffset = -1;
+    gint32 ret = ResolveSymbolicRef(
+        pCtx, strName, pSym, iOffset );
+    if( ERROR( ret ) )
+    {
+        // -ENOENT with a bound prefix means the remaining
+        // components are member accesses: keep the prefix and
+        // its kind so IsFbInstance/IsClassInstance can answer.
+        if( ret != -ENOENT || pSym.IsEmpty() )
+            return ret;
+    }
+
+    pRef->m_pDeclNode = pSym->m_pDeclNode;
+    pRef->m_bFb = ( pSym->m_eKind == symFunctionBlock );
+    pRef->m_bClass = ( pSym->m_eKind == symClass );
+    return 0;
 }
 
 }  // namespace primary_expr

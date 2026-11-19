@@ -78,7 +78,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStUnaryExpr );
     INIT_MAP_ENTRY( CStCallExpr );
     INIT_MAP_ENTRY( CStArgListNode );
-    INIT_MAP_ENTRY( CStArrayAccessExpr );
+    INIT_MAP_ENTRY( CStSubscriptList );
     INIT_MAP_ENTRY( CStMemberAccessExpr );
     INIT_MAP_ENTRY( CStDereferenceExpr );
     INIT_MAP_ENTRY( CStPointerMemberExpr );

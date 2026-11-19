@@ -650,7 +650,8 @@ gint32 ResolveTypeToDirectType(
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     CStScope* pCurScope,
-    SymPtr& pSym, gint32& iType );
+    SymPtr& pSym, gint32& iType,
+    ObjPtr& pDirectType );
 
 gint32 ReplaceAmbiguousNode(
     CStParseContext* pCtx,

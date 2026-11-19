@@ -1740,7 +1740,8 @@ gint32 ResolveTypeToDirectType(
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     CStScope* pTopScope,
-    SymPtr& pSym, gint32& iType )
+    SymPtr& pSym, gint32& iType,
+    ObjPtr& pDirectType )
 {
     gint32 ret = 0;
     if( pCtx == nullptr || vecNames.empty() )
@@ -1750,6 +1751,7 @@ gint32 ResolveTypeToDirectType(
         pTopScope =
             pCtx->m_oSymTab.GetCurrentScope();
     }
+    pSym.Clear();
 
     do{
         SymPtr pCurSym;
@@ -1784,6 +1786,11 @@ LBL_RESOLVE_SYMBOL:
         if( ptd->IsSymbolResolved() )
         {
             iType = ptd->m_iDirectType;
+            if( ptd->m_iTypeId ==
+                ptd->m_iDirectType )
+                pDirectType = pNode;
+            else
+                pDirectType = ptd->m_pDirectType;
             break;
         }
 
@@ -1850,7 +1857,7 @@ gint32 ReplaceAmbiguousNode(
             stparser::RuleSubrange_type_decl )
         {
             iClsid = 
-                clsid( CStSubrangeListNode);
+                clsid( CStSubrangeTypeDeclNode );
         }
         else if( iDirectType ==
             stparser::RuleEnum_type_decl )

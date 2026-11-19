@@ -42,7 +42,7 @@ typedef enum
     DECL_CLSID( CStUnaryExpr ),
     DECL_CLSID( CStCallExpr ),
     DECL_CLSID( CStArgListNode ),
-    DECL_CLSID( CStArrayAccessExpr ),
+    DECL_CLSID( CStSubscriptList ),
     DECL_CLSID( CStMemberAccessExpr ),
     DECL_CLSID( CStDereferenceExpr ),
     DECL_CLSID( CStPointerMemberExpr ),
