@@ -1,11 +1,17 @@
 SHELL:=/bin/bash
+jspackage:=@JS_NODE_PACKAGES@
 release:
 	rm -rf dist;mkdir dist
-	@if [ ! -d node_modules -a ! -L node_modules ]; then ln -s `npm root -g`;fi
-	@if [ ! -d node_modules/stream-browserify ]; then \
-        echo nodejs liberies are not installed properly; \
-        echo please install @JS_NODE_PACKAGES@ to `npm root -g`;\
-        exit 1;fi
+	@if [ ! -d node_modules ] && [ ! -L node_modules ]; then ln -s "$$(npm root -g)" node_modules;fi
+	@for f in $(jspackage); do [ -e "node_modules/$$f" ] || { \
+        [ -L node_modules ] && rm -f node_modules;\
+        if ! npm install $(jspackage);then \
+            echo nodejs libraries are not installed properly; \
+            echo please install $(jspackage) to $$(npm root);\
+            exit 1;\
+        fi;\
+        break;\
+    }; done
 	@sed -i "s@mode:[[:blank:]]*'development'@mode: 'production'@g" webpack.config.js
 	npx webpack
 	@echo please see 'README.md' for information about deployment.
@@ -18,11 +24,16 @@ sync:
 
 debug:
 	rm -rf dist;mkdir dist
-	@if [ ! -d node_modules -a ! -L node_modules ]; then ln -s `npm root -g`;fi
-	@if [ ! -d node_modules/stream-browserify ]; then \
-    echo nodejs liberies are not installed properly; \
-    echo please install @JS_NODE_PACKAGES@ to `npm root -g`;\
-    exit 1;fi
+	@if [ ! -d node_modules ] && [ ! -L node_modules ]; then ln -s "$$(npm root -g)" node_modules;fi
+	@for f in $(jspackage); do [ -e "node_modules/$$f" ] || { \
+        [ -L node_modules ] && rm -f node_modules;\
+        if ! npm install $(jspackage);then \
+            echo nodejs libraries are not installed properly; \
+            echo please install $(jspackage) to $$(npm root);\
+            exit 1;\
+        fi;\
+        break;\
+    }; done
 	@sed -i "s@mode:[[:blank:]]*'production'@mode: 'development'@g" webpack.config.js
 	npx webpack
 	@echo please see 'README.md' for information about deployment.

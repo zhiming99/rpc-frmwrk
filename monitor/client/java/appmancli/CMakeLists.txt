@@ -80,6 +80,46 @@ add_dependencies(generate_appman_java_cli rpcbase_jar ridlc ipc combase)
 # ==============================================================================
 set(JAR_OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/${jarpkg}")
 
+# Some 32-bit build containers (e.g. armhf under qemu) run on
+# overlayfs, whose directory offsets (d_off) and/or inode numbers do
+# not fit a 32-bit readdir()/stat(). javac then dies with 'Value too
+# large for defined data type' while walking the source directory.
+# The script below compiles in place first and, only on failure,
+# stages the sources in JAVA_BUILD_TMPDIR (a tmpfs by default) and
+# compiles there. Normal builds never enter the fallback.
+set(JAVA_BUILD_TMPDIR "/dev/shm" CACHE PATH
+    "Staging directory for the javac fallback on 32-bit/overlayfs builds")
+
+set(APP_JAVAC_SH "${CMAKE_CURRENT_BINARY_DIR}/build_appmancli_jar.sh")
+file(WRITE "${APP_JAVAC_SH}" [=[
+#!/bin/bash
+set -e
+SRC="$1"
+OUT="$2"
+STAGE="$3"
+JAVAC="$4"
+shift 4
+CP="$*"
+
+mkdir -p "$OUT"
+if CLASSPATH="$CP" "$JAVAC" -d "$OUT" "$SRC"/*.java; then
+    exit 0
+fi
+
+echo "javac failed in the build tree; retrying from $STAGE"
+TMP=$(mktemp -d "$STAGE/appmancli.XXXXXX" 2>/dev/null || mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+cp -a "$SRC"/. "$TMP"/
+
+# drop the trailing '.' from the classpath so javac does not
+# rescan the (possibly problematic) build tree
+CP_RETRY="${CP%:.}"
+CLASSPATH="$CP_RETRY" "$JAVAC" "$TMP"/*.java -d "$TMP/dist"
+
+rm -rf "$OUT"
+cp -a "$TMP/dist" "$OUT"
+]=])
+
 add_custom_command(
     OUTPUT "${JAR_OUTPUT_FILE}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/dist"
@@ -87,11 +127,14 @@ add_custom_command(
     # Copy static base java files over to the binary workspace to compile alongside autofiles
     COMMAND ${CMAKE_COMMAND} -E env bash -c "cp -r ${CMAKE_CURRENT_SOURCE_DIR}/${javasrcpath}/* ${CMAKE_CURRENT_BINARY_DIR}/${javasrcpath}/ || true"
     
-    # Replicates: CLASSPATH=... javac ...
+    # Replicates: CLASSPATH=... javac ... (with the overlayfs fallback)
     # Assumes project binary rpcbase.jar is located inside ${PROJECT_BINARY_DIR}/java/
-    COMMAND ${Java_JAVAC_EXECUTABLE} -d "${CMAKE_CURRENT_BINARY_DIR}/dist"
-            -classpath "${PROJECT_BINARY_DIR}/java/rpcbase.jar:${top_dir}/java/rpcbase.jar:/usr/share/java/commons-cli.jar:."
-            "${CMAKE_CURRENT_BINARY_DIR}/${javasrcpath}/*.java"
+    COMMAND bash "${APP_JAVAC_SH}"
+            "${CMAKE_CURRENT_BINARY_DIR}/${javasrcpath}"
+            "${CMAKE_CURRENT_BINARY_DIR}/dist"
+            "${JAVA_BUILD_TMPDIR}"
+            "${Java_JAVAC_EXECUTABLE}"
+            "${PROJECT_BINARY_DIR}/java/rpcbase.jar:${top_dir}/java/rpcbase.jar:/usr/share/java/commons-cli.jar:."
             
     # Replicates: cd dist && jar cf ...
     COMMAND ${Java_JAR_EXECUTABLE} cf "${JAR_OUTPUT_FILE}" -C "${CMAKE_CURRENT_BINARY_DIR}/dist" .
