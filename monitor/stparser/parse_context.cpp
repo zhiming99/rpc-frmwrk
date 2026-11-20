@@ -27,6 +27,7 @@
 #include <string>
 #include <filesystem>
 #include <regex>
+#include <strings.h>
 #include "antlr4-runtime.h"
 #include "stlexer.h"
 #include "stparser.h"
@@ -1544,6 +1545,26 @@ static enumRefMatch ResolvePathInScope(
     return refMatchNone;
 }
 
+// The nearest enclosing scope owned by a function block or a
+// class, or an empty ScopePtr when the statement is not inside
+// one. 'THIS' and 'SUPER' are only defined there; method and
+// block scopes in between are skipped.
+static ScopePtr FindStMemberScope( ScopePtr pScope )
+{
+    while( !pScope.IsEmpty() )
+    {
+        if( !pScope->m_pSymbol.IsEmpty() )
+        {
+            enumSymKind eKind = pScope->m_pSymbol->m_eKind;
+            if( eKind == symFunctionBlock ||
+                eKind == symClass )
+                return pScope;
+        }
+        pScope = pScope->m_pParent;
+    }
+    return pScope;
+}
+
 gint32 ResolveSymbolicRef( CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     SymPtr& pSym, gint32& iOffset, CStScope* pCurScope )
@@ -1576,6 +1597,108 @@ gint32 ResolveSymbolicRef( CStParseContext* pCtx,
 
     ScopePtr pScope = ( pCurScope == nullptr ?
         ost.GetCurrentScope() : ScopePtr( pCurScope ) );
+
+    // 'THIS' (case-insensitive) denotes the instance of the
+    // enclosing function block or class. Its members live in the
+    // scope that owns that unit, not in an inner block scope, so
+    // the lookup starts there and never walks further out.
+    if( strcasecmp( vecNames[ 0 ].c_str(), "THIS" ) == 0 )
+    {
+        ScopePtr pThisScope = FindStMemberScope( pScope );
+
+        // 'THIS' outside an FB or a class is a semantic error:
+        // no later resolving attempt can turn it into a valid
+        // reference
+        if( pThisScope.IsEmpty() )
+            return -EINVAL;
+
+        // bare 'THIS': the instance itself
+        pSym = pThisScope->m_pSymbol;
+        if( vecNames.size() == 1 )
+            return 0;
+
+        enumRefMatch eMatch = ResolvePathInScope(
+            ost, vecNames, 1, pThisScope, pSym, iOffset );
+        if( eMatch == refMatchFull )
+            return 0;
+        if( eMatch == refMatchPartial )
+            return -ENOENT;
+
+        // the first member did not resolve; report 'THIS'
+        // itself as the bound prefix so the caller can still
+        // tell which instance the members belong to
+        pSym = pThisScope->m_pSymbol;
+        iOffset = 1;
+        return -ENOENT;
+    }
+
+    // 'SUPER' (case-insensitive) denotes the base function
+    // block or class of the enclosing unit. The base type name
+    // comes from the unit's declaration, and its members are
+    // looked up in the scope the base type owns.
+    if( strcasecmp( vecNames[ 0 ].c_str(), "SUPER" ) == 0 )
+    {
+        ScopePtr pThisScope = FindStMemberScope( pScope );
+        // 'SUPER' outside an FB or a class is a semantic error,
+        // same as 'THIS'
+        if( pThisScope.IsEmpty() )
+            return -EINVAL;
+
+        SymPtr pUnit = pThisScope->m_pSymbol;
+        std::string strBase;
+        bool bHasDecl = false;
+        if( !pUnit->m_pDeclNode.IsEmpty() &&
+            pUnit->m_pDeclNode->GetClsid() ==
+                clsid( CStFunctionBlockDecl ) )
+        {
+            bHasDecl = true;
+            CStFunctionBlockDecl* pFb = pUnit->m_pDeclNode;
+            if( pFb != nullptr )
+                strBase = pFb->m_strExtends;
+        }
+        if( strBase.empty() )
+        {
+            // an FB whose declaration has no EXTENDS clause can
+            // never have a SUPER, so do not ask the caller to
+            // retry; without a declaration node there is still
+            // nothing to judge, and a class node is not built
+            // yet, so those cases stay retryable
+            return bHasDecl ? -EINVAL : -ENOENT;
+        }
+
+        // the base type is visible where the derived type is
+        // declared, i.e. in the parent scope of the unit
+        std::vector< std::string > vecBase =
+            ost.BreakdownQualified( strBase );
+        if( vecBase.empty() )
+            return -ENOENT;
+
+        SymPtr pBase;
+        gint32 ret = ResolveTypeRef( pCtx, vecBase,
+            symUnknown, pThisScope->m_pParent, pBase );
+        if( ERROR( ret ) || pBase.IsEmpty() ||
+            pBase->m_pDefScope == nullptr )
+            return -ENOENT;
+
+        // bare 'SUPER': the base type itself
+        pSym = pBase;
+        if( vecNames.size() == 1 )
+            return 0;
+
+        enumRefMatch eMatch = ResolvePathInScope( ost,
+            vecNames, 1,
+            ScopePtr( pBase->m_pDefScope ), pSym, iOffset );
+        if( eMatch == refMatchFull )
+            return 0;
+        if( eMatch == refMatchPartial )
+            return -ENOENT;
+
+        // the first member did not resolve; report 'SUPER'
+        // itself as the bound prefix
+        pSym = pBase;
+        iOffset = 1;
+        return -ENOENT;
+    }
 
     while( !pScope.IsEmpty() )
     {

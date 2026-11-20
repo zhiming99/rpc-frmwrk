@@ -391,11 +391,13 @@ global_var_access
     ;
 
 symbolic_variable returns [ ObjPtr pExpr ]
-    : ( has_this=this_notation | nh=namespace_hierarchy TOK_DOT )? va = var_access_or_multi_elem
+    : ( has_this=this_notation | sn=super_notation | nh=namespace_hierarchy TOK_DOT )? va = var_access_or_multi_elem
     {
         auto psvr = ( CStSymbolicVariableRef*)$va.pExpr;
         if( $has_this.ctx )
             psvr->m_bThis = true;
+        if( $sn.ctx )
+            psvr->m_bSuper = true;
         if( $nh.ctx )
             psvr->m_strQualified = $nh.ctx->getText();
         $pExpr = $va.pExpr;
@@ -553,6 +555,10 @@ expr_list returns [ ObjPtr pExprList ]
 
 this_notation
     : TOK_THIS TOK_DOT
+    ;
+
+super_notation
+    : TOK_SUPER TOK_DOT
     ;
 
 // ============================================================
@@ -1775,62 +1781,24 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
-            CParamList initInfo(
-                ( IConfigDb* )$si.pTypeInfo );
-
             ObjPtr pNode;
-            ObjPtr pTypeInit;
-            ObjPtr pTypeData;
-            stdstr strType;
-            gint32 iType = -1;
-
-            ret = initInfo.GetIntProp(
-                1, ( guint32& )iType );
-            initInfo.GetStrProp( 0, strType );
-
-            initInfo.GetObjPtr(
-                propStTypeData, pTypeData );
-
-            initInfo.GetObjPtr(
-                propStTypeInit, pTypeInit );
-
+            ret = rpcf::type_decl::BuildStSimpleTypeNode(
+                $si.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {
-                ret = -EINVAL;
                 pCtx->LogError( $si.start,
                     "Unknown type:'%s'(%d).",
                     $si.ctx->spec->getText().c_str(),
                     ret );
-            }
-            else if( iType == RuleDerived_type_access
-                && pTypeInit.IsEmpty() )
-            {
-                ret = pNode.NewObj(
-                    clsid( CStAmbiguousTypeDeclNode ) );
-            }
-            else 
-            {
-                ret = pNode.NewObj(
-                    clsid( CStSimpleTypeDeclNode ) );
-            }
-
-            if( ERROR( ret ) )
                 break;
+            }
 
             CStTypeDeclNode* ptd = pNode;
-            ptd->m_pTypeInit = pTypeInit;
-            ptd->m_oTypeRef = { strType, nullptr };
-            ptd->m_iTypeId = iType;
-
-            if( !pTypeData.IsEmpty() )
-                ptd->m_pTypeData = pTypeData;
-
-            if( IsDirectType( iType ) )
-                ptd->m_iDirectType = iType;
 
             SymPtr pSym;
             ret = ost.Declare( $st.ctx->getText(),
-                symDataType, pNode, pSym, strType,
+                symDataType, pNode, pSym,
+                ptd->m_oTypeRef.first,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( ERROR( ret ) )
             {
@@ -1937,53 +1905,23 @@ subrange_type_decl returns [ ObjPtr pTypeDecl ]
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
-            CParamList initInfo(
-                ( IConfigDb* )$si.pTypeInfo );
-
             ObjPtr pNode;
-            ObjPtr pTypeInit;
-            ObjPtr pTypeData;
-            stdstr strBaseType;
-            gint32 iBaseType = -1;
-
-            ret = initInfo.GetIntProp(
-                1, ( guint32& )iBaseType );
-            initInfo.GetStrProp( 0, strBaseType );
-            initInfo.GetObjPtr(
-                propStTypeInit, pTypeInit );
-            initInfo.GetObjPtr(
-                propStTypeData, pTypeData );
-
+            ret = rpcf::type_decl::BuildStSubrangeTypeNode(
+                $si.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {
-                ret = -EINVAL;
                 pCtx->LogError( $si.start,
                     "Unknown type:'%s'(%d).",
                     $si.ctx->getText().c_str(), ret );
                 break;
             }
 
-            ret = pNode.NewObj(
-                clsid( CStSubrangeTypeDeclNode ) );
-            if( ERROR( ret ) )
-                break;
-
             CStTypeDeclNode* ptd = pNode;
-            ptd->m_pTypeInit = pTypeInit;
-            ptd->m_oTypeRef = { strBaseType, nullptr };
-            ptd->m_iTypeId = iBaseType;
-
-            if( !pTypeData.IsEmpty() )
-                ptd->m_pTypeData = pTypeData;
-
-            // an elementary base type needs no further lookup;
-            // a named base type is resolved by ResolveSymbol()
-            if( IsDirectType( iBaseType ) )
-                ptd->m_iDirectType = RuleSubrange_type_decl;
 
             SymPtr pSym;
             ret = ost.Declare( $stn.ctx->getText(),
-                symDataType, pNode, pSym, strBaseType,
+                symDataType, pNode, pSym,
+                ptd->m_oTypeRef.first,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( ERROR( ret ) )
             {
@@ -2100,54 +2038,35 @@ enum_type_decl returns [ ObjPtr pTypeDecl ]
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
-            CParamList initInfo(
-                ( IConfigDb* )$si.pTypeInfo );
-
             ObjPtr pNode;
-            ObjPtr pTypeInit;
-            ObjPtr pTypeData;
-            stdstr strType = $etn.ctx->getText();
-            gint32 iType = RuleEnum_type_decl;
-
-            initInfo.GetObjPtr(
-                propStTypeData, pTypeData );
-
-            initInfo.GetObjPtr(
-                propStTypeInit, pTypeInit );
-
+            ret = rpcf::type_decl::BuildStEnumTypeNode(
+                $si.pTypeInfo, $etn.ctx->getText().c_str(),
+                pNode );
             if( ERROR( ret ) )
             {
-                ret = -EINVAL;
                 pCtx->LogError( $si.start,
                     "Unknown type:'%s'(%d).",
-                    $si.ctx->getText().c_str(),
-                    ret );
-            }
-            ret = pNode.NewObj(
-                clsid( CStEnumTypeDeclNode ) );
-
-            if( ERROR( ret ) )
+                    $si.ctx->getText().c_str(), ret );
                 break;
+            }
 
             CStTypeDeclNode* ptd = pNode;
             CStEnumTypeDeclNode* petd = pNode;
-            CStEnumValueRef* pRef = pTypeInit;
 
-            if( !pTypeInit.IsEmpty() )
-                ptd->m_pTypeInit = pTypeInit;
-
-            if( pRef )
-                pRef->m_pDeclNode = pNode;
-
-            ptd->m_oTypeRef = { strType, nullptr };
-            ptd->m_iTypeId = iType;
-
-            if( IsDirectType( iType ) )
-                ptd->m_iDirectType = iType;
+            // the value list is still needed to declare the
+            // individual enum-value symbols
+            ObjPtr pTypeData;
+            {
+                CParamList initInfo(
+                    ( IConfigDb* )$si.pTypeInfo );
+                initInfo.GetObjPtr(
+                    propStTypeData, pTypeData );
+            }
 
             SymPtr pSym;
             ret = ost.Declare( $etn.ctx->getText(),
-                symDataType, pNode, pSym, strType,
+                symDataType, pNode, pSym,
+                ptd->m_oTypeRef.first,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( ERROR( ret ) )
                 break;
@@ -2173,7 +2092,8 @@ enum_type_decl returns [ ObjPtr pTypeDecl ]
                     continue;
                 SymPtr pValSym;
                 ret = ost.Declare( strName,
-                    symEnumValue, pNode, pValSym, strType,
+                    symEnumValue, pNode, pValSym,
+                    ptd->m_oTypeRef.first,
                     ( CStVarDeclNode::enumVarCategory )0 );
                 if( ERROR( ret ) )
                     break;
@@ -2259,35 +2179,31 @@ namedval_type_decl returns [ ObjPtr pTypeDecl ]
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
-            CParamList initInfo(
-                ( IConfigDb* )$si.pTypeInfo );
-
             ObjPtr pNode;
-            ObjPtr pTypeInit;
-            ObjPtr pTypeData;
-            stdstr strType = $ntn.ctx->getText();
-            stdstr strBaseType = $nvt.ctx->getText();
-            gint32 iType = RuleNamedval_type_decl;
-
-            initInfo.GetObjPtr(
-                propStTypeData, pTypeData );
-            initInfo.GetObjPtr(
-                propStTypeInit, pTypeInit );
-
-            ret = pNode.NewObj(
-                clsid( CStNamedvalTypeDeclNode ) );
+            ret = rpcf::type_decl::BuildStNamedvalTypeNode(
+                $si.pTypeInfo, $ntn.ctx->getText().c_str(),
+                pNode );
             if( ERROR( ret ) )
+            {
+                pCtx->LogError( $si.start,
+                    "Unknown type:'%s'(%d).",
+                    $si.ctx->getText().c_str(), ret );
                 break;
+            }
 
             CStNamedvalTypeDeclNode* pntd = pNode;
             CStTypeDeclNode* ptd = pNode;
+            stdstr strBaseType = $nvt.ctx->getText();
 
-            ptd->m_pTypeInit = pTypeInit;
-            ptd->m_oTypeRef = { strType, nullptr };
-            ptd->m_iTypeId = iType;
-
-            if( IsDirectType( iType ) )
-                ptd->m_iDirectType = iType;
+            // the value list is still needed to declare the
+            // individual named-value symbols
+            ObjPtr pTypeData;
+            {
+                CParamList initInfo(
+                    ( IConfigDb* )$si.pTypeInfo );
+                initInfo.GetObjPtr(
+                    propStTypeData, pTypeData );
+            }
 
             SymPtr pSym;
             ret = ost.Declare( $ntn.ctx->getText(),
@@ -2297,7 +2213,7 @@ namedval_type_decl returns [ ObjPtr pTypeDecl ]
             {
                 pCtx->LogError( $ntn.start,
                     "Error: '%s' already defined",
-                    strType.c_str() );
+                    $ntn.ctx->getText().c_str() );
                 break;
             }
             pSym->SetTokens( $ntn.start, $si.stop );
@@ -2326,7 +2242,8 @@ namedval_type_decl returns [ ObjPtr pTypeDecl ]
 
                 SymPtr pValSym;
                 ret = ost.Declare( strName,
-                    symNamedValue, pNode, pValSym, strType,
+                    symNamedValue, pNode, pValSym,
+                    ptd->m_oTypeRef.first,
                     ( CStVarDeclNode::enumVarCategory )0 );
                 if( ERROR( ret ) )
                 {
@@ -2426,61 +2343,23 @@ array_type_decl returns [ ObjPtr pTypeDecl ]
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
-            CParamList initInfo(
-                ( IConfigDb* )$asi.pTypeInfo );
-
             ObjPtr pNode;
-            ObjPtr pTypeInit;
-            ObjPtr pTypeData;
-            stdstr strType;
-            gint32 iType = -1;
-
-            ret = initInfo.GetIntProp(
-                1, ( guint32& )iType );
-            initInfo.GetStrProp( 0, strType );
-            initInfo.GetObjPtr(
-                propStTypeInit, pTypeInit );
-
-            initInfo.GetObjPtr(
-                propStTypeData, pTypeData );
-
+            ret = rpcf::type_decl::BuildStArrayTypeNode(
+                $asi.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {
-                ret = -EINVAL;
                 pCtx->LogError( $asi.start,
                     "Unknown type:'%s'(%d).",
-                    $asi.ctx->spec->getText().c_str(),
-                    ret );
-            }
-            else if( iType == RuleDerived_type_access
-                && pTypeInit.IsEmpty() )
-            {
-                ret = pNode.NewObj(
-                    clsid( CStAmbiguousTypeDeclNode ) );
-            }
-            else
-            {
-                ret = pNode.NewObj(
-                    clsid( CStArrayTypeDeclNode ) );
-            }
-
-            if( ERROR( ret ) )
+                    $asi.ctx->spec->getText().c_str(), ret );
                 break;
+            }
 
             CStTypeDeclNode* ptd = pNode;
-            ptd->m_pTypeInit = pTypeInit;
-            ptd->m_oTypeRef = { strType, nullptr };
-            ptd->m_iTypeId = iType;
-
-            if( !pTypeData.IsEmpty() )
-                ptd->m_pTypeData = pTypeData;
-
-            if( IsDirectType( iType ) )
-                ptd->m_iDirectType = iType;
 
             SymPtr pSym;
             ret = ost.Declare( $atn.text,
-                symDataType, pNode, pSym, strType,
+                symDataType, pNode, pSym,
+                ptd->m_oTypeRef.first,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( ERROR( ret ) )
                 break;
@@ -2673,52 +2552,23 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
-            CParamList initInfo(
-                ( IConfigDb* )$si.pTypeInfo );
-
             ObjPtr pNode;
-            ObjPtr pTypeData;
-            stdstr strType;
-            gint32 iType = -1;
-
-            initInfo.GetIntProp(
-                1, ( guint32& )iType );
-            initInfo.GetStrProp( 0, strType );
-            initInfo.GetObjPtr(
-                propStTypeData, pTypeData );
-
-            if( IsElementaryType( iType ) )
+            ret = rpcf::type_decl::BuildStStringTypeNode(
+                $si.pTypeInfo, pNode );
+            if( ERROR( ret ) )
             {
-                ret = pNode.NewObj(
-                    clsid( CStStringTypeDeclNode ) );
-            }
-            else
-            {
-                ret = -EINVAL;
                 pCtx->LogError( $si.start,
                     "Unknown type:'%s'(%d).",
-                    $si.ctx->getText().c_str(),
-                    ret );
-            }
-            if( ERROR( ret ) )
+                    $si.ctx->getText().c_str(), ret );
                 break;
+            }
+
             CStTypeDeclNode* ptd = pNode;
-            CParamList oTypeInit;
-            ret = oTypeInit.CopyProp(
-                propStTypeInit, $si.pTypeInfo );
-            if( SUCCEEDED( ret ) )
-                ptd->m_pTypeInit = oTypeInit.GetCfg();
-            ptd->m_oTypeRef = { strType, nullptr };
-            ptd->m_iTypeId = iType;
-
-            if( !pTypeData.IsEmpty() )
-                ptd->m_pTypeData = pTypeData;
-
-            ptd->m_iDirectType = iType;
 
             SymPtr pSym;
             ret = ost.Declare( $stn.ctx->getText(),
-                symDataType, pNode, pSym, strType,
+                symDataType, pNode, pSym,
+                ptd->m_oTypeRef.first,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( ERROR( ret ) )
                 break;
@@ -3070,7 +2920,7 @@ data_type_access returns [ std::pair< stdstr, int > typePair ]
     ;
 
 derived_type_access
-/*    : single_elem_type_access
+    : single_elem_type_access
     | array_type_access
     | struct_type_access
     | string_type_access
@@ -3078,8 +2928,6 @@ derived_type_access
     | class_type_access
     | ref_type_access
     | interface_type_access
-*/
-    :instance_path
     ;
 
 single_elem_type_access

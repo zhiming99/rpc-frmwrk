@@ -736,6 +736,7 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     std::pair< int, Variant > m_oMbaValue;
 
     bool m_bThis = false;
+    bool m_bSuper = false;
     bool m_bRef = false;
     bool m_bNull = false;
     bool m_bClass = false;
@@ -787,6 +788,73 @@ namespace primary_expr
  */
 gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
     CStSymbolicVariableRef* pRef, enumSymKind iKind );
+}
+
+namespace type_decl
+{
+/**
+ * @brief Build the type-declaration node for an unnamed type
+ *
+ * Takes the configuration produced by simple_spec_init and creates
+ * either a CStSimpleTypeDeclNode, or a CStAmbiguousTypeDeclNode
+ * when the spec names a type that still has to be resolved.
+ *
+ * @param pTypeInfo the cfg returned by simple_spec_init
+ * @param pTypeNode [out] the created type node
+ * @return 0 on success, -EINVAL for a malformed spec, or another
+ *         negative status code from object creation
+ */
+gint32 BuildStSimpleTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a subrange type node from subrange_spec_init
+ *
+ * @param pTypeInfo the cfg returned by subrange_spec_init
+ * @param pTypeNode [out] a CStSubrangeTypeDeclNode
+ */
+gint32 BuildStSubrangeTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+
+/**
+ * @brief Build an enum type node from enum_spec_init
+ *
+ * @param pTypeInfo the cfg returned by enum_spec_init
+ * @param szName    the enum type's declared name
+ * @param pTypeNode [out] a CStEnumTypeDeclNode
+ */
+gint32 BuildStEnumTypeNode( const ObjPtr& pTypeInfo,
+    const char* szName, ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a named-value type node from namedval_spec_init
+ *
+ * @param pTypeInfo the cfg returned by namedval_spec_init
+ * @param szName    the named-value type's declared name
+ * @param pTypeNode [out] a CStNamedvalTypeDeclNode
+ */
+gint32 BuildStNamedvalTypeNode( const ObjPtr& pTypeInfo,
+    const char* szName, ObjPtr& pTypeNode );
+
+/**
+ * @brief Build an array type node from array_spec_init
+ *
+ * @param pTypeInfo the cfg returned by array_spec_init
+ * @param pTypeNode [out] a CStArrayTypeDeclNode, or a
+ *                  CStAmbiguousTypeDeclNode when the element
+ *                  type still has to be resolved
+ */
+gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a string type node from string_spec_init
+ *
+ * @param pTypeInfo the cfg returned by string_spec_init
+ * @param pTypeNode [out] a CStStringTypeDeclNode
+ */
+gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
 }
 
 

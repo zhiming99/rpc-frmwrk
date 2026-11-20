@@ -243,8 +243,13 @@ SymPtr CStSymbolTable::DeclareScopeOwner(
     CStSymbol* pSym = pSymbol;
     if( pSym == nullptr )
         return pSymbol;
-    pSym->m_pDefScope =
-        PushScope( eScopeKind, strName );
+    ScopePtr pNewScope = PushScope( eScopeKind, strName );
+    pSym->m_pDefScope = pNewScope;
+    // link the new scope back to its owner symbol so code
+    // inside it can tell which unit it belongs to ('THIS',
+    // 'SUPER', duplicate checks, ...)
+    if( !pNewScope.IsEmpty() )
+        pNewScope->m_pSymbol = pSymbol;
     return pSymbol;
 }
 

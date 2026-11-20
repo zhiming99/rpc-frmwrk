@@ -339,6 +339,8 @@ struct CStScope : public CObjBase
         if( m_vecUsingsArrs.size() )
             m_vecUsingsArrs.pop_back();
     }
+    inline CStScope* GetParent()
+    { return m_pParent; }
 };
 
 /**
@@ -439,6 +441,8 @@ public:
     {
         if( pScope.IsEmpty() )
             return;
+        if( m_stackScopes.size() )
+            pScope->m_pParent = m_stackScopes.back();
         m_stackScopes.push_back( pScope );
         return;
     }

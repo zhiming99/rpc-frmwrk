@@ -201,7 +201,7 @@ gint32 CStTypeDeclNode::ResolveSymbol(
             pCtx, vecComps, iSymType,
             pScope, pSym, iType, pDirectType );
         if( SUCCEEDED( ret ) &&
-            m_pDirectType.IsEmpty() )
+            !pDirectType.IsEmpty() )
             m_pDirectType = pDirectType;
 
         if( !pSym.IsEmpty() )
@@ -276,6 +276,280 @@ gint32 CStSimpleTypeDeclNode::ResolveSymbol(
     }while( 0 );
     return ret;
 }
+
+namespace type_decl
+{
+
+gint32 BuildStSimpleTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeInit;
+    ObjPtr pTypeData;
+    stdstr strType;
+    gint32 iType = -1;
+
+    gint32 ret = initInfo.GetIntProp(
+        1, ( guint32& )iType );
+    initInfo.GetStrProp( 0, strType );
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    if( iType == stparser::RuleDerived_type_access &&
+        pTypeInit.IsEmpty() )
+    {
+        ret = pTypeNode.NewObj(
+            clsid( CStAmbiguousTypeDeclNode ) );
+    }
+    else
+    {
+        ret = pTypeNode.NewObj(
+            clsid( CStSimpleTypeDeclNode ) );
+    }
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStTypeDeclNode* ptd = pTypeNode;
+    ptd->m_pTypeInit = pTypeInit;
+    ptd->m_oTypeRef = { strType, nullptr };
+    ptd->m_iTypeId = iType;
+
+    if( !pTypeData.IsEmpty() )
+        ptd->m_pTypeData = pTypeData;
+
+    if( IsDirectType( iType ) )
+        ptd->m_iDirectType = iType;
+
+    return 0;
+}
+
+gint32 BuildStSubrangeTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeInit;
+    ObjPtr pTypeData;
+    stdstr strBaseType;
+    gint32 iBaseType = -1;
+
+    gint32 ret = initInfo.GetIntProp(
+        1, ( guint32& )iBaseType );
+    initInfo.GetStrProp( 0, strBaseType );
+    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    ret = pTypeNode.NewObj(
+        clsid( CStSubrangeTypeDeclNode ) );
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStTypeDeclNode* ptd = pTypeNode;
+    ptd->m_pTypeInit = pTypeInit;
+    ptd->m_oTypeRef = { strBaseType, nullptr };
+    ptd->m_iTypeId = iBaseType;
+
+    if( !pTypeData.IsEmpty() )
+        ptd->m_pTypeData = pTypeData;
+
+    // an elementary base type needs no further lookup; a named
+    // base type is resolved by ResolveSymbol()
+    if( IsDirectType( iBaseType ) )
+        ptd->m_iDirectType = stparser::RuleSubrange_type_decl;
+
+    return 0;
+}
+
+gint32 BuildStEnumTypeNode( const ObjPtr& pTypeInfo,
+    const char* szName, ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeInit;
+    ObjPtr pTypeData;
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+
+    gint32 ret = pTypeNode.NewObj(
+        clsid( CStEnumTypeDeclNode ) );
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStTypeDeclNode* ptd = pTypeNode;
+    CStEnumValueRef* pRef = pTypeInit;
+
+    if( !pTypeInit.IsEmpty() )
+        ptd->m_pTypeInit = pTypeInit;
+
+    if( pRef )
+        pRef->m_pDeclNode = pTypeNode;
+
+    ptd->m_oTypeRef = {
+        szName != nullptr ? szName : "", nullptr };
+    ptd->m_iTypeId = stparser::RuleEnum_type_decl;
+
+    if( IsDirectType( ptd->m_iTypeId ) )
+        ptd->m_iDirectType = ptd->m_iTypeId;
+
+    return 0;
+}
+
+gint32 BuildStNamedvalTypeNode( const ObjPtr& pTypeInfo,
+    const char* szName, ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeInit;
+    ObjPtr pTypeData;
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+
+    gint32 ret = pTypeNode.NewObj(
+        clsid( CStNamedvalTypeDeclNode ) );
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStTypeDeclNode* ptd = pTypeNode;
+    ptd->m_pTypeInit = pTypeInit;
+    ptd->m_oTypeRef = {
+        szName != nullptr ? szName : "", nullptr };
+    ptd->m_iTypeId = stparser::RuleNamedval_type_decl;
+
+    if( IsDirectType( ptd->m_iTypeId ) )
+        ptd->m_iDirectType = ptd->m_iTypeId;
+
+    return 0;
+}
+
+gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeInit;
+    ObjPtr pTypeData;
+    stdstr strType;
+    gint32 iType = -1;
+
+    gint32 ret = initInfo.GetIntProp(
+        1, ( guint32& )iType );
+    initInfo.GetStrProp( 0, strType );
+    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    if( iType == stparser::RuleDerived_type_access &&
+        pTypeInit.IsEmpty() )
+    {
+        ret = pTypeNode.NewObj(
+            clsid( CStAmbiguousTypeDeclNode ) );
+    }
+    else
+    {
+        ret = pTypeNode.NewObj(
+            clsid( CStArrayTypeDeclNode ) );
+    }
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStTypeDeclNode* ptd = pTypeNode;
+    ptd->m_pTypeInit = pTypeInit;
+    ptd->m_oTypeRef = { strType, nullptr };
+    ptd->m_iTypeId = iType;
+
+    if( !pTypeData.IsEmpty() )
+        ptd->m_pTypeData = pTypeData;
+
+    if( IsDirectType( iType ) )
+        ptd->m_iDirectType = iType;
+
+    return 0;
+}
+
+gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeData;
+    stdstr strType;
+    gint32 iType = -1;
+
+    gint32 ret = initInfo.GetIntProp(
+        1, ( guint32& )iType );
+    initInfo.GetStrProp( 0, strType );
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    if( !IsElementaryType( iType ) )
+        return -EINVAL;
+
+    ret = pTypeNode.NewObj(
+        clsid( CStStringTypeDeclNode ) );
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStTypeDeclNode* ptd = pTypeNode;
+    CParamList oTypeInit;
+    ret = oTypeInit.CopyProp( propStTypeInit, pTypeInfo );
+    if( SUCCEEDED( ret ) )
+        ptd->m_pTypeInit = oTypeInit.GetCfg();
+
+    ptd->m_oTypeRef = { strType, nullptr };
+    ptd->m_iTypeId = iType;
+
+    if( !pTypeData.IsEmpty() )
+        ptd->m_pTypeData = pTypeData;
+
+    ptd->m_iDirectType = iType;
+
+    return 0;
+}
+
+}  // namespace type_decl
 
 std::string CStTypeDefinitionBlockNode::GetNodeInfo() const
 {
@@ -1009,7 +1283,8 @@ std::string CStProgConfigNode::GetNodeInfo() const
 std::string CStSymbolicVariableRef::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "SymbolicVar{ this: " << ( m_bThis ? "yes" : "no" ) << " }";
+    oss << "SymbolicVar{ this: " << ( m_bThis ? "yes" : "no" )
+        << ", super: " << ( m_bSuper ? "yes" : "no" ) << " }";
     return oss.str();
 }
 

@@ -182,29 +182,63 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
         return 0;
 
     std::string strName;
+    // 'THIS' and 'SUPER' are not stored by name; prefix them
+    // so that ResolveSymbolicRef starts the lookup at the
+    // enclosing unit or its base type instead of the current
+    // scope
+    if( pRef->m_bThis )
+        strName = "THIS";
+    else if( pRef->m_bSuper )
+        strName = "SUPER";
     if( !pRef->m_strQualified.empty() )
     {
-        strName = pRef->m_strQualified;
-        if( !pRef->m_strVarName.empty() )
-            strName += "." + pRef->m_strVarName;
+        if( !strName.empty() )
+            strName += ".";
+        strName += pRef->m_strQualified;
     }
-    else
-        strName = pRef->m_strVarName;
+    if( !pRef->m_strVarName.empty() )
+    {
+        if( !strName.empty() )
+            strName += ".";
+        strName += pRef->m_strVarName;
+    }
 
     if( strName.empty() )
         return -EINVAL;
 
     SymPtr pSym;
     gint32 iOffset = -1;
-    gint32 ret = ResolveSymbolicRef(
-        pCtx, strName, pSym, iOffset );
+
+    auto& ost = pCtx->m_oSymTab;
+    std::vector< std::string > vecNames =
+        ost.BreakdownQualified( strName );
+    if( vecNames.empty() )
+        return -EINVAL;
+
+    CStScope* pScope = ost.GetCurrentScope();
+    gint32 ret = ResolveSymbolicRef( pCtx,
+        vecNames, pSym, iOffset, pScope );
     if( ERROR( ret ) )
     {
         // -ENOENT with a bound prefix means the remaining
         // components are member accesses: keep the prefix and
         // its kind so IsFbInstance/IsClassInstance can answer.
         if( ret != -ENOENT || pSym.IsEmpty() )
+        {
             return ret;
+        }
+        else
+        {
+            // test if it is an array
+            const stdstr& strFirst = vecNames[ 0 ];
+            auto pos =
+                strFirst.find_first_of( '[' );
+            if( pos != stdstr::npos )
+            {
+                stdstr strArrName =
+                    strFirst.substr( 0, pos );
+            }
+        }
     }
 
     pRef->m_pDeclNode = pSym->m_pDeclNode;
