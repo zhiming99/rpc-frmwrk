@@ -42,7 +42,7 @@
 // Macro placeholder for future gettext string scanning
 #define _(String) dgettext("st_compiler", String)
 
-namespace rpcf
+namespace stc
 {
 
 enum class EnumTypeCategory {
@@ -618,6 +618,25 @@ gint32 ResolveTypeRef( CStParseContext* pctx,
  * iOffset >= 0, while a complete miss has an empty pSym and
  * iOffset == -1.
  *
+ * A name whose first component is 'THIS' (case-insensitive)
+ * denotes the instance of the enclosing function block or
+ * class: the remaining components are looked up in the scope
+ * that owns that unit, never in an inner block scope. 'THIS'
+ * alone resolves to the instance symbol. Inside any other unit
+ * (program, function, namespace, ...) -EINVAL is returned,
+ * since 'THIS' can never resolve there.
+ *
+ * A name whose first component is 'SUPER' (case-insensitive)
+ * denotes the base type of the enclosing function block or
+ * class: 'SUPER' alone resolves to the base type symbol and
+ * 'SUPER.member' looks the member up in the scope the base type
+ * owns. The base type name is taken from the EXTENDS clause of
+ * the enclosing unit, and is resolved where that unit is
+ * declared. -ENOENT is returned when the unit or its base type
+ * is not known yet; -EINVAL is returned outside an FB/class and
+ * when the enclosing FB is known to have no EXTENDS clause,
+ * since 'SUPER' can never resolve in those cases.
+ *
  * @param pCtx      the parse context carrying the symbol table
  * @param strName   the identifier or qualified name
  * @param pSym      [out] the resolved symbol, or the last
@@ -628,7 +647,10 @@ gint32 ResolveTypeRef( CStParseContext* pctx,
  *                  current scope
  * @return 0 on success, -ENOENT when the name is not fully
  *         bound (see pSym/iOffset for a partial match),
- *         -EINVAL on invalid arguments
+ *         -EINVAL on invalid arguments, or for a 'THIS' or
+ *         'SUPER' reference that can never resolve because
+ *         there is no enclosing FB/class (or the FB has no
+ *         EXTENDS clause)
  */
 gint32 ResolveSymbolicRef( CStParseContext* pCtx,
     const std::string& strName,
@@ -650,7 +672,8 @@ gint32 ResolveTypeToDirectType(
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     CStScope* pCurScope,
-    SymPtr& pSym, gint32& iType );
+    SymPtr& pSym, gint32& iType,
+    ObjPtr& pDirectType );
 
 gint32 ReplaceAmbiguousNode(
     CStParseContext* pCtx,

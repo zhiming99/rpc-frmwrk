@@ -35,6 +35,8 @@
 #include <utility>
 #include "rpc.h"
 
+namespace stc
+{
 // legacy parser context used by the address scanners
 struct CSTParserContext;
 
@@ -204,3 +206,4 @@ rpcf::ObjPtr ParsePeriAddr(
     const char* szText, CSTParserContext* pCtx );
 rpcf::ObjPtr ParseRpcfAddr(
     const char* szText, CSTParserContext* pCtx );
+}

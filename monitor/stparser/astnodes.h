@@ -32,8 +32,7 @@
 #include "stclsids.h"
 
 namespace antlr4 { class Token; }
-
-namespace rpcf
+namespace stc
 {
 
 enum enumSymKind {
@@ -58,12 +57,13 @@ enum enumSymKind {
 // Forward declarations
 class CStDeclNode;
 class CStStmtNode;
-struct CStExprNode;
+struct CStExprBase;
 class CStTypeNode;
 class CStVarDeclNode;
 class CStSymbol;
 class CStScope;
 class CStSymbol;
+struct CStParseContext;
 
 struct CStSymbolDeclNode : public CStAstNodeBase
 {
@@ -90,11 +90,11 @@ struct CStSymbolDeclNode : public CStAstNodeBase
 /**
  * @brief Base class for all expression nodes
  */
-struct CStExprNode : public CStAstNodeBase
+struct CStExprBase : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    CStExprNode() : super()
+    CStExprBase() : super()
     {}
 
     virtual bool IsSymbolResolved() const
@@ -118,15 +118,14 @@ struct CStExprNode : public CStAstNodeBase
 
     antlr4::Token* Stop()
     { return m_pStop; }
-
 };
 
 /**
  * @brief Literal expression (numbers, strings, booleans, etc.)
  */
-struct CStLiteralExpr : public CStExprNode
+struct CStLiteralExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumLiteralType {
         ltNumber,
@@ -141,7 +140,7 @@ struct CStLiteralExpr : public CStExprNode
     };
 
     enumLiteralType m_eLiteralType;
-    Variant m_oLiteralValue;
+    rpcf::Variant m_oLiteralValue;
 
     CStLiteralExpr() : super(),
         m_eLiteralType(ltNumber)
@@ -153,9 +152,9 @@ struct CStLiteralExpr : public CStExprNode
 /**
  * @brief Identifier expression (variable or function name)
  */
-struct CStIdentifierExpr : public CStExprNode
+struct CStIdentifierExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     std::string m_strName;
 
@@ -184,9 +183,9 @@ struct CStIdentifierExpr : public CStExprNode
  *  - m_pIndex:     the index expression of the indexed form
  *                  '%IW[expr]', empty if not indexed
  */
-struct CStDirectAddressNode : public CStExprNode
+struct CStDirectAddressNode : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumAddrType
     {
@@ -212,9 +211,9 @@ struct CStDirectAddressNode : public CStExprNode
 /**
  * @brief Binary expression (arithmetic, logical, comparison)
  */
-struct CStBinaryExpr : public CStExprNode
+struct CStBinaryExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumBinaryOp {
         boAdd, boSub, boMul, boDiv, boMod,
@@ -239,9 +238,9 @@ struct CStBinaryExpr : public CStExprNode
 /**
  * @brief Unary expression (NOT, -)
  */
-struct CStUnaryExpr : public CStExprNode
+struct CStUnaryExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     enum enumUnaryOp {
         uoNot,
@@ -265,9 +264,9 @@ struct CStUnaryExpr : public CStExprNode
 /**
  * @brief Function call expression
  */
-struct CStCallExpr : public CStExprNode
+struct CStCallExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     struct CNamedArg
     {
@@ -311,16 +310,15 @@ struct CStArgListNode : public CStAstNodeBase
 /**
  * @brief Array access expression
  */
-struct CStArrayAccessExpr : public CStExprNode
+struct CStSubscriptList : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
-    ObjPtr m_pArray;
-    ObjPtr m_pIndex;
+    // ObjPtr m_pIndex;
     std::vector< ObjPtr > m_vecIndices;
 
-    CStArrayAccessExpr() : super()
-    { SetClassId( clsid( CStArrayAccessExpr ) ); }
+    CStSubscriptList() : super()
+    { SetClassId( clsid( CStSubscriptList ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -328,22 +326,28 @@ struct CStArrayAccessExpr : public CStExprNode
 /**
  * @brief Member access expression (dot operator)
  */
-struct CStMemberAccessExpr : public CStExprNode
+struct CStMemberAccessExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
-    enum enumAccessType {
-        atDot,
-        atArrow
-    };
 
-    enumAccessType m_eAccessType;
-    ObjPtr m_pObject;
+    // struct declare node
+    ObjPtr m_pDeclNode;
     std::string m_strMember;
+    gint32 m_iRefRank = 0;
 
-    CStMemberAccessExpr() : super(),
-        m_eAccessType(atDot)
+    CStMemberAccessExpr() : super()
     { SetClassId( clsid( CStMemberAccessExpr ) ); }
+
+    bool IsRef() const
+    { return m_iRefRank == 0; }
+
+    bool IsArray() const
+    { return false; }
+
+    virtual bool IsSymbolResolved() const override;
+    virtual gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -351,9 +355,9 @@ struct CStMemberAccessExpr : public CStExprNode
 /**
  * @brief Dereference expression (*ptr)
  */
-struct CStDereferenceExpr : public CStExprNode
+struct CStDereferenceExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     ObjPtr m_pPointer;
 
@@ -366,9 +370,9 @@ struct CStDereferenceExpr : public CStExprNode
 /**
  * @brief Pointer member access (->)
  */
-struct CStPointerMemberExpr : public CStExprNode
+struct CStPointerMemberExpr : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     ObjPtr m_pPointer;
     std::string m_strMember;
@@ -455,25 +459,12 @@ struct CStInstancePathNode : public CStAstNodeBase
     virtual std::string GetNodeInfo() const override;
 };
 
-/**
- * @brief Boundary wrapper for a full expression
- *
- * Marks the root of an expression used in statement position (conditions,
- * loop bounds, case selectors, initializers, call arguments). Like the
- * l-value boundary nodes, it gives the semantic checker a uniform handle
- * on 'a complete expression' and a place to hang result-type info.
- * Expression-internal consumers (parenthesized factors, array indices,
- * subrange bounds) unwrap it via UnwrapFullExpression().
- */
-struct CStPrimaryExprNode : public CStExprNode
+struct CStPrimaryExprNode : public CStExprBase
 {
-    typedef CStExprNode super;
+    typedef CStExprBase super;
 
     CStPrimaryExprNode() : super()
     { SetClassId( clsid( CStPrimaryExprNode ) ); }
-
-    virtual bool IsSymbolResolved() const
-    { return false; }
 
     virtual std::string GetNodeInfo() const override
     { return ""; }
@@ -481,6 +472,20 @@ struct CStPrimaryExprNode : public CStExprNode
     { return ""; }
 };
 
+/**
+ * @brief Boundary wrapper for a full expression
+ *
+ * Marks the root of an expression used in
+ * statement position (conditions, loop bounds,
+ * case selectors, initializers, call arguments).
+ * Like the l-value boundary nodes, it gives the
+ * semantic checker a uniform handle on 'a
+ * complete expression' and a place to hang
+ * result-type info.  Expression-internal
+ * consumers (parenthesized factors, array
+ * indices, subrange bounds) unwrap it via
+ * UnwrapFullExpression().
+ */
 struct CStExpressionNode : public CStPrimaryExprNode
 {
     typedef CStPrimaryExprNode super;
@@ -517,6 +522,11 @@ struct CStSubrangeNode : public CStAstNodeBase
     CStSubrangeNode() : super()
     { SetClassId( clsid( CStSubrangeNode ) ); }
 
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind );
+
     virtual std::string GetNodeInfo() const override;
 };
 
@@ -538,6 +548,11 @@ struct CStSubrangeListNode : public CStAstNodeBase
 
     CStSubrangeListNode() : super()
     { SetClassId( clsid( CStSubrangeListNode ) ); }
+
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind );
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -676,61 +691,171 @@ struct CStAmbiguousValueRef: public CStPrimaryExprNode
     std::string GetNodeInfo() const override;
 };
 
-/**
- * @brief Array type node
- */
-struct CStArrayTypeNode : public CStTypeNode
+// Helpers for the primary_expr rule. They live in their own
+// namespace so the grammar actions stay small.
+namespace primary_expr
 {
-    typedef CStTypeNode super;
-
-    // Array dimension
-    struct CArrayDim
-    {
-        // Evaluated bounds, filled in by the semantic phase once the
-        // bound expressions are resolved against the variable tables
-        // (named constants, enum values, arithmetic). The parser
-        // does not evaluate them; they stay 0 here.
-        gint32 m_iStart = 0;
-        gint32 m_iEnd = 0;
-        // The bound expressions as parsed (start..end)
-        ObjPtr m_pStart;
-        ObjPtr m_pEnd;
-    };
-
-    ObjPtr m_pElementType;
-    std::vector< CArrayDim > m_vecDims;
-
-    CStArrayTypeNode() : super()
-    { SetClassId( clsid( CStArrayTypeNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
 
 /**
- * @brief Struct type node
+ * @brief Build the node for an enum/named-value reference
+ *
+ * Resolves the type named by 'Type#name', or the symbol bound
+ * to the unqualified 'name', and fills in m_pDeclNode/m_iIndex
+ * of the returned CStEnumValueRef or CStNamedvalValueRef.
+ * Returns a CStAmbiguousValueRef when the type is not visible
+ * yet, or an empty ObjPtr after logging an error.
+ *
+ * @param pCtx      the parse context carrying the symbol table
+ * @param pRef      the CStEnumValueRef produced by enum_value
+ * @param szRefText the literal source text, for diagnostics
  */
-struct CStStructTypeNode : public CStTypeNode
+ObjPtr BuildStValueRefNode( CStParseContext* pCtx, ObjPtr pRef,
+    const char* szRefText,
+    antlr4::Token* pStart, antlr4::Token* pStop );
+
+}
+
+struct CStSymbolicVariableRef: public CStPrimaryExprNode
 {
-    typedef CStTypeNode super;
+    // this class contains info from variable_access
+    typedef CStPrimaryExprNode super;
 
-    // Struct member
-    struct CStructMember
-    {
-        std::string m_strName;
-        ObjPtr m_pType;
-        ObjPtr m_pInitialValue;
-    };
+    ObjPtr m_pDeclNode;
+    stdstr m_strQualified;
+    stdstr m_strVarName;
+    std::vector< ObjPtr > m_vecMultiElemChain;
 
-    std::string m_strName;
-    std::string m_strTypeName;
-    std::vector< CStructMember > m_vecMembers;
-    bool m_bOverlap = false;
+    // the trailing multi-bit access 'first' is
+    // type id, and 'second' is a Variant,
+    // containing either a cfgptr or a string.  if
+    // first is int, the variant is a cfgptr with
+    // two properties, one is the value, the other
+    // the base of the int value. if typeid is
+    // multipart_access, the variant is a string
+    std::pair< int, rpcf::Variant > m_oMbaValue;
 
-    CStStructTypeNode() : super()
-    { SetClassId( clsid( CStStructTypeNode ) ); }
+    bool m_bThis = false;
+    bool m_bSuper = false;
+    bool m_bRef = false;
+    bool m_bNull = false;
+    bool m_bClass = false;
+    bool m_bFb = false;
+    gint32 m_iRefRank = 0;
+    bool m_bConstant = false;
+    
 
-    virtual std::string GetNodeInfo() const override;
+    CStSymbolicVariableRef() : super()
+    { SetClassId( clsid( CStSymbolicVariableRef) ); }
+
+    bool IsFbInstance() const
+    { return m_bFb; }
+
+    bool IsClassInstance() const
+    { return m_bClass; }
+
+    bool IsReference() const
+    { return m_bRef; }
+
+    bool IsLvalue() const
+    { return false; }
+
+    bool IsConstant() const
+    { return m_bConstant; }
+
+    bool IsNull() const
+    { return m_bNull; }
+
+    gint32 GetRefRank() const
+    { return m_iRefRank; }
+
+    bool IsSymbolResolved() const override;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
+
+    std::string GetNodeInfo() const override;
 };
+
+namespace primary_expr
+{
+/**
+ * @brief Resolve a symbolic variable/reference node
+ *
+ * Looks the node's qualified name up in the enclosing scopes
+ * and USING lists. On success the declaration node is stored
+ * and the m_bFb/m_bClass flags are set from the symbol kind.
+ */
+gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
+    CStSymbolicVariableRef* pRef, enumSymKind iKind );
+}
+
+namespace type_decl
+{
+/**
+ * @brief Build the type-declaration node for an unnamed type
+ *
+ * Takes the configuration produced by simple_spec_init and creates
+ * either a CStSimpleTypeDeclNode, or a CStAmbiguousTypeDeclNode
+ * when the spec names a type that still has to be resolved.
+ *
+ * @param pTypeInfo the cfg returned by simple_spec_init
+ * @param pTypeNode [out] the created type node
+ * @return 0 on success, -EINVAL for a malformed spec, or another
+ *         negative status code from object creation
+ */
+gint32 BuildStSimpleTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a subrange type node from subrange_spec_init
+ *
+ * @param pTypeInfo the cfg returned by subrange_spec_init
+ * @param pTypeNode [out] a CStSubrangeTypeDeclNode
+ */
+gint32 BuildStSubrangeTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+
+/**
+ * @brief Build an enum type node from enum_spec_init
+ *
+ * @param pTypeInfo the cfg returned by enum_spec_init
+ * @param szName    the enum type's declared name
+ * @param pTypeNode [out] a CStEnumTypeDeclNode
+ */
+gint32 BuildStEnumTypeNode( const ObjPtr& pTypeInfo,
+    const char* szName, ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a named-value type node from namedval_spec_init
+ *
+ * @param pTypeInfo the cfg returned by namedval_spec_init
+ * @param szName    the named-value type's declared name
+ * @param pTypeNode [out] a CStNamedvalTypeDeclNode
+ */
+gint32 BuildStNamedvalTypeNode( const ObjPtr& pTypeInfo,
+    const char* szName, ObjPtr& pTypeNode );
+
+/**
+ * @brief Build an array type node from array_spec_init
+ *
+ * @param pTypeInfo the cfg returned by array_spec_init
+ * @param pTypeNode [out] a CStArrayTypeDeclNode, or a
+ *                  CStAmbiguousTypeDeclNode when the element
+ *                  type still has to be resolved
+ */
+gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a string type node from string_spec_init
+ *
+ * @param pTypeInfo the cfg returned by string_spec_init
+ * @param pTypeNode [out] a CStStringTypeDeclNode
+ */
+gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+}
+
 
 
 /**
@@ -746,12 +871,21 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     using TYPE_REF =
         std::pair< std::string, CStSymbol* >;
     TYPE_REF m_oTypeRef; 
+    // the initialization info
     ObjPtr m_pTypeInit;
+
+    // type specific info
     ObjPtr m_pTypeData;
-    using TypePair = std::pair< gint32, gint32 >;
+
+    // the type id
     gint32 m_iTypeId = -1;
+
+    // the built-in types
     gint32 m_iDirectType = -1;
     gint32 m_iRefRank = 0;
+
+    // the type instance of the m_iDirectType
+    ObjPtr m_pDirectType;
 
     // pointer to CStDataTypeDeclNode
     ObjPtr m_pDtd; 
@@ -765,8 +899,7 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     virtual CStTypeDeclNode& operator=(
         const CStTypeDeclNode& rhs );
 
-    bool IsSymbolResolved() const override
-    { return ( m_iDirectType != -1 ); }
+    bool IsSymbolResolved() const override;
 
     virtual std::string GetNodeInfo() const override;
     virtual void ReplaceAmbiguousNode(
@@ -794,8 +927,6 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
 
     gint32 ResolveUsingNs( void* pCtx );
     virtual std::string GetNodeInfo() const override;
-    gint32 ResolveType(
-        void* pCtx, CStTypeDeclNode* ptd );
 };
 
 struct CStAmbiguousTypeDeclNode :
@@ -808,6 +939,37 @@ struct CStAmbiguousTypeDeclNode :
         SetClassId( clsid(
             CStAmbiguousTypeDeclNode ) );
     }
+};
+
+/**
+ * @brief Struct type node
+ */
+struct CStStructTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    // Struct member
+    struct CStructMember
+    {
+        std::string m_strName;
+        ObjPtr m_pType;
+        ObjPtr m_pInitialValue;
+        // for locate_at 
+        std::pair< int, rpcf::Variant > m_oMbaValue;
+    };
+
+    std::vector< CStructMember > m_vecMembers;
+    bool m_bOverlap = false;
+
+    CStStructTypeDeclNode() : super()
+    { SetClassId( clsid( CStStructTypeDeclNode ) ); }
+
+    gint32 LookupMember(
+        const stdstr& strName, ObjPtr pType )
+    { return ERROR_NOT_IMPL; }
+
+    virtual std::string GetNodeInfo() const override;
 };
 
 struct CStSimpleTypeDeclNode :
@@ -834,6 +996,11 @@ struct CStSubrangeTypeDeclNode :
 
     CStSubrangeTypeDeclNode() : super()
     { SetClassId( clsid( CStSubrangeTypeDeclNode ) ); }
+
+    bool IsSymbolResolved() const override;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 };
 
 struct CStEnumTypeDeclNode :
@@ -861,15 +1028,12 @@ struct CStArrayTypeDeclNode :
 
     CStArrayTypeDeclNode() : super()
     { SetClassId( clsid( CStArrayTypeDeclNode ) ); }
-};
 
-struct CStStructTypeDeclNode :
-    public CStAmbiguousTypeDeclNode
-{
-    typedef CStAmbiguousTypeDeclNode super;
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 
-    CStStructTypeDeclNode() : super()
-    { SetClassId( clsid( CStStructTypeDeclNode ) ); }
+    bool IsSymbolResolved() const override;
+    virtual std::string GetNodeInfo() const override;
 };
 
 struct CStStringTypeDeclNode :
@@ -898,7 +1062,6 @@ struct CStNamedvalTypeDeclNode :
     std::vector< stdstr > m_vecValNames;
     std::vector< ObjPtr > m_vecValInit;
     std::vector< CStSymbol* > m_vecValSyms;
-    gint32 m_dwInitIdx = -1;
 
     CStNamedvalTypeDeclNode() : super()
     { SetClassId( clsid( CStNamedvalTypeDeclNode ) ); }
@@ -1825,6 +1988,11 @@ struct CStArrayInitNode : public CStAstNodeBase
     CStArrayInitNode() : super()
     { SetClassId( clsid( CStArrayInitNode ) ); }
 
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind );
+
     virtual std::string GetNodeInfo() const override;
 };
 
@@ -1850,6 +2018,11 @@ struct CStArrayRepeatNode : public CStAstNodeBase
     CStArrayRepeatNode() : super(),
         m_iCount( 0 )
     { SetClassId( clsid( CStArrayRepeatNode ) ); }
+
+    bool IsSymbolResolved() const;
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind );
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -1948,27 +2121,6 @@ struct CStProgConfigNode : public CStAstNodeBase
 
     CStProgConfigNode() : super(), m_eRetain(retainNone)
     { SetClassId( clsid( CStProgConfigNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
-
-/**
- * @brief Symbolic variable reference node
- *
- * Represents a symbolic variable reference in a prog_cnxn context,
- * e.g., 'input1' in 'input1 := sensor1 OUTPUT_ASSIGN actuator1'.
- * Can be a simple identifier, array access, or this.member access.
- */
-struct CStSymbolicVarNode : public CStAstNodeBase
-{
-    typedef CStAstNodeBase super;
-
-    ObjPtr m_pVarPath;       // The instance_path (identifier or member access)
-    ObjPtr m_pSubscript;    // Optional array subscript
-    bool m_bIsThisNotation; // Whether using 'this' notation
-
-    CStSymbolicVarNode() : super(), m_bIsThisNotation( false )
-    { SetClassId( clsid( CStSymbolicVarNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -2146,7 +2298,7 @@ REGISTER_AST_NODE( CStBinaryExpr );
 REGISTER_AST_NODE( CStUnaryExpr );
 REGISTER_AST_NODE( CStCallExpr );
 REGISTER_AST_NODE( CStArgListNode );
-REGISTER_AST_NODE( CStArrayAccessExpr );
+REGISTER_AST_NODE( CStSubscriptList );
 REGISTER_AST_NODE( CStMemberAccessExpr );
 REGISTER_AST_NODE( CStDereferenceExpr );
 REGISTER_AST_NODE( CStPointerMemberExpr );
@@ -2156,14 +2308,16 @@ REGISTER_AST_NODE( CStInstancePathNode );
 REGISTER_AST_NODE( CStExpressionNode );
 REGISTER_AST_NODE( CStSubrangeNode );
 REGISTER_AST_NODE( CStSubrangeListNode );
+REGISTER_AST_NODE( CStSubrangeTypeDeclNode );
 REGISTER_AST_NODE( CStStmtListNode );
 REGISTER_AST_NODE( CStIfBranchListNode );
 REGISTER_AST_NODE( CStConstValueNode );
-REGISTER_AST_NODE( CStArrayTypeNode );
-REGISTER_AST_NODE( CStStructTypeNode );
+REGISTER_AST_NODE( CStArrayTypeDeclNode )
+REGISTER_AST_NODE( CStStructTypeDeclNode );
 REGISTER_AST_NODE( CStEnumValueRef );
 REGISTER_AST_NODE( CStNamedvalValueRef );
 REGISTER_AST_NODE( CStAmbiguousValueRef );
+REGISTER_AST_NODE( CStSymbolicVariableRef );
 REGISTER_AST_NODE( CStDataTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDeclNode );
 REGISTER_AST_NODE( CStTypeDefinitionBlockNode );
@@ -2211,7 +2365,6 @@ REGISTER_AST_NODE( CStCaseBranchListNode );
 REGISTER_AST_NODE( CStVarConfigListNode );
 REGISTER_AST_NODE( CStProgConfigListNode );
 REGISTER_AST_NODE( CStProgConfigNode );
-REGISTER_AST_NODE( CStSymbolicVarNode );
 REGISTER_AST_NODE( CStFbTaskNode );
 REGISTER_AST_NODE( CStProgCnxnNode );
 REGISTER_AST_NODE( CStProgConfElemNode );

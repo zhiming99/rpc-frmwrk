@@ -18,16 +18,35 @@ class_path:=$(addprefix dist/org/rpcf/appmancli, $(autofiles:.java=.class) $(bas
 appmancli_DATA=$(jarpkg)
 appmanclidir=$(libdir)/rpcf
 
+# Some 32-bit build containers (e.g. armhf under qemu) run on
+# overlayfs, whose directory offsets (d_off) and/or inode numbers
+# do not fit a 32-bit readdir()/stat(). javac then dies with
+# 'Value too large for defined data type' while walking the source
+# directory. On such a failure the sources are staged in
+# JAVABUILDDIR (a tmpfs by default) and compiled there. Override
+# on the make command line, e.g. 'make JAVABUILDDIR=/some/bind/mount'.
+JAVABUILDDIR = /dev/shm
+
 # Default target
 #all: $(jarpkg)
 
 # Build the Python wheel package
 $(jarpkg): $(class_path)
 	if [[ "$(MAKECMDGOALS)" =~ "install" ]]; then echo > /dev/null;else \
-	if [ ! -d ./dist ]; then mkdir ./dist; fi;\
-    CLASSPATH=$(top_dir)/java/rpcbase.jar:/usr/share/java/commons-cli.jar:./:$$CLASSPATH \
-    javac $(javasrcpath)*.java -d ./dist; \
-	cd dist && ( find . -type f | xargs jar cf $(jarname) );fi
+	if [ ! -d ./dist ]; then mkdir ./dist; fi; \
+	if CLASSPATH=$(top_dir)/java/rpcbase.jar:/usr/share/java/commons-cli.jar:./:$$CLASSPATH \
+	    javac $(javasrcpath)*.java -d ./dist; then \
+		cd dist && ( find . -type f | xargs jar cf $(jarname) ); \
+	else \
+		echo "javac failed in the source tree; retrying from $(JAVABUILDDIR)"; \
+		tmpdir=$$(mktemp -d -p $(JAVABUILDDIR) 2>/dev/null || mktemp -d) || exit 1; \
+		cp -a $(javasrcpath). $$tmpdir/ || { rm -rf $$tmpdir; exit 1; }; \
+		CLASSPATH=$(top_dir)/java/rpcbase.jar:/usr/share/java/commons-cli.jar \
+		    javac $$tmpdir/*.java -d $$tmpdir/dist || { rm -rf $$tmpdir; exit 1; }; \
+		( cd $$tmpdir/dist && find . -type f | xargs jar cf $(jarname) ) || { rm -rf $$tmpdir; exit 1; }; \
+		cp -a $$tmpdir/dist/$(jarname) ./dist/ || { rm -rf $$tmpdir; exit 1; }; \
+		rm -rf $$tmpdir; \
+	fi; fi
 
 $(class_path) : $(autofiles_path) $(EXTRA_DIST)
 

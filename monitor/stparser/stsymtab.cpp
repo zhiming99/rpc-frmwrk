@@ -23,9 +23,11 @@
  */
 
 #include "antlr4-runtime.h"
+#include "defines.h"
+using namespace rpcf;
 #include "stsymtab.h"
 
-namespace rpcf
+namespace stc
 {
 
 gint32 CStScope::AddSymbol( SymPtr pSymbol )
@@ -243,8 +245,13 @@ SymPtr CStSymbolTable::DeclareScopeOwner(
     CStSymbol* pSym = pSymbol;
     if( pSym == nullptr )
         return pSymbol;
-    pSym->m_pDefScope =
-        PushScope( eScopeKind, strName );
+    ScopePtr pNewScope = PushScope( eScopeKind, strName );
+    pSym->m_pDefScope = pNewScope;
+    // link the new scope back to its owner symbol so code
+    // inside it can tell which unit it belongs to ('THIS',
+    // 'SUPER', duplicate checks, ...)
+    if( !pNewScope.IsEmpty() )
+        pNewScope->m_pSymbol = pSymbol;
     return pSymbol;
 }
 
@@ -253,6 +260,12 @@ void CStSymbolTable::AddUnsolved(
     RESOLVE_FUNC resolve,
     CStSymbol* pSym )
 {
+    // a node is queued at most once: its first closure stays,
+    // and its symbol was already moved to m_queUnresovedSeq,
+    // so a repeated registration must not push it again
+    auto itrMap = m_mapUnresolved.find( pCtx );
+    if( itrMap != m_mapUnresolved.end() )
+        return;
     m_mapUnresolved.insert( { pCtx, resolve } );
     if( pSym == nullptr )
         return;
@@ -262,8 +275,10 @@ void CStSymbolTable::AddUnsolved(
         CStSymbol* pCurSym = *itr;
         if( pCurSym->m_iSeqNo == pSym->m_iSeqNo )
         {
+            // save the pointer before erasing: the iterator
+            // is invalid afterwards
             m_vecSymSeq.erase( itr );
-            m_queUnresovedSeq.push_back( *itr);
+            m_queUnresovedSeq.push_back( pCurSym );
             break;
         }
         itr++;
@@ -282,8 +297,10 @@ void CStSymbolTable::AddSolved(
         CStSymbol* pCurSym = *itr;
         if( pCurSym->m_iSeqNo == pSym->m_iSeqNo )
         {
+            // save the pointer before erasing: the iterator
+            // is invalid afterwards
             m_queUnresovedSeq.erase( itr );
-            m_vecSymSeq.push_back( *itr);
+            m_vecSymSeq.push_back( pCurSym );
             break;
         }
         itr++;
