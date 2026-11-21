@@ -31,6 +31,8 @@
 
 using namespace rpcf;
 
+namespace stc
+{
 // All the long time literal forms ('LT#', 'LTIME#', 'LDATE#',
 // 'LDT#', 'LTOD#', ...) start with an 'L' in their prefix.
 static bool StLiteralIsLong( const char* text )
@@ -1241,5 +1243,6 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
 
     return ObjPtr( pvecStr );
 }
-
 #endif // ST_LEGACY_ADDR_SCANNERS
+
+} // namespace stc

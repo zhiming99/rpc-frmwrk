@@ -27,6 +27,8 @@
 #include <regex>
 #include <filesystem>
 #include "antlr4-runtime.h"
+#include "defines.h"
+using namespace rpcf;
 #include "stlexer.h"
 #include "stparser.h"
 #include "parse_context.h"
@@ -34,7 +36,7 @@
 #include "pragma_expr/pragma_exprParser.h"
 #include "pragma_expr/pragma_exprLexer.h"
 
-namespace rpcf
+namespace stc
 {
 std::any CStPragmaEvaluator::visitPragma_condition(
     pragma_exprParser::Pragma_conditionContext* ctx)

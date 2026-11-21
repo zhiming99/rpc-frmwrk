@@ -36,7 +36,7 @@
 #include "parse_context.h"
 #include "pragma_expr/pragma_exprLexer.h"
 
-namespace rpcf
+namespace stc
 {
 
 std::string CStIncludeManager::ResolveIncludePath(
@@ -1834,8 +1834,7 @@ bool IsCompositeType( gint32 iType )
 
 bool IsElementaryType( gint32 iType )
 {
-    return CStParser::IsElementaryType(
-        iType );
+    return CStParser::IsElementaryType( iType );
 }
 
 bool IsDirectType( gint32 iType )
@@ -1944,10 +1943,10 @@ LBL_RESOLVE_SYMBOL:
         }
         else if( IsArrayType( ptd->m_iTypeId ) )
         {
-            if( ptd->m_oTypeRef.second == nullptr )
-                break;
-            pCurSym = ptd->m_oTypeRef.second;
-            goto LBL_RESOLVE_SYMBOL;
+            iType = ptd->m_iTypeId;
+            pDirectType = pNode;
+            ret = 0;
+            break;
         }
 
         if( iType != -1 )

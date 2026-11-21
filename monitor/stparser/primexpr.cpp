@@ -16,6 +16,8 @@
  * =====================================================================================
  */
 
+#include "defines.h"
+using namespace rpcf;
 #include "stlexer.h"
 #include "stclsids.h"
 #include "astnodes.h"
@@ -24,7 +26,7 @@
 #include "stsymtab.h"
 #include "st_parser_ext.h"
 
-namespace rpcf
+namespace stc
 {
 
 namespace primary_expr
@@ -177,76 +179,158 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
     if( pCtx == nullptr || pRef == nullptr )
         return -EINVAL;
 
-    // 'NULL' is a constant reference and needs no lookup
+    // 'NULL' is a constant reference and needs no
+    // lookup
     if( pRef->m_bNull || pRef->m_bConstant )
         return 0;
 
-    std::string strName;
-    // 'THIS' and 'SUPER' are not stored by name; prefix them
-    // so that ResolveSymbolicRef starts the lookup at the
-    // enclosing unit or its base type instead of the current
-    // scope
-    if( pRef->m_bThis )
-        strName = "THIS";
-    else if( pRef->m_bSuper )
-        strName = "SUPER";
-    if( !pRef->m_strQualified.empty() )
-    {
-        if( !strName.empty() )
-            strName += ".";
-        strName += pRef->m_strQualified;
-    }
-    if( !pRef->m_strVarName.empty() )
-    {
-        if( !strName.empty() )
-            strName += ".";
-        strName += pRef->m_strVarName;
-    }
-
-    if( strName.empty() )
-        return -EINVAL;
-
-    SymPtr pSym;
-    gint32 iOffset = -1;
-
-    auto& ost = pCtx->m_oSymTab;
-    std::vector< std::string > vecNames =
-        ost.BreakdownQualified( strName );
-    if( vecNames.empty() )
-        return -EINVAL;
-
-    CStScope* pScope = ost.GetCurrentScope();
-    gint32 ret = ResolveSymbolicRef( pCtx,
-        vecNames, pSym, iOffset, pScope );
-    if( ERROR( ret ) )
-    {
-        // -ENOENT with a bound prefix means the remaining
-        // components are member accesses: keep the prefix and
-        // its kind so IsFbInstance/IsClassInstance can answer.
-        if( ret != -ENOENT || pSym.IsEmpty() )
+    do{
+        std::string strName;
+        // 'THIS' and 'SUPER' are not stored by name;
+        // prefix them so that ResolveSymbolicRef
+        // starts the lookup at the enclosing unit or
+        // its base type instead of the current scope
+        if( pRef->m_bThis )
+            strName = "THIS";
+        else if( pRef->m_bSuper )
+            strName = "SUPER";
+        if( !pRef->m_strQualified.empty() )
         {
-            return ret;
+            if( !strName.empty() )
+                strName += ".";
+            strName += pRef->m_strQualified;
         }
-        else
+        if( !pRef->m_strVarName.empty() )
         {
-            // test if it is an array
-            const stdstr& strFirst = vecNames[ 0 ];
-            auto pos =
-                strFirst.find_first_of( '[' );
-            if( pos != stdstr::npos )
+            if( !strName.empty() )
+                strName += ".";
+            strName += pRef->m_strVarName;
+        }
+
+        if( strName.empty() )
+            return -EINVAL;
+
+        SymPtr pSym;
+        gint32 iOffset = -1;
+
+        auto& ost = pCtx->m_oSymTab;
+        std::vector< std::string > vecNames =
+            ost.BreakdownQualified( strName );
+        if( vecNames.empty() )
+            return -EINVAL;
+
+        CStScope* pScope = ost.GetCurrentScope();
+        gint32 ret = ResolveSymbolicRef( pCtx,
+            vecNames, pSym, iOffset, pScope );
+        if( ERROR( ret ) )
+        {
+            // -ENOENT with a bound prefix means the
+            // remaining components are member
+            // accesses: keep the prefix and its kind
+            // so IsFbInstance/IsClassInstance can
+            // answer.
+            if( ret != -ENOENT || pSym.IsEmpty() )
             {
-                stdstr strArrName =
-                    strFirst.substr( 0, pos );
+                // fatal error
+                break;
             }
-        }
-    }
+            else if( pRef->m_vecMultiElemChain.empty() )
+            {
+                // this is a forward reference
+                ret = -ENOENT;
+                break;
+            }
+            // resolve the symbols for each element in
+            // m_vecMultiElemChain
+            auto& vecChain = pRef->m_vecMultiElemChain;
+            CStTypeDeclNode* pCurType = pSym->m_pDeclNode;
+            for( auto& elem : vecChain )
+            {
+                if( pCurType == nullptr )
+                {
+                    // TODO:emit error type mismatch
+                    ret = -EINVAL;
+                    break;
+                }
+                if( elem->GetClsid() ==
+                    clsid( CStSubscriptList ) )
+                {
+                    // TODO: check if pCurType match
+                    // the subscript-list.  and
+                    // ResolveSymbol for subscript
+                    // list
+                    if( pCurType->GetClsid() !=
+                        clsid( CStArrayTypeDeclNode ) )
+                    {
+                        // TODO:emit error type mismatch
+                        ret = -EINVAL;
+                        break;
+                    }
 
-    pRef->m_pDeclNode = pSym->m_pDeclNode;
-    pRef->m_bFb = ( pSym->m_eKind == symFunctionBlock );
-    pRef->m_bClass = ( pSym->m_eKind == symClass );
+                    if( pCurType->m_iDirectType == -1 )
+                    {
+                        // unresolved symbol
+                        ret = -ENOENT;
+                        break;
+                    }
+                    auto psl =
+                        ( CStSubscriptList* )elem;
+
+                    ret = psl->ResolveSymbol(
+                        pCtx, symUnknown );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    if( !pCurType->m_pDirectType.IsEmpty() )
+                        pCurType = pCurType->m_pDirectType;
+                    else
+                        pCurType = nullptr;
+                }
+                else if( elem->GetClsid() ==
+                    clsid( CStMemberAccessExpr ) )
+                {
+                    if( pCurType->GetClsid() !=
+                        clsid( CStStructTypeDeclNode ) )
+                    {
+                        // TODO:emit error type mismatch
+                        ret = -EINVAL;
+                        break;
+                    }
+                    ObjPtr pType;
+                    auto pelem = ( CStMemberAccessExpr* )elem;
+                    auto pst = static_cast
+                        < CStStructTypeDeclNode* >( pCurType );
+                    ret = pst->LookupMember(
+                        pelem->m_strMember, pType );
+                    if( ERROR( ret ) )
+                    {
+                        // TODO: emit member not declared;
+                        break;
+                    }
+                    CStTypeDeclNode* ptd = pType;
+                    if( !ptd->m_pDirectType.IsEmpty() )
+                        pCurType = pCurType->m_pDirectType;
+                    else
+                        pCurType = nullptr;
+                }
+                else
+                {
+                    // TODO: emit unexpected type
+                }
+            }
+            if( ERROR( ret ) )
+                break;
+        }
+        pRef->m_pDeclNode = pSym->m_pDeclNode;
+        pRef->m_bFb = ( pSym->m_eKind == symFunctionBlock );
+        pRef->m_bClass = ( pSym->m_eKind == symClass );
+
+    }while( 0 );
+
     return 0;
 }
 
 }  // namespace primary_expr
 
-}  // namespace rpcf
+}  // namespace stc

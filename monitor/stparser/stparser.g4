@@ -391,7 +391,9 @@ global_var_access
     ;
 
 symbolic_variable returns [ ObjPtr pExpr ]
-    : ( has_this=this_notation | sn=super_notation | nh=namespace_hierarchy TOK_DOT )? va = var_access_or_multi_elem
+    : ( has_this=this_notation | sn=super_notation
+    | nh=namespace_hierarchy TOK_DOT )?
+    va = var_access_and_multi_elem
     {
         auto psvr = ( CStSymbolicVariableRef*)$va.pExpr;
         if( $has_this.ctx )
@@ -404,7 +406,7 @@ symbolic_variable returns [ ObjPtr pExpr ]
     }
     ;
 
-var_access_or_multi_elem returns [ ObjPtr pExpr ]
+var_access_and_multi_elem returns [ ObjPtr pExpr ]
     // equivalent to the spec's rule
     // ( var_access | multi_elem_var )
     : va=var_access melc=multi_elem_chain?
@@ -796,7 +798,7 @@ primary_expr returns [ ObjPtr pExpr ]
     | ev=enum_value
     {{
         auto pParser = static_cast< CStParser* >( this );
-        $pExpr = rpcf::primary_expr::BuildStValueRefNode(
+        $pExpr = stc::primary_expr::BuildStValueRefNode(
             pParser->GetParseContext(), $ev.pNode,
             $ev.ctx->getText().c_str(),
             $ev.start, $ev.stop );
@@ -1782,7 +1784,7 @@ simple_type_decl returns [ ObjPtr pTypeDecl ]
             auto& ost = pCtx->m_oSymTab;
 
             ObjPtr pNode;
-            ret = rpcf::type_decl::BuildStSimpleTypeNode(
+            ret = stc::type_decl::BuildStSimpleTypeNode(
                 $si.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {
@@ -1906,7 +1908,7 @@ subrange_type_decl returns [ ObjPtr pTypeDecl ]
             auto& ost = pCtx->m_oSymTab;
 
             ObjPtr pNode;
-            ret = rpcf::type_decl::BuildStSubrangeTypeNode(
+            ret = stc::type_decl::BuildStSubrangeTypeNode(
                 $si.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {
@@ -2039,7 +2041,7 @@ enum_type_decl returns [ ObjPtr pTypeDecl ]
             auto& ost = pCtx->m_oSymTab;
 
             ObjPtr pNode;
-            ret = rpcf::type_decl::BuildStEnumTypeNode(
+            ret = stc::type_decl::BuildStEnumTypeNode(
                 $si.pTypeInfo, $etn.ctx->getText().c_str(),
                 pNode );
             if( ERROR( ret ) )
@@ -2180,7 +2182,7 @@ namedval_type_decl returns [ ObjPtr pTypeDecl ]
             auto& ost = pCtx->m_oSymTab;
 
             ObjPtr pNode;
-            ret = rpcf::type_decl::BuildStNamedvalTypeNode(
+            ret = stc::type_decl::BuildStNamedvalTypeNode(
                 $si.pTypeInfo, $ntn.ctx->getText().c_str(),
                 pNode );
             if( ERROR( ret ) )
@@ -2344,7 +2346,7 @@ array_type_decl returns [ ObjPtr pTypeDecl ]
             auto& ost = pCtx->m_oSymTab;
 
             ObjPtr pNode;
-            ret = rpcf::type_decl::BuildStArrayTypeNode(
+            ret = stc::type_decl::BuildStArrayTypeNode(
                 $asi.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {
@@ -2553,7 +2555,7 @@ string_type_decl returns [ ObjPtr pTypeDecl ]
             auto& ost = pCtx->m_oSymTab;
 
             ObjPtr pNode;
-            ret = rpcf::type_decl::BuildStStringTypeNode(
+            ret = stc::type_decl::BuildStStringTypeNode(
                 $si.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {

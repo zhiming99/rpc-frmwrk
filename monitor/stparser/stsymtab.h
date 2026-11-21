@@ -35,7 +35,7 @@
 /**
  * @brief What kind of entity a symbol represents
  */
-namespace rpcf
+namespace stc
 {
 
 /**
@@ -562,10 +562,35 @@ public:
 
     //! indented scope tree listing, for debugging the semantic phase
     std::string Dump();
+
+    /**
+     * @brief Queue a node for a deferred resolving retry
+     *
+     * Only *declaration-level* nodes belong here: the ones
+     * created while parsing whose resolution may depend on a
+     * name declared later in the same unit, and whose retry can
+     * re-run a self-contained subtree.  Today that means
+     * CStTypeDeclNode (via ResolveTypeDecl), CStDataTypeDeclNode
+     * and CStNamespaceDecl (their USING lists), plus the POU and
+     * variable declaration nodes once they build ASTs.
+     *
+     * Expression and statement nodes must never be queued:
+     * CStExpressionNode, CStSymbolicVariableRef,
+     * CStMemberAccessExpr, CStSubscriptList, initializers, etc.
+     * are resolved as part of an owning declaration's subtree,
+     * so a failure there is returned to that owner, which is the
+     * entry already present in the map.  The semantic pass also
+     * resolves expression bodies only after all declarations are
+     * complete, so a failure there is reported, not retried.
+     *
+     * Registering the same node twice is a no-op; the first
+     * closure stays queued.
+     */
     void AddUnsolved( ObjPtr pCtx,
         RESOLVE_FUNC resolve,
         CStSymbol* pSym = nullptr );
 
+    //! drop a node from the retry map; call it on success
     void AddSolved(
         ObjPtr pCtx, CStSymbol* pSym );
 };

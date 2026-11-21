@@ -32,8 +32,7 @@
 #include "stclsids.h"
 
 namespace antlr4 { class Token; }
-
-namespace rpcf
+namespace stc
 {
 
 enum enumSymKind {
@@ -141,7 +140,7 @@ struct CStLiteralExpr : public CStExprBase
     };
 
     enumLiteralType m_eLiteralType;
-    Variant m_oLiteralValue;
+    rpcf::Variant m_oLiteralValue;
 
     CStLiteralExpr() : super(),
         m_eLiteralType(ltNumber)
@@ -733,7 +732,7 @@ struct CStSymbolicVariableRef: public CStPrimaryExprNode
     // two properties, one is the value, the other
     // the base of the int value. if typeid is
     // multipart_access, the variant is a string
-    std::pair< int, Variant > m_oMbaValue;
+    std::pair< int, rpcf::Variant > m_oMbaValue;
 
     bool m_bThis = false;
     bool m_bSuper = false;
@@ -858,34 +857,6 @@ gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
 }
 
 
-/**
- * @brief Struct type node
- */
-struct CStStructTypeNode : public CStTypeNode
-{
-    typedef CStTypeNode super;
-
-    // Struct member
-    struct CStructMember
-    {
-        std::string m_strName;
-        ObjPtr m_pType;
-        ObjPtr m_pInitialValue;
-        // for locate_at 
-        std::pair< int, Variant > m_oMbaValue;
-    };
-
-    std::string m_strName;
-    std::string m_strTypeName;
-    std::vector< CStructMember > m_vecMembers;
-    bool m_bOverlap = false;
-
-    CStStructTypeNode() : super()
-    { SetClassId( clsid( CStStructTypeNode ) ); }
-
-    virtual std::string GetNodeInfo() const override;
-};
-
 
 /**
  * @brief type_decl wrapper node
@@ -900,12 +871,20 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     using TYPE_REF =
         std::pair< std::string, CStSymbol* >;
     TYPE_REF m_oTypeRef; 
+    // the initialization info
     ObjPtr m_pTypeInit;
+
+    // type specific info
     ObjPtr m_pTypeData;
-    using TypePair = std::pair< gint32, gint32 >;
+
+    // the type id
     gint32 m_iTypeId = -1;
+
+    // the built-in types
     gint32 m_iDirectType = -1;
     gint32 m_iRefRank = 0;
+
+    // the type instance of the m_iDirectType
     ObjPtr m_pDirectType;
 
     // pointer to CStDataTypeDeclNode
@@ -920,8 +899,7 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     virtual CStTypeDeclNode& operator=(
         const CStTypeDeclNode& rhs );
 
-    bool IsSymbolResolved() const override
-    { return ( m_iDirectType != -1 ); }
+    bool IsSymbolResolved() const override;
 
     virtual std::string GetNodeInfo() const override;
     virtual void ReplaceAmbiguousNode(
@@ -949,8 +927,6 @@ struct CStDataTypeDeclNode : public CStAstNodeBase
 
     gint32 ResolveUsingNs( void* pCtx );
     virtual std::string GetNodeInfo() const override;
-    gint32 ResolveType(
-        void* pCtx, CStTypeDeclNode* ptd );
 };
 
 struct CStAmbiguousTypeDeclNode :
@@ -963,6 +939,37 @@ struct CStAmbiguousTypeDeclNode :
         SetClassId( clsid(
             CStAmbiguousTypeDeclNode ) );
     }
+};
+
+/**
+ * @brief Struct type node
+ */
+struct CStStructTypeDeclNode :
+    public CStAmbiguousTypeDeclNode
+{
+    typedef CStAmbiguousTypeDeclNode super;
+
+    // Struct member
+    struct CStructMember
+    {
+        std::string m_strName;
+        ObjPtr m_pType;
+        ObjPtr m_pInitialValue;
+        // for locate_at 
+        std::pair< int, rpcf::Variant > m_oMbaValue;
+    };
+
+    std::vector< CStructMember > m_vecMembers;
+    bool m_bOverlap = false;
+
+    CStStructTypeDeclNode() : super()
+    { SetClassId( clsid( CStStructTypeDeclNode ) ); }
+
+    gint32 LookupMember(
+        const stdstr& strName, ObjPtr pType )
+    { return ERROR_NOT_IMPL; }
+
+    virtual std::string GetNodeInfo() const override;
 };
 
 struct CStSimpleTypeDeclNode :
@@ -1027,15 +1034,6 @@ struct CStArrayTypeDeclNode :
 
     bool IsSymbolResolved() const override;
     virtual std::string GetNodeInfo() const override;
-};
-
-struct CStStructTypeDeclNode :
-    public CStAmbiguousTypeDeclNode
-{
-    typedef CStAmbiguousTypeDeclNode super;
-
-    CStStructTypeDeclNode() : super()
-    { SetClassId( clsid( CStStructTypeDeclNode ) ); }
 };
 
 struct CStStringTypeDeclNode :
@@ -2315,7 +2313,7 @@ REGISTER_AST_NODE( CStStmtListNode );
 REGISTER_AST_NODE( CStIfBranchListNode );
 REGISTER_AST_NODE( CStConstValueNode );
 REGISTER_AST_NODE( CStArrayTypeDeclNode )
-REGISTER_AST_NODE( CStStructTypeNode );
+REGISTER_AST_NODE( CStStructTypeDeclNode );
 REGISTER_AST_NODE( CStEnumValueRef );
 REGISTER_AST_NODE( CStNamedvalValueRef );
 REGISTER_AST_NODE( CStAmbiguousValueRef );

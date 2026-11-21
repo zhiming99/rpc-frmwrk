@@ -24,11 +24,11 @@
  */
 #pragma once
 
-namespace rpcf
+namespace stc
 {
 
 struct CStAstNodeBase :
-    public CObjBase
+    public rpcf::CObjBase
 {
     typedef CObjBase super;
     guint32 m_dwFlags = 0;

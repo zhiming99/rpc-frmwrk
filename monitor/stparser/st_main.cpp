@@ -94,7 +94,6 @@ static FactoryPtr InitClassFactory()
 
     // AST Type Nodes
     INIT_MAP_ENTRY( CStConstValueNode );
-    INIT_MAP_ENTRY( CStStructTypeNode );
     INIT_MAP_ENTRY( CStEnumValueRef );
     INIT_MAP_ENTRY( CStNamedvalValueRef );
     INIT_MAP_ENTRY( CStAmbiguousValueRef );

@@ -45,10 +45,12 @@ $(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parse
 $(gen_src) &: stparser.g4 stlexer.g4 Makefile
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -message-format gnu -o . stparser.g4 stlexer.g4
 	@echo "Injecting extension at the tail of stparser.h"
+	@echo 'using namespace rpcf;' >> stparser.h
 	@echo '#include "astnodes.h"' >> stparser.h
 	@echo '#include "stsymtab.h"' >> stparser.h
 	@echo '#include "parse_context.h"' >> stparser.h
 	@echo '#include "st_parser_ext.h"' >> stparser.h
+	@echo 'using namespace stc;' >> stparser.h
 
 $(PRAGMA_TARGET): $(pragma_obj) pragma.o
 	$(AR) $(ARFLAGS) -o $@ $^

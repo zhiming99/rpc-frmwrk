@@ -22,6 +22,8 @@
  * =====================================================================================
  */
 
+#include "defines.h"
+using namespace rpcf;
 #include "stlexer.h"
 #include "stclsids.h"
 #include "astnodes.h"
@@ -30,7 +32,7 @@
 #include "stsymtab.h"
 #include "st_parser_ext.h"
 
-namespace rpcf
+namespace stc
 {
 
 // Helper function to join vector of strings
@@ -119,23 +121,13 @@ gint32 CStDataTypeDeclNode::ResolveUsingNs(
         pCtx->m_oSymTab.GetCurrentScope();
     if( !pScope.IsEmpty() )
         pScope->PushUsingArr( m_vecUsings );
-    gint32 ret = rpcf::ResolveUsingNs(
+    gint32 ret = stc::ResolveUsingNs(
         pctx, ObjPtr( pScope ) );
     if( !pScope.IsEmpty() )
         pScope->PopUsingArr();
     return ret;
 }
 
-gint32 CStDataTypeDeclNode::ResolveType(
-    void* pctx,
-    CStTypeDeclNode* ptd )
-{
-    gint32 ret = 0;
-    do{
-
-    }while( 0 );
-    return ret;
-}
 // ========================================================================
 // CStTypeDeclNode Implementation
 // ========================================================================
@@ -153,11 +145,14 @@ CStTypeDeclNode& CStTypeDeclNode::operator=(
     m_pTypeData = rhs.m_pTypeData;
 
     // set the symbol's declare node to this one
-    m_pSymbol->m_pDeclNode = ObjPtr( this );
     m_pDirectType = rhs.m_pDirectType;
 
     // node for type resolution
     m_pDtd = rhs.m_pDtd; 
+
+    // overwriting sym's declnode as the last to
+    // avoid releasing rhs unexpectedly.
+    m_pSymbol->m_pDeclNode = ObjPtr( this );
     return *this;
 }
 
@@ -220,6 +215,9 @@ void CStTypeDeclNode::ReplaceAmbiguousNode(
     *this = *pAmbiguous;
     return;
 }
+
+bool CStTypeDeclNode::IsSymbolResolved() const
+{ return ( m_iDirectType != -1 ); }
 
 bool CStSimpleTypeDeclNode::IsSymbolResolved() const
 {
@@ -1030,7 +1028,8 @@ static gint32 ResolveStInitValue(
 
 bool CStArrayTypeDeclNode::IsSymbolResolved() const
 {
-    if( !IsDirectType( m_iDirectType ) )
+    if( !IsDirectType( m_iDirectType ) &&
+        m_iDirectType != stparser::TOK_ARRAY )
         return false;
 
     // the dimension bound expressions
@@ -1049,6 +1048,17 @@ bool CStArrayTypeDeclNode::IsSymbolResolved() const
             return false;
     }
 
+    if( !IsElementaryType( m_iDirectType ) )
+    {
+        if( m_pDirectType.IsEmpty() )
+            return false;
+        CStTypeDeclNode* pdt = m_pDirectType;
+        if( !pdt )
+            return false;
+        if( !pdt->IsSymbolResolved() )
+            return false;
+    }
+
     return true;
 }
 
@@ -1061,6 +1071,16 @@ gint32 CStArrayTypeDeclNode::ResolveSymbol(
     if( ERROR( ret ) )
         return ret;
 
+    if( !IsElementaryType( m_iDirectType ) )
+    {
+        if( m_pDirectType.IsEmpty() )
+            return -EINVAL;
+
+        CStTypeDeclNode* pType = m_pDirectType;
+        ret = pType->ResolveSymbol( pctx, iKind );
+        if( ERROR( ret ) )
+            return ret;
+    }
     if( !m_pTypeData.IsEmpty() )
     {
         CStSubrangeListNode* psrl = m_pTypeData;
@@ -1477,7 +1497,7 @@ bool CStNamespaceDecl::IsNamedNamespace() const
 gint32 CStNamespaceDecl::ResolveUsingNs( void* pctx )
 {
     CStScope* pScope = m_pSymbol->m_pDefScope;
-    return rpcf::ResolveUsingNs(
+    return stc::ResolveUsingNs(
         pctx, ObjPtr( pScope ) );
 }
 
@@ -1689,7 +1709,7 @@ IMPL_GETNODEINFO( CStEnumValueRef )
 IMPL_GETNODEINFO( CStNamedvalValueRef )
 IMPL_GETNODEINFO( CStAmbiguousValueRef )
 IMPL_GETNODEINFO( CStArrayTypeDeclNode )
-IMPL_GETNODEINFO( CStStructTypeNode )
+IMPL_GETNODEINFO( CStStructTypeDeclNode )
 // CStDataTypeDeclNode has explicit implementation
 // CStTypeDeclNode has explicit implementation
 IMPL_GETNODEINFO( CStPointerTypeNode )
@@ -1738,4 +1758,4 @@ IMPL_GETNODEINFO( CStResourceSectionNode )
 
 #undef IMPL_GETNODEINFO
 
-} // namespace rpcf
+} // namespace stc

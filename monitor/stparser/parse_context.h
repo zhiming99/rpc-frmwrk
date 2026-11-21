@@ -42,7 +42,7 @@
 // Macro placeholder for future gettext string scanning
 #define _(String) dgettext("st_compiler", String)
 
-namespace rpcf
+namespace stc
 {
 
 enum class EnumTypeCategory {
