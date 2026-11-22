@@ -939,6 +939,8 @@ struct CStAmbiguousTypeDeclNode :
         SetClassId( clsid(
             CStAmbiguousTypeDeclNode ) );
     }
+    bool IsSymbolResolved() const override
+    { return false; }
 };
 
 /**
