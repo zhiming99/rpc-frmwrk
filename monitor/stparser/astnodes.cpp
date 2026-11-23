@@ -35,6 +35,9 @@ using namespace rpcf;
 namespace stc
 {
 
+bool IsDerivedType( gint32 iType );
+bool IsStringType( gint32 iType );
+
 // Helper function to join vector of strings
 static std::string JoinStrings(
     const std::vector< std::string >& vec,
@@ -454,50 +457,112 @@ gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
     pTypeNode.Clear();
     if( pTypeInfo.IsEmpty() )
         return -EINVAL;
+    gint32 ret = 0;
 
-    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+    do{
+        CParamList initInfo( ( IConfigDb* )pTypeInfo );
 
-    ObjPtr pTypeInit;
-    ObjPtr pTypeData;
-    stdstr strType;
-    gint32 iType = -1;
+        ObjPtr pTypeInit;
+        ObjPtr pTypeData;
+        stdstr strType;
+        gint32 iType = -1;
 
-    gint32 ret = initInfo.GetIntProp(
-        1, ( guint32& )iType );
-    initInfo.GetStrProp( 0, strType );
-    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
-    initInfo.GetObjPtr( propStTypeData, pTypeData );
-    if( ERROR( ret ) )
-        return -EINVAL;
+        ret = initInfo.GetIntProp(
+            1, ( guint32& )iType );
+        initInfo.GetStrProp( 0, strType );
+        initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+        initInfo.GetObjPtr( propStTypeData, pTypeData );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
-    if( iType == stparser::RuleDerived_type_access &&
-        pTypeInit.IsEmpty() )
-    {
-        ret = pTypeNode.NewObj(
-            clsid( CStAmbiguousTypeDeclNode ) );
-    }
-    else
-    {
-        ret = pTypeNode.NewObj(
-            clsid( CStArrayTypeDeclNode ) );
-    }
-    if( ERROR( ret ) )
-        return ret;
-    if( pTypeNode.IsEmpty() )
-        return -ENOMEM;
+        if( IsDerivedType( iType ) &&
+            pTypeInit.IsEmpty() )
+        {
+            // we should not be here at all
+            // simple_type_decl will  handle this
+            // case
+            ret = pTypeNode.NewObj(
+                clsid( CStAmbiguousTypeDeclNode ) );
+        }
+        else
+        {
+            ret = pTypeNode.NewObj(
+                clsid( CStArrayTypeDeclNode ) );
+        }
+        if( ERROR( ret ) )
+            break;
+        if( pTypeNode.IsEmpty() )
+        {
+            ret = -ENOMEM;
+            break;
+        }
 
-    CStTypeDeclNode* ptd = pTypeNode;
-    ptd->m_pTypeInit = pTypeInit;
-    ptd->m_oTypeRef = { strType, nullptr };
-    ptd->m_iTypeId = iType;
+        CStTypeDeclNode* ptd1 = pTypeNode;
+        if( IsDerivedType( iType ) )
+        {
+            ptd1->m_pTypeInit = pTypeInit;
+            ptd1->m_oTypeRef = { strType, nullptr };
+            ptd1->m_iTypeId = iType;
+            break;
+        }
 
-    if( !pTypeData.IsEmpty() )
-        ptd->m_pTypeData = pTypeData;
+        
+        CStArrayTypeDeclNode* ptd = pTypeNode;
 
-    if( IsDirectType( iType ) )
-        ptd->m_iDirectType = iType;
+        // explicit array declaration
+        ObjPtr pElemObj;
+        ret = initInfo.GetObjPtr(
+            propStElemTypeInfo, pElemObj ); 
+        if( ERROR( ret ) )
+        {
+            // TODO: emit unexpected error 
+            ret = -EFAULT;
+            break;
+        }
 
-    return 0;
+        CParamList oElemCfg( ( IConfigDb* )pElemObj );
+        oElemCfg.GetStrProp( 0, strType ); 
+        oElemCfg.GetIntProp( 1, ( guint32& )iType );
+
+        if( !pTypeData.IsEmpty() )
+            ptd->m_pTypeData = pTypeData;
+
+        if( !pTypeInit.IsEmpty() )
+            ptd->m_pTypeInit = pTypeInit;
+
+        // string type is always the element type
+        ptd->m_oTypeRef = { strType, nullptr };
+
+        ObjPtr pElemTypeData;
+        oElemCfg.GetObjPtr(
+            propStTypeData, pElemTypeData );
+
+        if( IsDirectType( iType ) )
+        {
+            ptd->m_iTypeId = iType;
+            ptd->m_iDirectType = iType;
+            if( IsStringType( iType ) &&
+                !pElemTypeData.IsEmpty() )
+            {
+                // TODO: create a
+                // CStStringTypeDeclNode and
+                // assign to ptd->m_pDirectType
+            }
+        }
+        else 
+        {
+            // element is of a derived type
+            ptd->m_iTypeId = stparser::TOK_ARRAY;
+            // leaving m_iDirectType -1 for the
+            // resolving process
+            UNREFERENCED( ptd->m_iDirectType );
+        }
+
+    }while( 0 );
+    return ret;
 }
 
 gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
@@ -1067,43 +1132,106 @@ gint32 CStArrayTypeDeclNode::ResolveSymbol(
 {
     // resolve the element type: m_oTypeRef.first names either
     // an elementary type or another named type
-    gint32 ret = super::ResolveSymbol( pctx, iKind );
-    if( ERROR( ret ) )
-        return ret;
+    gint32 ret = 0;
+    do{
+        stdstr strType = this->m_oTypeRef.first;
+        auto pCtx = reinterpret_cast
+            < CStParseContext* >( pctx );
+        auto& ost = pCtx->m_oSymTab;
+        std::vector< stdstr > vecComps =
+            ost.BreakdownQualified( strType );
 
-    if( !IsElementaryType( m_iDirectType ) )
-    {
+        auto pScope = ost.GetCurrentScope();
+        SymPtr pSym;
+        gint32 iType = -1;
+
+        ObjPtr pDirectType;
+        ret = ResolveTypeToDirectType(
+            pCtx, vecComps, iKind,
+            pScope, pSym, iType, pDirectType );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( SUCCEEDED( ret ) &&
+            !pDirectType.IsEmpty() )
+            m_pDirectType = pDirectType;
+
+        if( !pSym.IsEmpty() )
+            this->m_oTypeRef.second = pSym;
+
+        if( iType >= 0 )
+            this->m_iDirectType = iType;
+
         if( m_pDirectType.IsEmpty() )
-            return -EINVAL;
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         CStTypeDeclNode* pType = m_pDirectType;
-        ret = pType->ResolveSymbol( pctx, iKind );
-        if( ERROR( ret ) )
-            return ret;
-    }
-    if( !m_pTypeData.IsEmpty() )
-    {
-        CStSubrangeListNode* psrl = m_pTypeData;
-        if( psrl != nullptr )
+        if( pType )
         {
-            ret = psrl->ResolveSymbol( pctx, iKind );
+            ret = pType->ResolveSymbol( pctx, iKind );
             if( ERROR( ret ) )
-                return ret;
+                break;
         }
-    }
-
-    if( !m_pTypeInit.IsEmpty() )
-    {
-        CStArrayInitNode* pai = m_pTypeInit;
-        if( pai != nullptr )
+        else
         {
-            ret = pai->ResolveSymbol( pctx, iKind );
-            if( ERROR( ret ) )
-                return ret;
+            // TODO: emit unexpected error
         }
-    }
 
-    return 0;
+        CStTypeDeclNode* pElemType = m_pElemType;
+        if( pElemType )
+        {
+            ret = pElemType->ResolveSymbol(
+                pctx, iKind );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( !m_pTypeData.IsEmpty() )
+        {
+            CStSubrangeListNode* psrl = m_pTypeData;
+            if( psrl != nullptr )
+            {
+                ret = psrl->ResolveSymbol( pctx, iKind );
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+
+        if( !m_pTypeInit.IsEmpty() )
+        {
+            CStArrayInitNode* pai = m_pTypeInit;
+            if( pai != nullptr )
+            {
+                ret = pai->ResolveSymbol( pctx, iKind );
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CStStructTypeDeclNode::LookupMember(
+    const stdstr& strName, ObjPtr& pType ) const
+{
+    for( const auto& member : m_vecMembers )
+    {
+        if( member.m_strName != strName )
+            continue;
+        pType = member.m_pType;
+        // the member is declared, but its type
+        // node is not built yet: let the caller
+        // retry
+        return pType.IsEmpty() ? -ENOENT : 0;
+    }
+    // members of a declared struct are fixed;
+    // retrying will never make the name appear
+    return -EINVAL;
 }
 
 bool CStSubrangeTypeDeclNode::IsSymbolResolved() const

@@ -29,6 +29,8 @@ using namespace rpcf;
 namespace stc
 {
 
+bool IsDerivedType( gint32 iType );
+
 namespace primary_expr
 {
 
@@ -183,6 +185,7 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
     // lookup
     if( pRef->m_bNull || pRef->m_bConstant )
         return 0;
+    gint32 ret = 0;
 
     do{
         std::string strName;
@@ -208,7 +211,10 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
         }
 
         if( strName.empty() )
-            return -EINVAL;
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         SymPtr pSym;
         gint32 iOffset = -1;
@@ -217,11 +223,15 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
         std::vector< std::string > vecNames =
             ost.BreakdownQualified( strName );
         if( vecNames.empty() )
-            return -EINVAL;
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         CStScope* pScope = ost.GetCurrentScope();
-        gint32 ret = ResolveSymbolicRef( pCtx,
+        ret = ResolveSymbolicRef( pCtx,
             vecNames, pSym, iOffset, pScope );
+
         if( ERROR( ret ) )
         {
             // -ENOENT with a bound prefix means the
@@ -234,101 +244,153 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
                 // fatal error
                 break;
             }
-            else if( pRef->m_vecMultiElemChain.empty() )
+            else if( pSym->m_eKind == symNamespace ||
+                pRef->m_vecMultiElemChain.empty() )
             {
                 // this is a forward reference
                 ret = -ENOENT;
                 break;
             }
-            // resolve the symbols for each element in
-            // m_vecMultiElemChain
-            auto& vecChain = pRef->m_vecMultiElemChain;
-            CStTypeDeclNode* pCurType = pSym->m_pDeclNode;
-            for( auto& elem : vecChain )
+            else if( iOffset != ( gint32 )vecNames.size() - 1 )
             {
-                if( pCurType == nullptr )
+                // TODO: emit internal error
+                ret = -EINVAL;
+            }
+            // a forward reference
+            break;
+        }
+
+        // resolve the symbols for each element in
+        // m_vecMultiElemChain
+        auto& vecChain = pRef->m_vecMultiElemChain;
+        CStTypeDeclNode* pCurType = nullptr;
+        if( pSym->m_eKind == symVariable )
+        {
+            CStVarDeclNode* pVar = pSym->m_pDeclNode;
+            if( pVar && !pVar->m_pType.IsEmpty() )
+                pCurType = pVar->m_pType;      // resolve it, then m_pDirectType
+        }
+        else
+        {
+            pCurType = pSym->m_pDeclNode;
+        }
+        for( auto& elem : vecChain )
+        {
+            if( pCurType == nullptr )
+            {
+                // TODO:emit error type mismatch
+                ret = -EINVAL;
+                break;
+            }
+            else if( !pCurType->IsSymbolResolved() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( IsDerivedType( pCurType->m_iTypeId ) )
+                pCurType = pCurType->m_pDirectType;
+
+            if( !pCurType )
+            {
+                // TODO:emit unexpected error
+                ret = -EINVAL;
+                break;
+            }
+            if( elem->GetClsid() ==
+                clsid( CStSubscriptList ) )
+            {
+                if( pCurType->GetClsid() !=
+                    clsid( CStArrayTypeDeclNode ) )
                 {
                     // TODO:emit error type mismatch
                     ret = -EINVAL;
                     break;
                 }
-                if( elem->GetClsid() ==
-                    clsid( CStSubscriptList ) )
+
+                if( pCurType->m_iDirectType == -1 )
                 {
-                    // TODO: check if pCurType match
-                    // the subscript-list.  and
-                    // ResolveSymbol for subscript
-                    // list
-                    if( pCurType->GetClsid() !=
-                        clsid( CStArrayTypeDeclNode ) )
-                    {
-                        // TODO:emit error type mismatch
-                        ret = -EINVAL;
-                        break;
-                    }
-
-                    if( pCurType->m_iDirectType == -1 )
-                    {
-                        // unresolved symbol
-                        ret = -ENOENT;
-                        break;
-                    }
-                    auto psl =
-                        ( CStSubscriptList* )elem;
-
-                    ret = psl->ResolveSymbol(
-                        pCtx, symUnknown );
-
-                    if( ERROR( ret ) )
-                        break;
-
-                    if( !pCurType->m_pDirectType.IsEmpty() )
-                        pCurType = pCurType->m_pDirectType;
-                    else
-                        pCurType = nullptr;
+                    // unresolved symbol
+                    ret = -ENOENT;
+                    break;
                 }
-                else if( elem->GetClsid() ==
-                    clsid( CStMemberAccessExpr ) )
+                auto pRangeList = ( CStSubrangeListNode* )
+                    pCurType->m_pTypeData;
+                if( pRangeList == nullptr )
                 {
-                    if( pCurType->GetClsid() !=
-                        clsid( CStStructTypeDeclNode ) )
-                    {
-                        // TODO:emit error type mismatch
-                        ret = -EINVAL;
-                        break;
-                    }
-                    ObjPtr pType;
-                    auto pelem = ( CStMemberAccessExpr* )elem;
-                    auto pst = static_cast
-                        < CStStructTypeDeclNode* >( pCurType );
-                    ret = pst->LookupMember(
-                        pelem->m_strMember, pType );
-                    if( ERROR( ret ) )
-                    {
-                        // TODO: emit member not declared;
-                        break;
-                    }
-                    CStTypeDeclNode* ptd = pType;
-                    if( !ptd->m_pDirectType.IsEmpty() )
-                        pCurType = pCurType->m_pDirectType;
-                    else
-                        pCurType = nullptr;
+                    // TODO: unexpected error
+                    ret = -EFAULT;
+                    break;
                 }
-                else
+                auto psl = ( CStSubscriptList* )elem;
+
+                if( !psl->IsSymbolResolved() )
                 {
-                    // TODO: emit unexpected type
+                    ret = -ENOENT;
+                    break;
                 }
+
+                if( pRangeList->m_vecRanges.size() !=
+                    psl->m_vecIndices.size() )
+                {
+                    // TODO: emit array dimension mismatch.
+                    ret = -EINVAL;
+                    break;
+                }
+                pCurType = pCurType->m_pDirectType;
             }
-            if( ERROR( ret ) )
+            else if( elem->GetClsid() ==
+                clsid( CStMemberAccessExpr ) )
+            {
+                if( pCurType->GetClsid() !=
+                    clsid( CStStructTypeDeclNode ) )
+                {
+                    // TODO:emit error type mismatch
+                    ret = -EINVAL;
+                    break;
+                }
+                ObjPtr pType;
+                auto pelem = ( CStMemberAccessExpr* )elem;
+                auto pst = static_cast
+                    < CStStructTypeDeclNode* >( pCurType );
+                ret = pst->LookupMember(
+                    pelem->m_strMember, pType );
+                if( ERROR( ret ) )
+                {
+                    // TODO: emit error member not declared;
+                    break;
+                }
+
+                CStTypeDeclNode* ptd = pType;
+                if( ptd == nullptr )
+                {
+                    ret = -ENOENT;          // LookupMember found nothing usable
+                    break;
+                }
+                if( !ptd->IsSymbolResolved() )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
+                pelem->m_pDeclNode = pType;  // what IsSymbolResolved() checks later
+                pCurType = ptd;              // let 291 normalize aliases, 334 step arrays
+            }
+            else
+            {
+                // TODO: emit unexpected error
+                ret = -EINVAL;
                 break;
+            }
         }
+        if( ERROR( ret ) )
+            break;
         pRef->m_pDeclNode = pSym->m_pDeclNode;
         pRef->m_bFb = ( pSym->m_eKind == symFunctionBlock );
         pRef->m_bClass = ( pSym->m_eKind == symClass );
 
     }while( 0 );
 
-    return 0;
+    return ret;
 }
 
 }  // namespace primary_expr

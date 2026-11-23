@@ -968,8 +968,8 @@ struct CStStructTypeDeclNode :
     { SetClassId( clsid( CStStructTypeDeclNode ) ); }
 
     gint32 LookupMember(
-        const stdstr& strName, ObjPtr pType )
-    { return ERROR_NOT_IMPL; }
+        const stdstr& strName,
+        ObjPtr& pType ) const;
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -1026,6 +1026,11 @@ struct CStEnumTypeDeclNode :
 struct CStArrayTypeDeclNode :
     public CStAmbiguousTypeDeclNode
 {
+    ObjPtr m_pElemType;
+    ObjPtr m_pElemTypeData;
+    gint32 m_iElemTypeId;
+    gint32 m_iElemDirectType;
+
     typedef CStAmbiguousTypeDeclNode super;
 
     CStArrayTypeDeclNode() : super()

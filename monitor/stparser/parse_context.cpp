@@ -1857,6 +1857,11 @@ bool IsDerivedType( gint32 iType )
         stparser::RuleDerived_type_access;
 }
 
+bool IsStringType( gint32 iType )
+{
+    return CStParser::IsStringType( iType );
+}
+
 gint32 ResolveTypeToDirectType(
     CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,

@@ -82,6 +82,10 @@ enum {
     // TOK_WCHAR_LITERAL, since CConfigDb2 has no wide string
     // type.
     propStStrValue = rpcf::propReservedEnd + 1024 + 12,
+    // Type info from elem_type_name, a cfgptr, with
+    // 0: type name in string, 1: type id
+    // propTypeData: the type data from string_spec
+    propStElemTypeInfo = rpcf::propReservedEnd + 1024 + 13,
 };
 
 // Values of propStNumFlag for a TOK_REAL literal

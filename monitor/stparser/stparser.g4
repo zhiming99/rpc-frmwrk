@@ -2392,8 +2392,14 @@ array_spec returns [ ObjPtr pTypeInfo ]
       TOK_OF dta=data_type_access
     {
         CParamList oParams;
-        oParams.Push( $dta.typePair.first );
-        oParams.Push( $dta.typePair.second );
+        CParamList oDtaInfo(
+            ( IConfigDb* )$dta.pDtaInfo );
+        
+        oParams.Push( "ARRAY" );
+        oParams.Push( stparser::TOK_ARRAY );
+        oParams.SetObjPtr( 
+            propStElemTypeInfo, $dta.pDtaInfo );
+
         if( !$rl.pRangeList.IsEmpty() )
             oParams.SetObjPtr(
                 propStTypeData, $rl.pRangeList );
@@ -2715,13 +2721,28 @@ ref_spec returns [ ObjPtr pTypeInfo ]
     : (tok+=TOK_REF_TO)+ dta=data_type_access
     {
         CParamList oParams;
-        oParams.Push( $dta.typePair.first );
-        oParams.Push( $dta.typePair.second );
-        CParamList oTypeData;
-        oTypeData.SetIntProp(
-            propStRefRank, $tok.size() );
+        oParams.CopyParams(
+            ( IConfigDb* )$dta.pDtaInfo );
+        CParamList oDtaInfo( $dta.pDtaInfo );
+        ObjPtr pTypeData;
+        gint32 ret = oDtaInfo.GetObjPtr(
+            propStTypeData, pTypeData );
+        if( SUCCEEDED( ret ) )
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb*)pTypeData );
+            oCfg.SetIntProp(
+                propStRefRank, $tok.size() );
+        }
+        else
+        {
+            CParamList oCfg;
+            oCfg.SetIntProp(
+                propStRefRank, $tok.size() );
+            pTypeData = oCfg.GetCfg();
+        }
         oParams.SetObjPtr(
-            propStTypeData, oTypeData.GetCfg() );
+            propStTypeData, pTypeData );
         $pTypeInfo = oParams.GetCfg();
     }
     ;
@@ -2914,11 +2935,28 @@ property_prototype
 // Data Type Access
 // ============================================================
 
-data_type_access returns [ std::pair< stdstr, int > typePair ]
+data_type_access returns [ ObjPtr pDtaInfo ]
     : etn=elem_type_name
-    { $typePair = {$etn.start->getText(), $etn.start->getType()};}
+    {{
+        CParamList oParams;
+        oParams.Push($etn.start->getText());
+        oParams.Push(( guint32 )
+            $etn.start->getType());
+        if( !$etn.pTypeInfo.IsEmpty() )
+        {
+            oParams.SetObjPtr(
+                propStTypeData, $etn.pTypeInfo );
+        }
+        $pDtaInfo = oParams.GetCfg();
+    }}
     | dta=derived_type_access
-    { $typePair = {$dta.ctx->getText(), RuleDerived_type_access};}
+    {{
+        CParamList oParams;
+        oParams.Push($dta.ctx->getText());
+        oParams.Push(( guint32)
+            RuleDerived_type_access );
+        $pDtaInfo = oParams.GetCfg();
+    }}
     ;
 
 derived_type_access
