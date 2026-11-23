@@ -967,9 +967,15 @@ struct CStStructTypeDeclNode :
     CStStructTypeDeclNode() : super()
     { SetClassId( clsid( CStStructTypeDeclNode ) ); }
 
+    // a struct is known as soon as its own type is
+    // known; the member types are checked one by one
+    // when a member is used, so a pending member does
+    // not hide the whole struct
+    bool IsSymbolResolved() const override
+    { return m_iDirectType != -1; }
+
     gint32 LookupMember(
-        const stdstr& strName,
-        ObjPtr& pType ) const;
+        const stdstr& strName, ObjPtr& pType ) const;
 
     virtual std::string GetNodeInfo() const override;
 };

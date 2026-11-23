@@ -174,6 +174,42 @@ ObjPtr BuildStValueRefNode( CStParseContext* pCtx, ObjPtr pRef,
     return ObjPtr();
 }
 
+// Resolve one '.member' step against pCurType and return the
+// member's type node in pMemberType.
+static gint32 ResolveStMemberStep( CStParseContext* pCtx,
+    CStTypeDeclNode* pCurType, const std::string& strMember,
+    CStTypeDeclNode*& pMemberType )
+{
+    pMemberType = nullptr;
+    if( pCtx == nullptr || pCurType == nullptr ||
+        strMember.empty() )
+        return -EINVAL;
+
+    if( pCurType->GetClsid() !=
+        clsid( CStStructTypeDeclNode ) )
+    {
+        // TODO: emit error type mismatch
+        return -EINVAL;
+    }
+
+    auto pst = static_cast
+        < CStStructTypeDeclNode* >( pCurType );
+    ObjPtr pType;
+    gint32 ret = pst->LookupMember( strMember, pType );
+    if( ERROR( ret ) )
+        return ret;
+
+    CStTypeDeclNode* ptd = pType;
+    if( ptd == nullptr )
+        return -ENOENT;
+
+    if( !ptd->IsSymbolResolved() )
+        return -ENOENT;
+
+    pMemberType = ptd;
+    return 0;
+}
+
 gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
     CStSymbolicVariableRef* pRef, enumSymKind iKind )
 {
@@ -232,49 +268,64 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
         ret = ResolveSymbolicRef( pCtx,
             vecNames, pSym, iOffset, pScope );
 
+        // The components the scope lookup could not bind. A
+        // bound prefix with leftover components is a member
+        // path, not a forward reference: 'obj.member' is parsed
+        // as the qualified name 'obj' plus the name 'member',
+        // and 'member' lives in obj's type, not in a scope.
+        std::vector< std::string > vecMembers;
         if( ERROR( ret ) )
         {
-            // -ENOENT with a bound prefix means the
-            // remaining components are member
-            // accesses: keep the prefix and its kind
-            // so IsFbInstance/IsClassInstance can
-            // answer.
             if( ret != -ENOENT || pSym.IsEmpty() )
             {
-                // fatal error
+                // fatal error: permanent, or nothing bound
                 break;
             }
-            else if( pSym->m_eKind == symNamespace ||
-                pRef->m_vecMultiElemChain.empty() )
+            if( pSym->m_eKind == symNamespace )
             {
-                // this is a forward reference
+                // a namespace member may still be declared
+                // after this reference
                 ret = -ENOENT;
                 break;
             }
-            else if( iOffset != ( gint32 )vecNames.size() - 1 )
+            if( iOffset < 0 ||
+                ( size_t )iOffset >= vecNames.size() )
             {
-                // TODO: emit internal error
+                // partial match without a position: the
+                // lookup and this caller disagree
                 ret = -EINVAL;
+                break;
             }
-            // a forward reference
-            break;
+            vecMembers.insert( vecMembers.end(),
+                vecNames.begin() + iOffset, vecNames.end() );
+            ret = 0;
         }
 
-        // resolve the symbols for each element in
-        // m_vecMultiElemChain
-        auto& vecChain = pRef->m_vecMultiElemChain;
+        // the type the remaining path starts from
         CStTypeDeclNode* pCurType = nullptr;
         if( pSym->m_eKind == symVariable )
         {
-            CStVarDeclNode* pVar = pSym->m_pDeclNode;
-            if( pVar && !pVar->m_pType.IsEmpty() )
-                pCurType = pVar->m_pType;      // resolve it, then m_pDirectType
+            if( !pSym->m_pDeclNode.IsEmpty() &&
+                pSym->m_pDeclNode->GetClsid() ==
+                    clsid( CStVarDeclNode ) )
+            {
+                CStVarDeclNode* pVar = pSym->m_pDeclNode;
+                if( !pVar->m_pType.IsEmpty() )
+                    pCurType = pVar->m_pType;
+            }
         }
         else
         {
             pCurType = pSym->m_pDeclNode;
         }
-        for( auto& elem : vecChain )
+
+        // the dotted components the scope lookup could not bind
+        // come first, then the parsed multi-element chain
+        auto& vecChain = pRef->m_vecMultiElemChain;
+        size_t iMember = 0;
+        size_t iElem = 0;
+        while( iMember < vecMembers.size() ||
+            iElem < vecChain.size() )
         {
             if( pCurType == nullptr )
             {
@@ -282,22 +333,34 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
                 ret = -EINVAL;
                 break;
             }
-            else if( !pCurType->IsSymbolResolved() )
-            {
-                ret = -ENOENT;
-                break;
-            }
-
             if( IsDerivedType( pCurType->m_iTypeId ) )
                 pCurType = pCurType->m_pDirectType;
-
-            if( !pCurType )
+            if( pCurType == nullptr )
             {
                 // TODO:emit unexpected error
                 ret = -EINVAL;
                 break;
             }
-            if( elem->GetClsid() ==
+            if( !pCurType->IsSymbolResolved() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( iMember < vecMembers.size() )
+            {
+                CStTypeDeclNode* pType = nullptr;
+                ret = ResolveStMemberStep( pCtx, pCurType,
+                    vecMembers[ iMember ], pType );
+                if( ERROR( ret ) )
+                    break;
+                pCurType = pType;
+                iMember++;
+                continue;
+            }
+
+            ObjPtr pElem = vecChain[ iElem++ ];
+            if( pElem->GetClsid() ==
                 clsid( CStSubscriptList ) )
             {
                 if( pCurType->GetClsid() !=
@@ -322,7 +385,7 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
                     ret = -EFAULT;
                     break;
                 }
-                auto psl = ( CStSubscriptList* )elem;
+                auto psl = ( CStSubscriptList* )pElem;
 
                 if( !psl->IsSymbolResolved() )
                 {
@@ -339,41 +402,19 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
                 }
                 pCurType = pCurType->m_pDirectType;
             }
-            else if( elem->GetClsid() ==
+            else if( pElem->GetClsid() ==
                 clsid( CStMemberAccessExpr ) )
             {
-                if( pCurType->GetClsid() !=
-                    clsid( CStStructTypeDeclNode ) )
-                {
-                    // TODO:emit error type mismatch
-                    ret = -EINVAL;
-                    break;
-                }
-                ObjPtr pType;
-                auto pelem = ( CStMemberAccessExpr* )elem;
-                auto pst = static_cast
-                    < CStStructTypeDeclNode* >( pCurType );
-                ret = pst->LookupMember(
+                auto pelem = ( CStMemberAccessExpr* )pElem;
+                CStTypeDeclNode* pType = nullptr;
+                ret = ResolveStMemberStep( pCtx, pCurType,
                     pelem->m_strMember, pType );
                 if( ERROR( ret ) )
-                {
-                    // TODO: emit error member not declared;
                     break;
-                }
-
-                CStTypeDeclNode* ptd = pType;
-                if( ptd == nullptr )
-                {
-                    ret = -ENOENT;          // LookupMember found nothing usable
-                    break;
-                }
-                if( !ptd->IsSymbolResolved() )
-                {
-                    ret = -ENOENT;
-                    break;
-                }
-                pelem->m_pDeclNode = pType;  // what IsSymbolResolved() checks later
-                pCurType = ptd;              // let 291 normalize aliases, 334 step arrays
+                // what CStMemberAccessExpr::IsSymbolResolved
+                // and the later passes look at
+                pelem->m_pDeclNode = pType;
+                pCurType = pType;
             }
             else
             {
