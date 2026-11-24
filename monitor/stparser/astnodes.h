@@ -854,6 +854,17 @@ gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
  */
 gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
     ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a reference type node from ref_spec_init
+ *
+ * @param pTypeInfo the cfg returned by ref_spec_init
+ * @param pTypeNode [out] a CStRefTypeDeclNode, or a
+ *                  CStAmbiguousTypeDeclNode when the
+ *                  referenced type still has to be resolved
+ */
+gint32 BuildStRefTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
 }
 
 
@@ -1056,6 +1067,11 @@ struct CStStringTypeDeclNode :
 
     CStStringTypeDeclNode() : super()
     { SetClassId( clsid( CStStringTypeDeclNode ) ); }
+
+    // a string type is known by its elementary type and its
+    // length expression; there is no name to look up
+    bool IsSymbolResolved() const override
+    { return m_iDirectType != -1; }
 };
 
 struct CStRefTypeDeclNode :
@@ -1065,6 +1081,12 @@ struct CStRefTypeDeclNode :
 
     CStRefTypeDeclNode() : super()
     { SetClassId( clsid( CStRefTypeDeclNode ) ); }
+
+    // a reference type is known once the referenced type is
+    // known; the node itself has no name and no initializer
+    // expression to resolve
+    bool IsSymbolResolved() const override
+    { return m_iDirectType != -1; }
 };
 
 struct CStNamedvalTypeDeclNode :

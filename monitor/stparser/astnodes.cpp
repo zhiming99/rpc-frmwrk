@@ -303,6 +303,11 @@ gint32 BuildStSimpleTypeNode( const ObjPtr& pTypeInfo,
     if( ERROR( ret ) )
         return -EINVAL;
 
+    // a string type carries its length, so it is a string
+    // type node of its own, as string_type_decl would build
+    if( IsStringType( iType ) )
+        return BuildStStringTypeNode( pTypeInfo, pTypeNode );
+
     if( iType == stparser::RuleDerived_type_access &&
         pTypeInit.IsEmpty() )
     {
@@ -547,9 +552,15 @@ gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
             if( IsStringType( iType ) &&
                 !pElemTypeData.IsEmpty() )
             {
-                // TODO: create a
-                // CStStringTypeDeclNode and
-                // assign to ptd->m_pDirectType
+                // a string element carries its length in a
+                // type node of its own, so build that node
+                // and make it the array's element type
+                ObjPtr pElemNode;
+                ret = BuildStStringTypeNode(
+                    pElemTypeData, pElemNode );
+                if( ERROR( ret ) )
+                    break;
+                ptd->m_pDirectType = pElemNode;
             }
         }
         else 
@@ -608,6 +619,83 @@ gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
         ptd->m_pTypeData = pTypeData;
 
     ptd->m_iDirectType = iType;
+
+    return 0;
+}
+
+gint32 BuildStRefTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeInit;
+    ObjPtr pTypeData;
+    stdstr strType;
+    gint32 iType = -1;
+
+    gint32 ret = initInfo.GetIntProp(
+        1, ( guint32& )iType );
+    initInfo.GetStrProp( 0, strType );
+    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    if( iType == stparser::RuleDerived_type_access &&
+        pTypeInit.IsEmpty() )
+    {
+        ret = pTypeNode.NewObj(
+            clsid( CStAmbiguousTypeDeclNode ) );
+    }
+    else
+    {
+        ret = pTypeNode.NewObj(
+            clsid( CStRefTypeDeclNode ) );
+    }
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStTypeDeclNode* ptd = pTypeNode;
+    if( !pTypeInit.IsEmpty() )
+        ptd->m_pTypeInit = pTypeInit;
+
+    ptd->m_oTypeRef = { strType, nullptr };
+    ptd->m_iTypeId = stparser::TOK_REF_TO;
+
+    if( !pTypeData.IsEmpty() )
+        ptd->m_pTypeData = pTypeData;
+
+    // the referenced type is the element this node refers
+    // to, see BuildStArrayTypeNode
+    if( IsDirectType( iType ) )
+        ptd->m_iDirectType = iType;
+
+    // a referenced string keeps its length in a type node of
+    // its own
+    if( IsStringType( iType ) && !pTypeData.IsEmpty() )
+    {
+        ObjPtr pElemNode;
+        ret = BuildStStringTypeNode( pTypeData, pElemNode );
+        if( ERROR( ret ) )
+            return ret;
+        ptd->m_pDirectType = pElemNode;
+    }
+
+    if( !pTypeData.IsEmpty() )
+    {
+        CParamList oTypeData( pTypeData );
+        gint32 iRank = 0;
+        ret = oTypeData.GetIntProp(
+            propStRefRank, ( guint32& )iRank );
+        if( SUCCEEDED( ret ) )
+            ptd->m_iRefRank = iRank;
+    }
 
     return 0;
 }

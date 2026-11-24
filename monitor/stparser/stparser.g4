@@ -2379,8 +2379,9 @@ array_spec_init returns [ ObjPtr pTypeInfo ]
         $pTypeInfo = $spec.pTypeInfo;
         CParamList oParams(
             ( IConfigDb* )$pTypeInfo );
-        // The array initializer is not built yet, keep the
-        // slot consistently as simple_spec_init does.
+        // The array initializer is not built yet,
+        // keep the slot consistently as
+        // simple_spec_init does.
         if( $ai.ctx )
             oParams.SetObjPtr(
                 propStTypeInit, $ai.pTypeInit );
@@ -2623,73 +2624,23 @@ ref_type_decl returns [ ObjPtr pTypeDecl ]
             auto pCtx = pParser->GetParseContext();
             auto& ost = pCtx->m_oSymTab;
 
-            CParamList initInfo(
-                ( IConfigDb* )$rsi.pTypeInfo );
-
             ObjPtr pNode;
-            ObjPtr pTypeInit;
-            ObjPtr pTypeData;
-            stdstr strType;
-            gint32 iType = -1;
-
-            ret = initInfo.GetIntProp(
-                1, ( guint32& )iType );
-            initInfo.GetStrProp( 0, strType );
-            initInfo.GetObjPtr(
-                propStTypeInit , pTypeInit );
-
-            initInfo.GetObjPtr(
-                propStTypeData, pTypeData );
-
+            ret = stc::type_decl::BuildStRefTypeNode(
+                $rsi.pTypeInfo, pNode );
             if( ERROR( ret ) )
             {
-                ret = -EINVAL;
                 pCtx->LogError( $rsi.start,
                     "Unknown type:'%s'(%d).",
-                    $rsi.ctx->rs->getText().c_str(),
-                    ret );
-            }
-            else if( iType == RuleDerived_type_access
-                && pTypeInit.IsEmpty() )
-            {
-                ret = pNode.NewObj(
-                    clsid( CStAmbiguousTypeDeclNode ) );
-            }
-            else 
-            {
-                ret = pNode.NewObj(
-                    clsid( CStRefTypeDeclNode ) );
-            }
-
-            if( ERROR( ret ) )
+                    $rsi.ctx->rs->getText().c_str(), ret );
                 break;
-
-            CStRefTypeDeclNode* ptd = pNode;
-            if( !pTypeInit.IsEmpty() )
-                ptd->m_pTypeInit = pTypeInit;
-
-            ptd->m_oTypeRef = { strType, nullptr };
-            ptd->m_iTypeId = TOK_REF_TO;
-
-            if( !pTypeData.IsEmpty() )
-                ptd->m_pTypeData = pTypeData;
-
-            if( IsDirectType( iType ) )
-                ptd->m_iDirectType = iType;
-
-            if( !pTypeData.IsEmpty() )
-            {
-                CParamList oTypeData( pTypeData );
-                gint32 iRank = 0;
-                ret = oTypeData.GetIntProp(
-                    propStRefRank, ( guint32& )iRank );
-                if( SUCCEEDED( ret ) )
-                    ptd->m_iRefRank = iRank;
             }
+
+            CStTypeDeclNode* ptd = pNode;
 
             SymPtr pSym;
             ret = ost.Declare( $rtn.text,
-                symDataType, pNode, pSym, strType,
+                symDataType, pNode, pSym,
+                ptd->m_oTypeRef.first,
                 ( CStVarDeclNode::enumVarCategory )0 );
             if( ERROR( ret ) )
                 break;
