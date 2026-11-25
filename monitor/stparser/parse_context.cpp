@@ -1909,9 +1909,48 @@ LBL_RESOLVE_SYMBOL:
         if( pSym.IsEmpty() )
             pSym = pCurSym;
 
+        // the node is on the resolving stack. Its identity is
+        // already known, so a reference to it (a REF_TO, which
+        // adds no inline storage) is satisfied; a by-value use
+        // is caught by the caller's state guard
+        if( ptd->GetTypeState() ==
+            CStTypeDeclNode::tsInProgress )
+        {
+            if( ptd->GetClsid() ==
+                    clsid( CStArrayTypeDeclNode ) ||
+                IsArrayType( ptd->m_iTypeId ) )
+            {
+                iType = stparser::TOK_ARRAY;
+                pDirectType = pNode;
+                break;
+            }
+            if( ptd->m_iDirectType != -1 )
+            {
+                iType = ptd->m_iDirectType;
+                pDirectType = pNode;
+                break;
+            }
+            ret = -ENOENT;
+            break;
+        }
+
         // declared from a direct type
         if( ptd->IsSymbolResolved() )
         {
+            // an array is its own direct type. An alias of an
+            // array keeps m_iTypeId == RuleDerived_type_access
+            // (it is an array, but not declared directly),
+            // which the code generator needs to emit a type
+            // alias rather than an array declaration
+            if( ptd->GetClsid() ==
+                    clsid( CStArrayTypeDeclNode ) ||
+                IsArrayType( ptd->m_iTypeId ) )
+            {
+                iType = stparser::TOK_ARRAY;
+                pDirectType = pNode;
+                break;
+            }
+
             iType = ptd->m_iDirectType;
             if( ptd->m_iTypeId ==
                 ptd->m_iDirectType )
@@ -2090,7 +2129,17 @@ gint32 ResolveTypeDecl(
                     pObj, ptd->m_iDirectType,
                     pNewNode );
                 if( SUCCEEDED( ret ) )
+                {
                     pObj = pNewNode;
+                    // the ambiguous node only resolved the
+                    // type reference; the concrete node still
+                    // has to resolve its initializer, the
+                    // array bounds, the member types, etc.
+                    CStTypeDeclNode* pNew = pObj;
+                    if( pNew != nullptr )
+                        ret = pNew->ResolveSymbol(
+                            pctx, symDataType );
+                }
             }
             if( bPushedHere )
                 pdtd->m_pScope->PopUsingArr();
@@ -2098,14 +2147,40 @@ gint32 ResolveTypeDecl(
             return ret;
         });
         ret = func( pObj, pctx );
-        if( ERROR( ret ) )
+        if( ret == -ENOENT )
         {
+            // a forward reference: retry after the parse.
+            // Read the node back from pObj: the closure may
+            // have replaced it, and the old node may be gone.
             auto pCtx = reinterpret_cast
                 < CStParseContext* >( pctx );
             auto& ost = pCtx->m_oSymTab;
-            auto pSym = ptd->m_pSymbol;
+            CStTypeDeclNode* pCur = pObj;
+            auto pSym = ( pCur != nullptr ?
+                pCur->m_pSymbol : nullptr );
             ost.AddUnsolved( pObj, func, pSym );
             ret = -EAGAIN;
+        }
+        else if( ERROR( ret ) )
+        {
+            // a permanent failure, e.g. a cyclic type
+            // declaration: report it and do not queue it for
+            // another attempt
+            auto pCtx = reinterpret_cast
+                < CStParseContext* >( pctx );
+            CStTypeDeclNode* pCur = pObj;
+            auto pSym = ( pCur != nullptr ?
+                pCur->m_pSymbol : nullptr );
+            antlr4::Token* pTok = nullptr;
+            stdstr strName;
+            if( pSym != nullptr )
+            {
+                pTok = pSym->m_pStart;
+                strName = pSym->m_strName;
+            }
+            pCtx->LogError( pTok,
+                "Invalid or cyclic type declaration "
+                "'%s'(%d).", strName.c_str(), ret );
         }
 
     }while( 0 );

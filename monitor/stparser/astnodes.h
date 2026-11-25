@@ -65,6 +65,8 @@ class CStScope;
 class CStSymbol;
 struct CStParseContext;
 
+using MemberInit=std::vector< std::pair< std::string, ObjPtr > > ;
+
 struct CStSymbolDeclNode : public CStAstNodeBase
 {
     static stdstr m_strEmpty;
@@ -602,7 +604,7 @@ struct CStConstValueNode : public CStPrimaryExprNode
 {
     typedef CStPrimaryExprNode super;
 
-    std::pair< int, ObjPtr > m_oValue;
+    std::pair< int, Variant > m_oValue;
     CStConstValueNode() : super()
     { SetClassId( clsid( CStConstValueNode ) ); }
 
@@ -865,6 +867,31 @@ gint32 BuildStStringTypeNode( const ObjPtr& pTypeInfo,
  */
 gint32 BuildStRefTypeNode( const ObjPtr& pTypeInfo,
     ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a struct type node from struct_spec / struct_decl
+ *
+ * @param pTypeInfo the cfg returned by struct_decl or
+ *                  struct_spec_init; the member list, when
+ *                  any, is in propStTypeData as an
+ *                  ObjVecPtr of member cfgs (name in prop 0,
+ *                  the member's spec cfg in propStTypeData)
+ * @param pTypeNode [out] a CStStructTypeDeclNode, or a
+ *                  CStAmbiguousTypeDeclNode when the struct
+ *                  type is named and still has to be resolved
+ */
+gint32 BuildStStructTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
+
+/**
+ * @brief Build a type node from any spec cfg
+ *
+ * Dispatches on the spec's shape: array, inline struct,
+ * reference (propStRefRank in the type data), string,
+ * subrange, and simple type as the fallback.
+ */
+gint32 BuildStTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode );
 }
 
 
@@ -901,8 +928,46 @@ struct CStTypeDeclNode : public CStSymbolDeclNode
     // pointer to CStDataTypeDeclNode
     ObjPtr m_pDtd; 
 
+    // the resolving state, used to break cycles between type
+    // declarations, e.g. 'a : ARRAY [1..2] OF a'
+    enum enumTypeState
+    {
+        tsUnresolved = 0,   // not resolved yet, may be retried
+        tsInProgress,       // on the resolving stack
+        tsDone,             // resolved successfully
+        tsInvalid           // permanent error, e.g. a cycle
+    };
+
+    enumTypeState m_iState = tsUnresolved;
+
     CStTypeDeclNode() : super()
     {}
+
+    enumTypeState GetTypeState() const
+    { return m_iState; }
+
+    /**
+     * @brief Mark this node as being resolved
+     *
+     * @return 0 to proceed, 1 when the node is already
+     *         resolved, or -EINVAL when the node is invalid
+     *         or already on the resolving stack (a cycle)
+     */
+    gint32 BeginResolve();
+
+    /**
+     * @brief Record the outcome of a resolving attempt
+     *
+     * A retryable -ENOENT returns the node to tsUnresolved so
+     * the next attempt can proceed; any other error marks the
+     * node invalid.
+     */
+    void EndResolve( gint32 ret );
+
+    //! the type-specific part of ResolveSymbol(), without the
+    //! cycle state handling
+    gint32 ResolveOwnSymbol(
+        void* pctx, enumSymKind iSymKind );
 
     virtual gint32 ResolveSymbol(
         void* pctx, enumSymKind iSymKind ) override;
@@ -978,12 +1043,14 @@ struct CStStructTypeDeclNode :
     CStStructTypeDeclNode() : super()
     { SetClassId( clsid( CStStructTypeDeclNode ) ); }
 
-    // a struct is known as soon as its own type is
-    // known; the member types are checked one by one
-    // when a member is used, so a pending member does
-    // not hide the whole struct
+    // a struct is fully resolved only after its member types
+    // have been resolved; IsSymbolResolved() stays false until
+    // ResolveSymbol() has completed once
     bool IsSymbolResolved() const override
-    { return m_iDirectType != -1; }
+    { return m_iDirectType != -1 && m_iState == tsDone; }
+
+    gint32 ResolveSymbol(
+        void* pctx, enumSymKind iKind ) override;
 
     gint32 LookupMember(
         const stdstr& strName, ObjPtr& pType ) const;
@@ -2069,9 +2136,7 @@ struct CStStructInitNode : public CStAstNodeBase
 {
     typedef CStAstNodeBase super;
 
-    std::vector< std::string > m_vecMembers;
-    std::vector< ObjPtr > m_vecValues;
-
+    MemberInit m_vecElemInits;
     CStStructInitNode() : super()
     { SetClassId( clsid( CStStructInitNode ) ); }
 

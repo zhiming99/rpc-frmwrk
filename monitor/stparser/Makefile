@@ -66,6 +66,12 @@ stbase.o: stbase.cpp stbase.h $(key_headers)
 st_main.o: st_main.cpp $(key_headers)
 primexpr.o: primexpr.cpp $(key_headers)
 
+# the generated parser/lexer include the AST headers (injected
+# at the tail of stparser.h), so a header change must rebuild
+# them too: a stale object has the old class layout
+stparser.o stlexer.o stparserVisitor.o stparserBaseListener.o \
+stparserListener.o stparserBaseVisitor.o: $(key_headers)
+
 $(pragma_auto_gen) $(pragma_auto_headers) &: pragma_expr.g4
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -message-format gnu -listener -o ./pragma_expr pragma_expr.g4
 

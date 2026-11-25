@@ -147,6 +147,12 @@ CStTypeDeclNode& CStTypeDeclNode::operator=(
     m_iRefRank = rhs.m_iRefRank;
     m_pTypeData = rhs.m_pTypeData;
 
+    // the resolving state is deliberately not copied: this
+    // node replaces an ambiguous node which only resolved the
+    // type reference, and the concrete node still has to
+    // resolve its own initializer, bounds, members, ...
+    m_iState = tsUnresolved;
+
     // set the symbol's declare node to this one
     m_pDirectType = rhs.m_pDirectType;
 
@@ -172,7 +178,52 @@ std::string CStTypeDeclNode::GetNodeInfo() const
     return oss.str();
 }
 
+gint32 CStTypeDeclNode::BeginResolve()
+{
+    if( m_iState == tsInvalid )
+        return -EINVAL;
+
+    if( m_iState == tsInProgress )
+    {
+        // reentered while still resolving: a cyclic type
+        // declaration such as 'a : ARRAY [1..2] OF a'
+        m_iState = tsInvalid;
+        return -EINVAL;
+    }
+
+    if( m_iState == tsDone )
+        return 1;
+
+    m_iState = tsInProgress;
+    return 0;
+}
+
+void CStTypeDeclNode::EndResolve( gint32 ret )
+{
+    if( ret == 0 )
+        m_iState = tsDone;
+    else if( ret == -ENOENT )
+        // a retryable failure must not look like a cycle
+        m_iState = tsUnresolved;
+    else
+        m_iState = tsInvalid;
+}
+
 gint32 CStTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iSymType ) 
+{
+    gint32 ret = BeginResolve();
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 1 )
+        return 0;
+
+    ret = ResolveOwnSymbol( pctx, iSymType );
+    EndResolve( ret );
+    return ret;
+}
+
+gint32 CStTypeDeclNode::ResolveOwnSymbol(
     void* pctx, enumSymKind iSymType ) 
 {
     if( IsSymbolResolved() )
@@ -220,7 +271,11 @@ void CStTypeDeclNode::ReplaceAmbiguousNode(
 }
 
 bool CStTypeDeclNode::IsSymbolResolved() const
-{ return ( m_iDirectType != -1 ); }
+{
+    if( m_iState == tsInProgress || m_iState == tsInvalid )
+        return false;
+    return ( m_iDirectType != -1 );
+}
 
 bool CStSimpleTypeDeclNode::IsSymbolResolved() const
 {
@@ -251,10 +306,17 @@ bool CStSimpleTypeDeclNode::IsSymbolResolved() const
 gint32 CStSimpleTypeDeclNode::ResolveSymbol(
     void* pctx, enumSymKind iSymType ) 
 {
-    gint32 ret = super::ResolveSymbol(
-        pctx, iSymType );
+    // guard the whole body: the base part resolves the type
+    // reference, the part below resolves the initializer, and
+    // both belong to this node's resolution
+    gint32 ret = BeginResolve();
     if( ERROR( ret ) )
         return ret;
+    if( ret == 1 )
+        return 0;
+
+    ret = ResolveOwnSymbol( pctx, iSymType );
+    if( SUCCEEDED( ret ) )
     do{
         if( !m_pTypeInit.IsEmpty() )
         {
@@ -275,6 +337,8 @@ gint32 CStSimpleTypeDeclNode::ResolveSymbol(
                 break;
         }
     }while( 0 );
+
+    EndResolve( ret );
     return ret;
 }
 
@@ -483,20 +547,27 @@ gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
             break;
         }
 
-        if( IsDerivedType( iType ) &&
-            pTypeInit.IsEmpty() )
+        // prop 1 is TOK_ARRAY for an inline 'ARRAY [..] OF T',
+        // and RuleDerived_type_access for a bare name of an
+        // existing array type, which resolves to that type
+        // later
+        if( IsDerivedType( iType ) )
         {
-            // we should not be here at all
-            // simple_type_decl will  handle this
-            // case
             ret = pTypeNode.NewObj(
                 clsid( CStAmbiguousTypeDeclNode ) );
+            if( ERROR( ret ) )
+                break;
+            CStTypeDeclNode* ptd1 = pTypeNode;
+            ptd1->m_pTypeInit = pTypeInit;
+            ptd1->m_oTypeRef = { strType, nullptr };
+            ptd1->m_iTypeId = iType;
+            break;
         }
-        else
-        {
-            ret = pTypeNode.NewObj(
-                clsid( CStArrayTypeDeclNode ) );
-        }
+
+        // 'ARRAY [..] OF T': always an array node, whatever
+        // the element type is
+        ret = pTypeNode.NewObj(
+            clsid( CStArrayTypeDeclNode ) );
         if( ERROR( ret ) )
             break;
         if( pTypeNode.IsEmpty() )
@@ -505,16 +576,6 @@ gint32 BuildStArrayTypeNode( const ObjPtr& pTypeInfo,
             break;
         }
 
-        CStTypeDeclNode* ptd1 = pTypeNode;
-        if( IsDerivedType( iType ) )
-        {
-            ptd1->m_pTypeInit = pTypeInit;
-            ptd1->m_oTypeRef = { strType, nullptr };
-            ptd1->m_iTypeId = iType;
-            break;
-        }
-
-        
         CStArrayTypeDeclNode* ptd = pTypeNode;
 
         // explicit array declaration
@@ -698,6 +759,153 @@ gint32 BuildStRefTypeNode( const ObjPtr& pTypeInfo,
     }
 
     return 0;
+}
+
+gint32 BuildStStructTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList initInfo( ( IConfigDb* )pTypeInfo );
+
+    ObjPtr pTypeInit;
+    ObjPtr pTypeData;
+    stdstr strType;
+    gint32 iType = -1;
+
+    gint32 ret = initInfo.GetIntProp(
+        1, ( guint32& )iType );
+    initInfo.GetStrProp( 0, strType );
+    initInfo.GetObjPtr( propStTypeInit, pTypeInit );
+    initInfo.GetObjPtr( propStTypeData, pTypeData );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    if( IsDerivedType( iType ) )
+    {
+        // the name of an existing struct type: the node
+        // resolves to that type later
+        ret = pTypeNode.NewObj(
+            clsid( CStAmbiguousTypeDeclNode ) );
+        if( ERROR( ret ) )
+            return ret;
+        CStTypeDeclNode* ptd = pTypeNode;
+        ptd->m_pTypeInit = pTypeInit;
+        ptd->m_oTypeRef = { strType, nullptr };
+        ptd->m_iTypeId = iType;
+        return 0;
+    }
+
+    ret = pTypeNode.NewObj(
+        clsid( CStStructTypeDeclNode ) );
+    if( ERROR( ret ) )
+        return ret;
+    if( pTypeNode.IsEmpty() )
+        return -ENOMEM;
+
+    CStStructTypeDeclNode* pst = pTypeNode;
+    pst->m_pTypeInit = pTypeInit;
+    pst->m_oTypeRef = { strType, nullptr };
+    pst->m_iTypeId = stparser::TOK_STRUCT;
+    pst->m_iDirectType = stparser::TOK_STRUCT;
+
+    if( pTypeData.IsEmpty() )
+        return 0;   // an empty struct
+
+    ObjVecPtr pvec( pTypeData );
+    if( pvec.IsEmpty() )
+        return 0;
+    auto& vec = ( *pvec )();
+
+    // reserve up front: a CStructMember holds a Variant whose
+    // copy constructor rejects the default value, so the
+    // vector must not reallocate its elements
+    pst->m_vecMembers.reserve( vec.size() );
+
+    for( auto& pElem : vec )
+    {
+        if( pElem.IsEmpty() )
+            continue;
+        CParamList oElem( ( IConfigDb* )pElem );
+        stdstr strName;
+        ObjPtr pMemberInfo;
+        oElem.GetStrProp( 0, strName );
+        oElem.GetObjPtr( propStTypeData, pMemberInfo );
+        if( strName.empty() || pMemberInfo.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ObjPtr pMemberType;
+        ret = BuildStTypeNode( pMemberInfo, pMemberType );
+        if( ERROR( ret ) )
+            break;
+        CStTypeDeclNode* ptd = pMemberType;
+        if( ptd == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        pst->m_vecMembers.emplace_back();
+        auto& member = pst->m_vecMembers.back();
+        member.m_strName = strName;
+        member.m_pType = pMemberType;
+    }
+
+    return ret;
+}
+
+gint32 BuildStTypeNode( const ObjPtr& pTypeInfo,
+    ObjPtr& pTypeNode )
+{
+    pTypeNode.Clear();
+    if( pTypeInfo.IsEmpty() )
+        return -EINVAL;
+
+    CParamList oInfo( ( IConfigDb* )pTypeInfo );
+    gint32 iType = -1;
+    gint32 ret = oInfo.GetIntProp(
+        1, ( guint32& )iType );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    // a reference is marked by its rank in the type data, and
+    // must be checked before the referenced type's own kind
+    ObjPtr pTypeData;
+    oInfo.GetObjPtr( propStTypeData, pTypeData );
+    if( !pTypeData.IsEmpty() )
+    {
+        CParamList oData( ( IConfigDb* )pTypeData );
+        gint32 iRank = 0;
+        if( SUCCEEDED( oData.GetIntProp(
+            propStRefRank, ( guint32& )iRank ) ) )
+            return BuildStRefTypeNode(
+                pTypeInfo, pTypeNode );
+    }
+
+    // an inline array is marked by TOK_ARRAY in prop 1; a
+    // bare array type name goes through simple_type_access
+    // instead, see BuildStArrayTypeNode
+    if( iType == stparser::TOK_ARRAY )
+        return BuildStArrayTypeNode( pTypeInfo, pTypeNode );
+
+    if( iType == stparser::TOK_STRUCT )
+        return BuildStStructTypeNode( pTypeInfo, pTypeNode );
+
+    if( IsStringType( iType ) )
+        return BuildStStringTypeNode( pTypeInfo, pTypeNode );
+
+    // a subrange spec carries its CStSubrangeNode in the type
+    // data; an elementary name alone has no other marker
+    if( !pTypeData.IsEmpty() &&
+        pTypeData->GetClsid() == clsid( CStSubrangeNode ) )
+        return BuildStSubrangeTypeNode( pTypeInfo, pTypeNode );
+
+    return BuildStSimpleTypeNode( pTypeInfo, pTypeNode );
 }
 
 }  // namespace type_decl
@@ -1181,6 +1389,11 @@ static gint32 ResolveStInitValue(
 
 bool CStArrayTypeDeclNode::IsSymbolResolved() const
 {
+    // never report a node that is being resolved, or one that
+    // turned out to be cyclic, as resolved
+    if( m_iState == tsInProgress || m_iState == tsInvalid )
+        return false;
+
     if( !IsDirectType( m_iDirectType ) &&
         m_iDirectType != stparser::TOK_ARRAY )
         return false;
@@ -1208,7 +1421,14 @@ bool CStArrayTypeDeclNode::IsSymbolResolved() const
         CStTypeDeclNode* pdt = m_pDirectType;
         if( !pdt )
             return false;
-        if( !pdt->IsSymbolResolved() )
+        if( pdt->GetClsid() == clsid( CStArrayTypeDeclNode ) )
+        {
+            // the element may point back at this node; rely on
+            // its recorded state instead of recursing
+            if( pdt->GetTypeState() != tsDone )
+                return false;
+        }
+        else if( !pdt->IsSymbolResolved() )
             return false;
     }
 
@@ -1218,9 +1438,19 @@ bool CStArrayTypeDeclNode::IsSymbolResolved() const
 gint32 CStArrayTypeDeclNode::ResolveSymbol(
     void* pctx, enumSymKind iKind )
 {
-    // resolve the element type: m_oTypeRef.first names either
-    // an elementary type or another named type
-    gint32 ret = 0;
+    // the state guard turns a cyclic element type, such as
+    // 'a : ARRAY [1..2] OF a', into a permanent error instead
+    // of an endless recursion
+    gint32 ret = BeginResolve();
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 1 )
+        return 0;
+
+    // resolve the element type: m_oTypeRef.first
+    // names either an elementary type or another
+    // named type
+    ret = 0;
     do{
         stdstr strType = this->m_oTypeRef.first;
         auto pCtx = reinterpret_cast
@@ -1233,28 +1463,38 @@ gint32 CStArrayTypeDeclNode::ResolveSymbol(
         SymPtr pSym;
         gint32 iType = -1;
 
-        ObjPtr pDirectType;
-        ret = ResolveTypeToDirectType(
-            pCtx, vecComps, iKind,
-            pScope, pSym, iType, pDirectType );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( SUCCEEDED( ret ) &&
-            !pDirectType.IsEmpty() )
-            m_pDirectType = pDirectType;
-
-        if( !pSym.IsEmpty() )
-            this->m_oTypeRef.second = pSym;
-
-        if( iType >= 0 )
-            this->m_iDirectType = iType;
-
-        if( m_pDirectType.IsEmpty() )
+        pSym = this->m_oTypeRef.second;
+        // an elementary element type, including a string, is
+        // already recorded at build time and has no name to
+        // look up
+        if( !IsElementaryType( m_iDirectType ) &&
+            ( pSym.IsEmpty() ||
+            this->m_iDirectType == -1 ) )
         {
-            ret = -EINVAL;
-            break;
+            ObjPtr pDirectType;
+            pSym.Clear();
+            ret = ResolveTypeToDirectType(
+                pCtx, vecComps, iKind,
+                pScope, pSym, iType, pDirectType );
+
+            if( ERROR( ret ) )
+                break;
+
+            if( SUCCEEDED( ret ) &&
+                !pDirectType.IsEmpty() )
+                m_pDirectType = pDirectType;
+
+            if( !pSym.IsEmpty() )
+                this->m_oTypeRef.second = pSym;
+
+            if( iType >= 0 )
+                this->m_iDirectType = iType;
+
+            if( m_pDirectType.IsEmpty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
         }
 
         CStTypeDeclNode* pType = m_pDirectType;
@@ -1301,6 +1541,55 @@ gint32 CStArrayTypeDeclNode::ResolveSymbol(
         }
 
     }while( 0 );
+
+    EndResolve( ret );
+    return ret;
+}
+
+gint32 CStStructTypeDeclNode::ResolveSymbol(
+    void* pctx, enumSymKind iKind )
+{
+    // the state guard also catches a struct that contains
+    // itself by value, e.g. 's : STRUCT x : s; END_STRUCT',
+    // and a mutual struct cycle
+    gint32 ret = BeginResolve();
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 1 )
+        return 0;
+
+    do{
+        for( auto& member : m_vecMembers )
+        {
+            CStTypeDeclNode* ptd = member.m_pType;
+            if( ptd == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            ret = ptd->ResolveSymbol( pctx, iKind );
+            if( ERROR( ret ) )
+                break;
+
+            // a member that resolves back to this struct by
+            // value is a cyclic declaration. A reference to
+            // this struct, e.g. 'r : REF_TO s', adds no
+            // inline storage and is legal
+            if( ptd->GetClsid() ==
+                    clsid( CStRefTypeDeclNode ) ||
+                ptd->m_iTypeId == stparser::TOK_REF_TO )
+                continue;
+
+            CStTypeDeclNode* pDirect = ptd->m_pDirectType;
+            if( pDirect == ( CStTypeDeclNode* )this )
+            {
+                ret = -EINVAL;   // cyclic struct declaration
+                break;
+            }
+        }
+    }while( 0 );
+
+    EndResolve( ret );
     return ret;
 }
 
@@ -1347,43 +1636,52 @@ bool CStSubrangeTypeDeclNode::IsSymbolResolved() const
 gint32 CStSubrangeTypeDeclNode::ResolveSymbol(
     void* pctx, enumSymKind iKind )
 {
-    gint32 ret = 0;
+    gint32 ret = BeginResolve();
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 1 )
+        return 0;
 
-    // a named (derived) base type must be resolved first; an
-    // elementary base is already recorded at parse time
-    if( m_iDirectType != stparser::RuleSubrange_type_decl )
-    {
-        ret = super::ResolveSymbol( pctx, iKind );
-        if( ERROR( ret ) )
-            return ret;
-    }
-
-    if( !m_pTypeData.IsEmpty() )
-    {
-        CStSubrangeNode* psr = m_pTypeData;
-        if( psr != nullptr )
+    do{
+        // a named (derived) base type must be resolved first;
+        // an elementary base is already recorded at parse time
+        if( m_iDirectType != stparser::RuleSubrange_type_decl )
         {
-            ret = psr->ResolveSymbol( pctx, iKind );
+            ret = ResolveOwnSymbol( pctx, iKind );
             if( ERROR( ret ) )
-                return ret;
+                break;
         }
-    }
 
-    if( !m_pTypeInit.IsEmpty() )
-    {
-        CStExprBase* pExpr = m_pTypeInit;
-        if( pExpr != nullptr )
+        if( !m_pTypeData.IsEmpty() )
         {
-            ret = pExpr->ResolveSymbol( pctx, iKind );
-            if( ERROR( ret ) )
-                return ret;
+            CStSubrangeNode* psr = m_pTypeData;
+            if( psr != nullptr )
+            {
+                ret = psr->ResolveSymbol( pctx, iKind );
+                if( ERROR( ret ) )
+                    break;
+            }
         }
-    }
 
-    // the subrange type is a type of its own, not an alias of
-    // its base type
-    m_iDirectType = stparser::RuleSubrange_type_decl;
-    return 0;
+        if( !m_pTypeInit.IsEmpty() )
+        {
+            CStExprBase* pExpr = m_pTypeInit;
+            if( pExpr != nullptr )
+            {
+                ret = pExpr->ResolveSymbol( pctx, iKind );
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+
+        // the subrange type is a type of its own, not an alias
+        // of its base type
+        m_iDirectType = stparser::RuleSubrange_type_decl;
+
+    }while( 0 );
+
+    EndResolve( ret );
+    return ret;
 }
 
 // ========================================================================
@@ -1473,7 +1771,7 @@ gint32 CStArrayInitNode::ResolveSymbol(
 std::string CStStructInitNode::GetNodeInfo() const
 {
     std::ostringstream oss;
-    oss << "StructInit{ members: " << m_vecMembers.size() << " }";
+    oss << "StructInit{ members: " << m_vecElemInits.size() << " }";
     return oss.str();
 }
 

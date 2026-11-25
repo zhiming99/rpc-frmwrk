@@ -852,7 +852,8 @@ constant returns [ ObjPtr pNode ]
         ObjPtr pNode;
         pNode.NewObj( clsid( CStConstValueNode ) );
         auto pConst = ( CStConstValueNode* )pNode;
-        pConst->m_oValue = $nl.pair;
+        pConst->m_oValue = { $nl.pair.first,
+             Variant( $nl.pair.second ) };
         $pNode = pNode;
     }}
     | sl = string_literal
@@ -860,7 +861,8 @@ constant returns [ ObjPtr pNode ]
         ObjPtr pNode;
         pNode.NewObj( clsid( CStConstValueNode ) );
         auto pConst = ( CStConstValueNode* )pNode;
-        pConst->m_oValue = $sl.pair;
+        pConst->m_oValue = { $sl.pair.first,
+             Variant( $sl.pair.second ) };
         $pNode = pNode;
     }}
     | tl = time_literal
@@ -868,7 +870,8 @@ constant returns [ ObjPtr pNode ]
         ObjPtr pNode;
         pNode.NewObj( clsid( CStConstValueNode ) );
         auto pConst = ( CStConstValueNode* )pNode;
-        pConst->m_oValue = $tl.pair;
+        pConst->m_oValue = { $tl.pair.first,
+             Variant( $tl.pair.second ) };
         $pNode = pNode;
     }}
     | bl = bool_literal
@@ -876,7 +879,8 @@ constant returns [ ObjPtr pNode ]
         ObjPtr pNode;
         pNode.NewObj( clsid( CStConstValueNode ) );
         auto pConst = ( CStConstValueNode* )pNode;
-        pConst->m_oValue = $bl.pair;
+        pConst->m_oValue = { $bl.pair.first,
+             Variant( $bl.pair.second ) };
         $pNode = pNode;
     }}
     | bsl = bit_str_literal
@@ -884,7 +888,8 @@ constant returns [ ObjPtr pNode ]
         ObjPtr pNode;
         pNode.NewObj( clsid( CStConstValueNode ) );
         auto pConst = ( CStConstValueNode* )pNode;
-        pConst->m_oValue = $bsl.pair;
+        pConst->m_oValue = { $bsl.pair.first,
+             Variant( $bsl.pair.second ) };
         $pNode = pNode;
     }}
     ;
@@ -1465,12 +1470,12 @@ var_decl
     ;
 
 var_decl_init
-    : {IsSimpleType()}? variable_list TOK_COLON var_decl_init_set
-    | {IsArrayType()}? array_var_decl_init
-    | {IsStructType()}? struct_var_decl_init
-    | {IsFBType()}? fb_decl_init
-    | {IsInterfaceType()}? interface_spec_init
-    | {IsAmbiguousType()}? variable_list TOK_COLON ambiguous_var_decl_init
+    : variable_list TOK_COLON var_decl_init_set
+    | array_var_decl_init
+    | struct_var_decl_init
+    | fb_decl_init
+    | interface_spec_init
+    // | variable_list TOK_COLON ambiguous_var_decl_init
     ;
 
 ambiguous_var_decl_init
@@ -1994,6 +1999,8 @@ subrange_spec_init returns [ ObjPtr pTypeInfo ]
                     clsid( CStConstValueNode ) );
                 CStConstValueNode* pc = pInit;
                 pc->m_oValue = pr;
+                pc->m_oValue = { pr.first,
+                     Variant( pr.second ) };
                 pc->SetTokens( $iv, $iv );
                 oParams.SetObjPtr(
                     propStTypeInit, pInit );
@@ -2379,12 +2386,14 @@ array_spec_init returns [ ObjPtr pTypeInfo ]
         $pTypeInfo = $spec.pTypeInfo;
         CParamList oParams(
             ( IConfigDb* )$pTypeInfo );
-        // The array initializer is not built yet,
-        // keep the slot consistently as
-        // simple_spec_init does.
+        // The array initializer is not built yet, keep
+        // the slot consistently as simple_spec_init
+        // does.
         if( $ai.ctx )
+        {
             oParams.SetObjPtr(
                 propStTypeInit, $ai.pTypeInit );
+        }
     }
     ;
 
@@ -2527,28 +2536,122 @@ struct_type_decl
     ;
 
 struct_type_decl_init returns [ ObjPtr pTypeDecl ]
-    : struct_type_name TOK_COLON struct_spec
+    : stn=struct_type_name TOK_COLON sd=struct_spec
+    {
+        gint32 ret = 0;
+        do{
+            auto pParser =
+                static_cast< CStParser* >( this );
+            auto pCtx = pParser->GetParseContext();
+            auto& ost = pCtx->m_oSymTab;
+
+            ObjPtr pNode;
+            ret = stc::type_decl::BuildStStructTypeNode(
+                $sd.pTypeInfo, pNode );
+            if( ERROR( ret ) )
+            {
+                pCtx->LogError( $sd.start,
+                    "Unknown type:'%s'(%d).",
+                    $sd.ctx->getText().c_str(), ret );
+                break;
+            }
+
+            CStTypeDeclNode* ptd = pNode;
+
+            SymPtr pSym;
+            ret = ost.Declare( $stn.text,
+                symDataType, pNode, pSym,
+                ptd->m_oTypeRef.first,
+                ( CStVarDeclNode::enumVarCategory )0 );
+            if( ERROR( ret ) )
+                break;
+            pSym->SetTokens( $stn.start, $sd.stop );
+            ptd->m_pSymbol = pSym;
+            $pTypeDecl = pNode;
+
+        }while( 0 );
+    }
     ;
 
-struct_spec_init
-    : struct_type_access (TOK_ASSIGN struct_init)?
+struct_spec_init returns [ ObjPtr pTypeInfo ]
+    : sta=struct_type_access (TOK_ASSIGN si=struct_init)?
+    {{
+        stdstr strType = $sta.ctx->getText();
+        gint32 iType = RuleDerived_type_access;
+        CParamList oParams;
+        oParams.Push( strType );
+        oParams.Push( ( guint32 )iType );
+        if( $si.ctx )
+        {
+            oParams.SetObjPtr(
+                propStTypeInit, $si.ctx->pTypeInit );
+        }
+        $pTypeInfo = oParams.GetCfg();
+    }}
     ;
 
-struct_init
-    : TOK_LPAREN struct_elem_init_list TOK_RPAREN
+struct_init returns [ ObjPtr pTypeInit ]
+    : TOK_LPAREN se=struct_elem_init_list TOK_RPAREN
+    {
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStStructInitNode ) );
+        auto* psin = ( CStStructInitNode* )pObj;
+        ObjVecPtr pvec( $se.pElemList );
+        if( !pvec.IsEmpty() )
+        {
+            for( auto& pElem : ( *pvec )() )
+            {
+                CParamList oElem( ( IConfigDb* )pElem );
+                stdstr strName;
+                ObjPtr pVal;
+                oElem.GetStrProp( 0, strName );
+                oElem.GetObjPtr( propStTypeInit, pVal );
+                psin->m_vecElemInits.push_back(
+                    { strName, pVal } );
+            }
+        }
+        $pTypeInit = pObj;
+    }
     ;
 
-struct_elem_init_list
-    : struct_elem_init (TOK_COMMA struct_elem_init)*
-    ;
-struct_elem_init_value
-    : array_elem_init_value
-    | ref_value
+struct_elem_init_list returns [ ObjPtr pElemList ]
+    : first=struct_elem_init
+      (TOK_COMMA rest+=struct_elem_init)*
+    {
+        ObjVecPtr pvec( true );
+        auto& vec = ( *pvec )();
+        if( !$first.pElemInit.IsEmpty() )
+            vec.push_back( $first.pElemInit );
+        for( auto& elem : $rest )
+        {
+            if( elem == nullptr ||
+                elem->pElemInit.IsEmpty() )
+                continue;
+            vec.push_back( elem->pElemInit );
+        }
+        if( vec.empty() )
+            $pElemList.Clear();
+        else
+            $pElemList = pvec;
+    }
     ;
 
-struct_elem_init
-    : struct_elem_name TOK_ASSIGN struct_elem_init_value
-    | struct_elem_name TOK_ASSIGN ref_value
+struct_elem_init returns [ ObjPtr pElemInit ]
+    : sen=struct_elem_name TOK_ASSIGN seiv=struct_elem_init_value
+    {
+        CParamList oElem;
+        oElem.Push( $sen.ctx->getText() );
+        oElem.SetObjPtr(
+            propStTypeInit, $seiv.pElemInit );
+        $pElemInit = oElem.GetCfg();
+    }
+    ;
+
+struct_elem_init_value returns [ ObjPtr pElemInit ]
+    : ae=array_elem_init_value
+    { $pElemInit = $ae.pElemInit; }
+    | rv=ref_value
+    { $pElemInit = $rv.pExpr; }
     ;
 
 string_type_decl returns [ ObjPtr pTypeDecl ]
@@ -2708,11 +2811,10 @@ ref_value returns [ ObjPtr pExpr ]
     | TOK_NULL
     { 
         ObjPtr pObj;
-        pObj.NewObj( clsid( CStSymbolicVariableRef ) );
-        auto psv = ( CStSymbolicVariableRef* )pObj;
-        psv->m_bNull = true;
-        psv->m_bConstant = true;
-        psv->m_bRef = true;
+        pObj.NewObj( clsid( CStConstValueNode ) );
+        auto psv = ( CStConstValueNode* )pObj;
+        psv->m_oValue = { RuleRef_value,
+            Variant( ( intptr_t* ) nullptr ) };
         $pExpr = pObj;
     }
     ;
@@ -3473,17 +3575,52 @@ string_spec returns [ ObjPtr pTypeInfo ]
     ;
 
 // Struct decl
-struct_decl
-    : TOK_STRUCT TOK_OVERLAP? struct_elem_decls TOK_END_STRUCT
+struct_decl returns [ ObjPtr pTypeInfo ]
+    : TOK_STRUCT TOK_OVERLAP? sed = struct_elem_decls TOK_END_STRUCT
+    {
+        CParamList oParams;
+        oParams.Push( "STRUCT" );
+        oParams.Push( stparser::TOK_STRUCT );
+        oParams.SetObjPtr(
+            propStTypeData, $sed.pElemList );
+        $pTypeInfo = oParams.GetCfg();
+    }
     ;
 
 // Struct elem decl
-struct_elem_decls
-    : struct_elem_decl ( semicolons struct_elem_decl )* opt_semicolons
+struct_elem_decls returns [ ObjPtr pElemList ]
+    : first=struct_elem_decl
+      ( semicolons rest+=struct_elem_decl )*
+      opt_semicolons
+    {
+        ObjVecPtr pvec( true );
+        auto& vec = ( *pvec )();
+        if( !$first.pElemInfo.IsEmpty() )
+            vec.push_back( $first.pElemInfo );
+        for( auto& elem : $rest )
+        {
+            if( elem == nullptr ||
+                elem->pElemInfo.IsEmpty() )
+                continue;
+            vec.push_back( elem->pElemInfo );
+        }
+        if( vec.empty() )
+            $pElemList.Clear();
+        else
+            $pElemList = pvec;
+    }
     ;
 
-struct_elem_decl
-    : struct_elem_name ( locate_at multibit_part_access )? TOK_COLON struct_elem_init_set
+struct_elem_decl returns [ ObjPtr pElemInfo ]
+    : sen=struct_elem_name ( la=locate_at mpa=multibit_part_access )? TOK_COLON seis=struct_elem_init_set
+    {
+        CParamList oElemInfo;
+        oElemInfo.Push( $sen.ctx->getText() );
+        oElemInfo.SetObjPtr(
+            propStTypeData, $seis.pTypeInfo );
+        // TODO: the locate_at/multibit access info
+        $pElemInfo = oElemInfo.GetCfg();
+    }
     | var_decl_init
     ;
 
@@ -3491,19 +3628,29 @@ struct_elem_name
     : identifier
     ;
 
-struct_elem_init_set
-    : simple_spec_init
-    | subrange_spec_init
-    | ref_spec_init
-    | string_spec_init
-    | array_spec_init
-    | struct_spec_init
+struct_elem_init_set returns [ ObjPtr pTypeInfo ]
+    : s1=simple_spec_init
+    {{ $pTypeInfo = $s1.pTypeInfo; }}
+    | s2=subrange_spec_init
+    {{ $pTypeInfo = $s2.pTypeInfo; }}
+    | s3=ref_spec_init
+    {{ $pTypeInfo = $s3.pTypeInfo; }}
+    | s4=string_spec_init
+    {{ $pTypeInfo = $s4.pTypeInfo; }}
+    | s5=array_spec_init
+    {{ $pTypeInfo = $s5.pTypeInfo; }}
+    | s6=struct_spec_init
+    {{ $pTypeInfo = $s6.pTypeInfo; }}
+    | s7=struct_decl
+    {{ $pTypeInfo = $s7.pTypeInfo; }}
     ;
 
 // Struct spec
-struct_spec
-    : struct_decl
-    | struct_spec_init
+struct_spec returns [ ObjPtr pTypeInfo ]
+    : sd=struct_decl
+    { $pTypeInfo = $sd.pTypeInfo; }
+    | ssi=struct_spec_init
+    { $pTypeInfo = $ssi.pTypeInfo; }
     ;
 
 // Struct var decl
@@ -3553,11 +3700,10 @@ ambiguous_type_ref
 // Var decl init simple set
 // Uses semantic predicates to further disambiguate simple type declarations
 var_decl_init_simple_set
-    : {IsSimpleSpec()}? simple_spec_init
-    | {IsSubrangeSpec()}? subrange_spec_init
-    | {IsRefSpec()}? ref_spec_init
-    | {IsStringSpec()}? string_spec_init
-    | ambiguous_spec_decl
+    : simple_spec_init
+    | subrange_spec_init
+    | ref_spec_init
+    | string_spec_init
     ;
 
 ambiguous_spec_decl
