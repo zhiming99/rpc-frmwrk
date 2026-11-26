@@ -1033,8 +1033,15 @@ struct CStStructTypeDeclNode :
         std::string m_strName;
         ObjPtr m_pType;
         ObjPtr m_pInitialValue;
-        // for locate_at 
-        std::pair< int, rpcf::Variant > m_oMbaValue;
+        // for 'AT direct_address', a CStDirectAddressNode
+        ObjPtr m_pDirectAddr;
+        // for the multibit part access after the address,
+        // a cfg with 0: TOK_INT or TOK_MULTPART_ACCESS,
+        // 1: the Variant value. Kept as an ObjPtr, not a
+        // Variant, so copying a member does not copy a
+        // Variant (whose copy constructor rejects the
+        // default value)
+        ObjPtr m_pMbaValue;
     };
 
     std::vector< CStructMember > m_vecMembers;

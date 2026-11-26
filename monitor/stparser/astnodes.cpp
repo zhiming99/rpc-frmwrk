@@ -36,6 +36,7 @@ namespace stc
 {
 
 bool IsDerivedType( gint32 iType );
+bool IsArrayType( gint32 iType );
 bool IsStringType( gint32 iType );
 
 // Helper function to join vector of strings
@@ -819,25 +820,63 @@ gint32 BuildStStructTypeNode( const ObjPtr& pTypeInfo,
         return 0;
     auto& vec = ( *pvec )();
 
-    // reserve up front: a CStructMember holds a Variant whose
-    // copy constructor rejects the default value, so the
-    // vector must not reallocate its elements
-    pst->m_vecMembers.reserve( vec.size() );
-
     for( auto& pElem : vec )
     {
         if( pElem.IsEmpty() )
             continue;
         CParamList oElem( ( IConfigDb* )pElem );
-        stdstr strName;
         ObjPtr pMemberInfo;
-        oElem.GetStrProp( 0, strName );
-        oElem.GetObjPtr( propStTypeData, pMemberInfo );
-        if( strName.empty() || pMemberInfo.IsEmpty() )
+        std::vector< stdstr > vecNames;
+
+        // prop 0 is either a single name, or the name list
+        // of a 'a, b : T' declaration from var_decl_init
+        gint32 iPropType = -1;
+        ret = ( ( IConfigDb* )pElem )->GetPropertyType(
+            0, iPropType );
+        if( ERROR( ret ) )
         {
             ret = -EINVAL;
             break;
         }
+        if( iPropType == typeString )
+        {
+            stdstr strName;
+            oElem.GetStrProp( 0, strName );
+            if( !strName.empty() )
+                vecNames.push_back( strName );
+        }
+        else
+        {
+            ObjPtr pObj;
+            oElem.GetObjPtr( 0, pObj );
+            StrVecPtr pvecNames( pObj );
+            if( !pvecNames.IsEmpty() )
+            {
+                auto& vecVars = ( *pvecNames )();
+                vecNames.insert( vecNames.end(),
+                    vecVars.begin(), vecVars.end() );
+            }
+        }
+        if( vecNames.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        oElem.GetObjPtr( propStTypeData, pMemberInfo );
+        if( pMemberInfo.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        // a located member carries both the direct address and
+        // the multibit part access, e.g.
+        // 'head AT %IW0 .3 : INT'
+        ObjPtr pDirectAddr;
+        ObjPtr pMbaValue;
+        oElem.GetObjPtr( propStDirectAddr, pDirectAddr );
+        oElem.GetObjPtr( propStMbaValue, pMbaValue );
 
         ObjPtr pMemberType;
         ret = BuildStTypeNode( pMemberInfo, pMemberType );
@@ -850,10 +889,15 @@ gint32 BuildStStructTypeNode( const ObjPtr& pTypeInfo,
             break;
         }
 
-        pst->m_vecMembers.emplace_back();
-        auto& member = pst->m_vecMembers.back();
-        member.m_strName = strName;
-        member.m_pType = pMemberType;
+        for( auto& strName : vecNames )
+        {
+            pst->m_vecMembers.emplace_back();
+            auto& member = pst->m_vecMembers.back();
+            member.m_strName = strName;
+            member.m_pType = pMemberType;
+            member.m_pDirectAddr = pDirectAddr;
+            member.m_pMbaValue = pMbaValue;
+        }
     }
 
     return ret;
@@ -890,7 +934,7 @@ gint32 BuildStTypeNode( const ObjPtr& pTypeInfo,
     // an inline array is marked by TOK_ARRAY in prop 1; a
     // bare array type name goes through simple_type_access
     // instead, see BuildStArrayTypeNode
-    if( iType == stparser::TOK_ARRAY )
+    if( IsArrayType( iType ) )
         return BuildStArrayTypeNode( pTypeInfo, pTypeNode );
 
     if( iType == stparser::TOK_STRUCT )
@@ -904,6 +948,8 @@ gint32 BuildStTypeNode( const ObjPtr& pTypeInfo,
     if( !pTypeData.IsEmpty() &&
         pTypeData->GetClsid() == clsid( CStSubrangeNode ) )
         return BuildStSubrangeTypeNode( pTypeInfo, pTypeNode );
+
+    // TODO: Build fb_type or interface_type node
 
     return BuildStSimpleTypeNode( pTypeInfo, pTypeNode );
 }

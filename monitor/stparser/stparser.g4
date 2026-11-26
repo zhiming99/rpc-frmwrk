@@ -63,6 +63,7 @@ options { tokenVocab=stlexer; }
 
 @parser::context {
 #include "rpc.h"
+#include "stbase.h"
 //#include "astnodes.h"
 //#include "stsymtab.h"
 using namespace rpcf;
@@ -1322,7 +1323,7 @@ fb_decl_init
     ;
 
 fb_decl_no_init
-    : fb_name (TOK_COMMA fb_name ) TOK_COLON fb_type_access
+    : fb_name (TOK_COMMA fb_name )* TOK_COLON fb_type_access
     ;
 
 fb_modifier
@@ -1469,13 +1470,29 @@ var_decl
     : identifier_list TOK_COLON var_member_init
     ;
 
-var_decl_init
-    : variable_list TOK_COLON var_decl_init_set
-    | array_var_decl_init
-    | struct_var_decl_init
+var_decl_init returns [ ObjPtr pElemInfo ]
+    : vl=variable_list TOK_COLON vdiss=var_decl_init_simple_set
+    {{
+         CParamList oElemInfo;
+         oElemInfo.Push( $vl.pvecNames );
+         oElemInfo.SetIntProp(
+            propStRuleId, RuleVar_decl_init );
+         oElemInfo.SetObjPtr(
+            propStTypeData, $vdiss.pTypeInfo );
+        $pElemInfo = oElemInfo.GetCfg();
+    }}
+    | avdi=array_var_decl_init
+    {{
+        $pElemInfo = $avdi.pVarInfo;
+    }}
+    | svdi=struct_var_decl_init
+    {{
+        $pElemInfo = $svdi.pVarInfo;
+    }}
     | fb_decl_init
+    {{ /* unreachable alternative */ }}
     | interface_spec_init
-    // | variable_list TOK_COLON ambiguous_var_decl_init
+    {{ /* unreachable alternative */ }}
     ;
 
 ambiguous_var_decl_init
@@ -2433,8 +2450,17 @@ array_type_access
     : instance_path
     ;
 
-array_var_decl_init
-    : variable_list TOK_COLON array_spec_init
+array_var_decl_init returns [ ObjPtr pVarInfo ]
+    : vl=variable_list TOK_COLON asi=array_spec_init
+    {{
+         CParamList oElemInfo;
+         oElemInfo.Push( $vl.pvecNames );
+         oElemInfo.SetIntProp(
+            propStRuleId, RuleArray_var_decl_init );
+         oElemInfo.SetObjPtr(
+            propStTypeData, $asi.pTypeInfo );
+        $pVarInfo = oElemInfo.GetCfg();
+    }}
     ;
 
 range_list returns [ ObjPtr pRangeList ]
@@ -2526,7 +2552,8 @@ array_elem_init_value returns [ ObjPtr pElemInit ]
     {  $pElemInit = $ce.pExpr; }
     // SPEC Bug: enum_value is already covered by const_expr
     // | enum_value
-    | struct_init
+    | si=struct_init
+    { $pElemInit = $si.pTypeInit; }
     | ai=array_init
     {  $pElemInit = $ai.pTypeInit; }
     ;
@@ -3095,21 +3122,67 @@ initial_value
 // Additional Rules
 // ============================================================
 
-variable_list
-    : variable_name (TOK_COMMA variable_name)*
+variable_list returns [ ObjPtr pvecNames ]
+    : vn=variable_name (TOK_COMMA rest+=variable_name)*
+    {
+        StrVecPtr pvecNames( true );
+        auto& vecNames = ( *pvecNames )();
+        vecNames.push_back( $vn.ctx->getText() );
+        for( auto& elem : $rest )
+            vecNames.push_back( elem->getText() );
+        $pvecNames = pvecNames;
+    }
     ;
 
 struct_type_access
     : instance_path
     ;
 
-locate_at
-    : TOK_AT direct_variable
+locate_at returns [ ObjPtr pAddr ]
+    : TOK_AT dv=direct_variable
+    { $pAddr = $dv.pAddr; }
     ;
 
-direct_variable
-    : TOK_ABS_ADDR_PERIPHERAL
-    | TOK_RPCF_ADDR
+direct_variable returns [ ObjPtr pAddr ]
+    : t1=TOK_ABS_ADDR_PERIPHERAL
+    {{
+        auto pParser = static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        ObjPtr pParsed = stc::ParsePeriAddr( pCtx, $t1 );
+        if( !pParsed.IsEmpty() )
+        {
+            ObjPtr pNode;
+            pNode.NewObj( clsid( CStDirectAddressNode ) );
+            CStDirectAddressNode* pda = pNode;
+            pda->m_strAddress = $t1.text;
+            pda->m_eAddrType =
+                CStDirectAddressNode::datPeripheral;
+            pda->m_pParsed = pParsed;
+            if( !pda->m_strAddress.empty() &&
+                pda->m_strAddress.back() == '*' )
+                pda->m_bPartialAddr = true;
+            pda->SetTokens( $t1, $t1 );
+            $pAddr = pNode;
+        }
+    }}
+    | t2=TOK_RPCF_ADDR
+    {{
+        auto pParser = static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        ObjPtr pParsed = stc::ParseRpcfAddr( pCtx, $t2 );
+        if( !pParsed.IsEmpty() )
+        {
+            ObjPtr pNode;
+            pNode.NewObj( clsid( CStDirectAddressNode ) );
+            CStDirectAddressNode* pda = pNode;
+            pda->m_strAddress = $t2.text;
+            pda->m_eAddrType =
+                CStDirectAddressNode::datRpcf;
+            pda->m_pParsed = pParsed;
+            pda->SetTokens( $t2, $t2 );
+            $pAddr = pNode;
+        }
+    }}
     ;
 
 fb_type_access
@@ -3130,7 +3203,9 @@ opt_constant
     ;
 
 loc_partly_var
-    : identifier TOK_AT TOK_PART_ADDR TOK_COLON var_spec semicolons
+    // IEC spec bug: the enclosing var_decls_init_set list supplies the
+    // trailing ';' via its own 'semicolons'
+    : identifier TOK_AT TOK_PART_ADDR TOK_COLON var_spec
     ;
 
 var_spec
@@ -3612,16 +3687,32 @@ struct_elem_decls returns [ ObjPtr pElemList ]
     ;
 
 struct_elem_decl returns [ ObjPtr pElemInfo ]
-    : sen=struct_elem_name ( la=locate_at mpa=multibit_part_access )? TOK_COLON seis=struct_elem_init_set
+    : sen=struct_elem_name ( la=locate_at mpa=multibit_part_access? )? TOK_COLON seis=struct_elem_init_set
     {
         CParamList oElemInfo;
         oElemInfo.Push( $sen.ctx->getText() );
         oElemInfo.SetObjPtr(
             propStTypeData, $seis.pTypeInfo );
-        // TODO: the locate_at/multibit access info
+        if( $la.ctx )
+            oElemInfo.SetObjPtr(
+                propStDirectAddr, $la.pAddr );
+        if( $mpa.ctx )
+        {
+            CParamList oMba;
+            oMba.SetIntProp( 0,
+                ( guint32 )$mpa.oValPair.first );
+            if( $mpa.oValPair.second.m_iType != typeNone )
+                oMba.SetProperty(
+                    1, $mpa.oValPair.second );
+            oElemInfo.SetObjPtr(
+                propStMbaValue, oMba.GetCfg() );
+        }
         $pElemInfo = oElemInfo.GetCfg();
     }
-    | var_decl_init
+    | vdi=var_decl_init
+    {
+        $pElemInfo = $vdi.pElemInfo;
+    }
     ;
 
 struct_elem_name
@@ -3659,8 +3750,17 @@ struct_var_decl
     ;
 
 // Struct var decl init
-struct_var_decl_init
-    : variable_list TOK_COLON struct_spec_init
+struct_var_decl_init returns [ ObjPtr pVarInfo ]
+    : vl=variable_list TOK_COLON asi=struct_spec_init
+    {{
+         CParamList oElemInfo;
+         oElemInfo.Push( $vl.pvecNames );
+         oElemInfo.SetIntProp(
+            propStRuleId, RuleStruct_var_decl_init );
+         oElemInfo.SetObjPtr(
+            propStTypeData, $asi.pTypeInfo );
+        $pVarInfo = oElemInfo.GetCfg();
+    }}
     ;
 
 // Task config list
@@ -3699,11 +3799,15 @@ ambiguous_type_ref
 
 // Var decl init simple set
 // Uses semantic predicates to further disambiguate simple type declarations
-var_decl_init_simple_set
-    : simple_spec_init
-    | subrange_spec_init
-    | ref_spec_init
-    | string_spec_init
+var_decl_init_simple_set returns [ ObjPtr pTypeInfo ]
+    : s1=simple_spec_init
+    {{ $pTypeInfo = $s1.pTypeInfo; }}
+    | s2=subrange_spec_init
+    {{ $pTypeInfo = $s2.pTypeInfo; }}
+    | s3=ref_spec_init
+    {{ $pTypeInfo = $s3.pTypeInfo; }}
+    | s4=string_spec_init
+    {{ $pTypeInfo = $s4.pTypeInfo; }}
     ;
 
 ambiguous_spec_decl

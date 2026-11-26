@@ -429,8 +429,10 @@ struct CStParseContext
         const char* szMsgId,
         Args... args)
     {
-        // Avoid crashing on corrupted lookahead symbols
-        if (!pToken)
+        // Avoid crashing on corrupted lookahead symbols, and
+        // on diagnostics emitted without a token stream (unit
+        // harnesses)
+        if( !pToken || m_pMainStream == nullptr )
             return;
 
         // Resolve source file tracking layer
