@@ -1251,9 +1251,9 @@ struct CStDerivedTypeNode : public CStTypeNode
 /**
  * @brief Variable declaration node
  */
-struct CStVarDeclNode : public CStAstNodeBase
+struct CStVarDeclNode : public CStSymbolDeclNode
 {
-    typedef CStAstNodeBase super;
+    typedef CStSymbolDeclNode super;
 
     enum enumVarCategory {
         vcInput,
@@ -1914,14 +1914,20 @@ struct CStAccessDeclsNode : public CStAstNodeBase
  *
  * Collects global variable declarations.
  */
-struct CStGlobalVarDeclListNode : public CStAstNodeBase
+struct CStGlobalVarDeclsNode :
+    public CStSymbolDeclNode
 {
-    typedef CStAstNodeBase super;
-
+    typedef CStSymbolDeclNode super;
+    
+    CStScope* m_pScope = nullptr;
     std::vector< ObjPtr > m_vecGlobalVars;
 
-    CStGlobalVarDeclListNode() : super()
-    { SetClassId( clsid( CStGlobalVarDeclListNode ) ); }
+    bool m_bInternal = false;
+    bool m_bRetain = false;
+    bool m_bConstant = false;
+
+    CStGlobalVarDeclsNode() : super()
+    { SetClassId( clsid( CStGlobalVarDeclsNode ) ); }
 
     virtual std::string GetNodeInfo() const override;
 };
@@ -2454,7 +2460,7 @@ REGISTER_AST_NODE( CStUsingDirective );
 REGISTER_AST_NODE( CStAccessDeclNode );
 REGISTER_AST_NODE( CStAccessDeclListNode );
 REGISTER_AST_NODE( CStAccessDeclsNode );
-REGISTER_AST_NODE( CStGlobalVarDeclListNode );
+REGISTER_AST_NODE( CStGlobalVarDeclsNode );
 REGISTER_AST_NODE( CStConfigDeclNode );
 REGISTER_AST_NODE( CStDeclsNode );
 REGISTER_AST_NODE( CStSingleResourceDeclNode );

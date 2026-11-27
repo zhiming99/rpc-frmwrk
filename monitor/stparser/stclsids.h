@@ -108,7 +108,7 @@ typedef enum
     DECL_CLSID( CStAccessDeclNode ),
     DECL_CLSID( CStAccessDeclListNode ),
     DECL_CLSID( CStAccessDeclsNode ),
-    DECL_CLSID( CStGlobalVarDeclListNode ),
+    DECL_CLSID( CStGlobalVarDeclsNode ),
     DECL_CLSID( CStConfigDeclNode ),
     DECL_CLSID( CStDeclsNode ),
     DECL_CLSID( CStSingleResourceDeclNode ),

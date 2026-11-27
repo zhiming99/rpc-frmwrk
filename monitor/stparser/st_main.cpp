@@ -145,7 +145,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStAccessDeclNode );
     INIT_MAP_ENTRY( CStAccessDeclListNode );
     INIT_MAP_ENTRY( CStAccessDeclsNode );
-    INIT_MAP_ENTRY( CStGlobalVarDeclListNode );
+    INIT_MAP_ENTRY( CStGlobalVarDeclsNode );
     INIT_MAP_ENTRY( CStConfigDeclNode );
     INIT_MAP_ENTRY( CStDeclsNode );
     INIT_MAP_ENTRY( CStSingleResourceDeclNode );

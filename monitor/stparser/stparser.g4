@@ -3190,11 +3190,15 @@ fb_type_access
 //  | (instance_path '.')? ( std_fb_name | derived_fb_name )
     ;
 
-loc_var_spec_init
-    : simple_spec_init
-    | array_spec_init
-    | struct_spec_init
-    | string_spec_init
+loc_var_spec_init returns [ ObjPtr pTypeInfo ]
+    : s1=simple_spec_init
+    {{ $pTypeInfo = $s1.pTypeInfo; }}
+    | s2=array_spec_init
+    {{ $pTypeInfo = $s2.pTypeInfo; }}
+    | s3=struct_spec_init
+    {{ $pTypeInfo = $s3.pTypeInfo; }}
+    | s4=string_spec_init
+    {{ $pTypeInfo = $s4.pTypeInfo; }}
     ;
 
 opt_constant
@@ -3340,11 +3344,24 @@ method_var_decls
 // Global var decls
 global_var_decls
     : TOK_VAR_GLOBAL opt_internal retain_or_constant? global_var_decl_list? TOK_END_VAR
+    {
+        auto pParser =
+            static_cast< CStParser* >( this );
+        auto pCtx = pParser->GetParseContext();
+        auto& ost = pCtx->m_oSymTab;
+        ObjPtr pObj;
+        pObj.NewObj( clsid( CStGlobalVarDeclsNode ) );
+        auto pgvl = ( CStGlobalVarDeclsNode* )pObj;
+        auto pScope = ost.GetCurrentScope();
+        pgvl->m_pScope = pScope;
+    }
     ;
 
-retain_or_constant
+retain_or_constant returns [ gint32 tokid ]
     : TOK_RETAIN
+    { $tokid = stparser::TOK_RETAIN; }
     | TOK_CONSTANT
+    { $tokid = stparser::TOK_CONSTANT; }
     ;
 
 global_var_decl_list
@@ -3656,6 +3673,11 @@ struct_decl returns [ ObjPtr pTypeInfo ]
         CParamList oParams;
         oParams.Push( "STRUCT" );
         oParams.Push( stparser::TOK_STRUCT );
+        if( $TOK_OVERLAP )
+        {
+            oParams.SetBoolProp(
+                propStOverlap, true );
+        }
         oParams.SetObjPtr(
             propStTypeData, $sed.pElemList );
         $pTypeInfo = oParams.GetCfg();
@@ -3732,8 +3754,6 @@ struct_elem_init_set returns [ ObjPtr pTypeInfo ]
     {{ $pTypeInfo = $s5.pTypeInfo; }}
     | s6=struct_spec_init
     {{ $pTypeInfo = $s6.pTypeInfo; }}
-    | s7=struct_decl
-    {{ $pTypeInfo = $s7.pTypeInfo; }}
     ;
 
 // Struct spec

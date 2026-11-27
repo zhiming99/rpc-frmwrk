@@ -97,6 +97,7 @@ enum {
     // cfg with 0: TOK_INT or TOK_MULTPART_ACCESS,
     // 1: the Variant value, e.g. the bit number
     propStMbaValue = rpcf::propReservedEnd + 1024 + 15,
+    propStOverlap = rpcf::propReservedEnd + 1024 + 16,
 };
 
 // Values of propStNumFlag for a TOK_REAL literal
