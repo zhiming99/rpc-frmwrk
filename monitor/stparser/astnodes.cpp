@@ -1943,7 +1943,8 @@ bool CStMemberAccessExpr::IsSymbolResolved() const
         return false;
 
     CStSymbolDeclNode* pDecl = m_pDeclNode;
-    if( pDecl != nullptr && !pDecl->IsSymbolResolved() )
+    if( pDecl != nullptr &&
+        !pDecl->IsSymbolResolved() )
         return false;
 
     // TODO: verify the member against the object's type once

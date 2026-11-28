@@ -1915,9 +1915,9 @@ struct CStAccessDeclsNode : public CStAstNodeBase
  * Collects global variable declarations.
  */
 struct CStGlobalVarDeclsNode :
-    public CStSymbolDeclNode
+    public CStAstNodeBase
 {
-    typedef CStSymbolDeclNode super;
+    typedef CStAstNodeBase super;
     
     CStScope* m_pScope = nullptr;
     std::vector< ObjPtr > m_vecGlobalVars;

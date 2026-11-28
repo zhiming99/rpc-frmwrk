@@ -273,7 +273,10 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
         // path, not a forward reference: 'obj.member' is parsed
         // as the qualified name 'obj' plus the name 'member',
         // and 'member' lives in obj's type, not in a scope.
-        std::vector< std::string > vecMembers;
+        // Turn the leftover components into member accesses,
+        // prepend them to the parsed chain, and reduce the
+        // name to the bound prefix so a later resolution does
+        // not produce them again.
         if( ERROR( ret ) )
         {
             if( ret != -ENOENT || pSym.IsEmpty() )
@@ -296,8 +299,71 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
                 ret = -EINVAL;
                 break;
             }
-            vecMembers.insert( vecMembers.end(),
-                vecNames.begin() + iOffset, vecNames.end() );
+
+            std::vector< ObjPtr > vecCut;
+            for( size_t i = ( size_t )iOffset;
+                i < vecNames.size(); i++ )
+            {
+                ObjPtr pElem;
+                ret = pElem.NewObj(
+                    clsid( CStMemberAccessExpr ) );
+                if( ERROR( ret ) )
+                    break;
+                auto pma = ( CStMemberAccessExpr* )pElem;
+                pma->m_strMember = vecNames[ i ];
+                if( pSym->m_pStart != nullptr )
+                    pma->SetTokens(
+                        pSym->m_pStart, pSym->m_pStop );
+                vecCut.push_back( pElem );
+            }
+            if( ERROR( ret ) )
+                break;
+
+            // keep the parent links the chain had: each
+            // element's parent is the one before it
+            auto& vecChain = pRef->m_vecMultiElemChain;
+            CStAstNodeBase* pPrev = pRef;
+            for( auto& pElem : vecCut )
+            {
+                ( ( CStAstNodeBase* )pElem )->SetParent( pPrev );
+                pPrev = ( CStAstNodeBase* )pElem;
+            }
+            if( !vecChain.empty() )
+                ( ( CStAstNodeBase* )vecChain.front() )
+                    ->SetParent( pPrev );
+            vecChain.insert( vecChain.begin(),
+                vecCut.begin(), vecCut.end() );
+
+            // reduce the name to the bound prefix
+            size_t uBase =
+                ( pRef->m_bThis || pRef->m_bSuper ) ? 1 : 0;
+            if( pRef->m_bThis || pRef->m_bSuper )
+            {
+                // the head is the enclosing instance and has
+                // no stored name
+                if( ( size_t )iOffset <= uBase )
+                    pRef->m_strVarName.clear();
+            }
+            else if( ( size_t )iOffset > uBase )
+            {
+                pRef->m_strVarName = vecNames[ iOffset - 1 ];
+
+                std::string strQual;
+                size_t i = uBase;
+                if( i < ( size_t )iOffset &&
+                    vecNames[ i ] == GLOBAL_SCOPE_MARK )
+                {
+                    strQual = "_";
+                    i++;
+                }
+                for( ; i < ( size_t )iOffset - 1; i++ )
+                {
+                    if( !strQual.empty() )
+                        strQual += ".";
+                    strQual += vecNames[ i ];
+                }
+                pRef->m_strQualified = strQual;
+            }
             ret = 0;
         }
 
@@ -319,13 +385,12 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
             pCurType = pSym->m_pDeclNode;
         }
 
-        // the dotted components the scope lookup could not bind
-        // come first, then the parsed multi-element chain
+        // resolve the type along the multi-element chain;
+        // the components cut off the name above are already
+        // its leading elements
         auto& vecChain = pRef->m_vecMultiElemChain;
-        size_t iMember = 0;
         size_t iElem = 0;
-        while( iMember < vecMembers.size() ||
-            iElem < vecChain.size() )
+        while( iElem < vecChain.size() )
         {
             if( pCurType == nullptr )
             {
@@ -345,18 +410,6 @@ gint32 ResolveStSymbolicVariableRef( CStParseContext* pCtx,
             {
                 ret = -ENOENT;
                 break;
-            }
-
-            if( iMember < vecMembers.size() )
-            {
-                CStTypeDeclNode* pType = nullptr;
-                ret = ResolveStMemberStep( pCtx, pCurType,
-                    vecMembers[ iMember ], pType );
-                if( ERROR( ret ) )
-                    break;
-                pCurType = pType;
-                iMember++;
-                continue;
             }
 
             ObjPtr pElem = vecChain[ iElem++ ];
