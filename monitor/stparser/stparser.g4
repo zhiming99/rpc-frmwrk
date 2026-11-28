@@ -2574,7 +2574,7 @@ struct_type_decl_init returns [ ObjPtr pTypeDecl ]
 
             ObjPtr pNode;
             ret = stc::type_decl::BuildStStructTypeNode(
-                $sd.pTypeInfo, pNode );
+                $sd.pTypeInfo, pNode, pCtx );
             if( ERROR( ret ) )
             {
                 pCtx->LogError( $sd.start,
@@ -3282,22 +3282,56 @@ func_access
     ;
 
 // Global var decl
-global_var_decl
-    : global_var_spec TOK_COLON global_var_type_set
+global_var_decl returns [ ObjPtr pDecl ]
+    : gs=global_var_spec TOK_COLON gts=global_var_type_set
+    {{
+        CParamList oDecl;
+        oDecl.Push( $gs.pNames );
+        oDecl.SetObjPtr( propStTypeData, $gts.pTypeInfo );
+        if( !$gs.pAddr.IsEmpty() )
+            oDecl.SetObjPtr( propStDirectAddr, $gs.pAddr );
+        // the source span, for diagnostics and symbol tokens
+        oDecl.SetIntPtr( 4, ( guint32* )$gs.start );
+        oDecl.SetIntPtr( 5, ( guint32* )$gs.stop );
+        $pDecl = oDecl.GetCfg();
+    }}
     ;
 
 global_var_name
     : identifier
     ;
 
-global_var_spec
-    : global_var_name ( TOK_COMMA global_var_name )*
-    | global_var_name locate_at
+global_var_spec returns [ ObjPtr pNames, ObjPtr pAddr ]
+    : first=global_var_name ( TOK_COMMA rest+=global_var_name )*
+    {{
+        StrVecPtr pvecNames( true );
+        auto& vecNames = ( *pvecNames )();
+        vecNames.push_back( $first.ctx->getText() );
+        for( auto& elem : $rest )
+            vecNames.push_back( elem->getText() );
+        $pNames = pvecNames;
+    }}
+    | gvn=global_var_name la=locate_at
+    {{
+        StrVecPtr pvecNames( true );
+        ( *pvecNames )().push_back( $gvn.ctx->getText() );
+        $pNames = pvecNames;
+        $pAddr = $la.pAddr;
+    }}
     ;
 
-global_var_type_set
-    : loc_var_spec_init
-    | fb_type_access
+global_var_type_set returns [ ObjPtr pTypeInfo ]
+    : lsi=loc_var_spec_init
+    { $pTypeInfo = $lsi.pTypeInfo; }
+    | fta=fb_type_access
+    {{
+        // TODO: no FB-instance type node yet. Keep the name
+        // so a later pass can resolve it against symFunctionBlock
+        CParamList oParams;
+        oParams.Push( $fta.ctx->getText() );
+        oParams.Push( ( guint32 )RuleDerived_type_access );
+        $pTypeInfo = oParams.GetCfg();
+    }}
     ;
 
 // Config init
@@ -3342,19 +3376,166 @@ method_var_decls
     ;
 
 // Global var decls
-global_var_decls
-    : TOK_VAR_GLOBAL opt_internal retain_or_constant? global_var_decl_list? TOK_END_VAR
-    {
+global_var_decls returns [ ObjPtr pDecls ]
+    : TOK_VAR_GLOBAL intro=opt_internal rc=retain_or_constant?
+      gl=global_var_decl_list? TOK_END_VAR
+    {{
         auto pParser =
             static_cast< CStParser* >( this );
         auto pCtx = pParser->GetParseContext();
         auto& ost = pCtx->m_oSymTab;
+
         ObjPtr pObj;
         pObj.NewObj( clsid( CStGlobalVarDeclsNode ) );
         auto pgvl = ( CStGlobalVarDeclsNode* )pObj;
-        auto pScope = ost.GetCurrentScope();
-        pgvl->m_pScope = pScope;
-    }
+        pgvl->m_pScope = ost.GetCurrentScope();
+        pgvl->m_bInternal =
+            ( $intro.ctx->TOK_INTERNAL() != nullptr );
+        if( $rc.ctx )
+        {
+            pgvl->m_bConstant =
+                ( $rc.tokid == stparser::TOK_CONSTANT );
+            pgvl->m_bRetain =
+                ( $rc.tokid == stparser::TOK_RETAIN );
+        }
+
+        if( $gl.ctx != nullptr && !$gl.pList.IsEmpty() )
+        do{
+            ObjVecPtr pvec( $gl.pList );
+            for( auto& pSpec : ( *pvec )() )
+            {
+                CParamList oSpec( ( IConfigDb* )pSpec );
+
+                ObjPtr pObjNames;
+                ObjPtr pTypeInfo;
+                ObjPtr pAddr;
+                oSpec.GetObjPtr( 0, pObjNames );
+                oSpec.GetObjPtr(
+                    propStTypeData, pTypeInfo );
+                oSpec.GetObjPtr(
+                    propStDirectAddr, pAddr );
+                if( pObjNames.IsEmpty() ||
+                    pTypeInfo.IsEmpty() )
+                    continue;
+
+                StrVecPtr pNames( pObjNames );
+                if( pNames.IsEmpty() )
+                    continue;
+
+                CParamList oTypeInfo(
+                    ( IConfigDb* )pTypeInfo );
+                stdstr strTypeName;
+                gint32 iType = -1;
+                oTypeInfo.GetStrProp( 0, strTypeName );
+                oTypeInfo.GetIntProp(
+                    1, ( guint32& )iType );
+
+                // the initializer belongs to the variable;
+                // a string spec keeps its initial text in the
+                // type info, so only an object is taken here
+                ObjPtr pInit;
+                gint32 iPropType = -1;
+                if( SUCCEEDED( ( ( IConfigDb* )pTypeInfo )->
+                    GetPropertyType(
+                    propStTypeInit, iPropType ) ) &&
+                    iPropType == typeObj )
+                    oTypeInfo.GetObjPtr(
+                        propStTypeInit, pInit );
+
+                antlr4::Token* pStart = nullptr;
+                antlr4::Token* pStop = nullptr;
+                oSpec.GetIntPtr(
+                    4, ( guint32*& )pStart );
+                oSpec.GetIntPtr(
+                    5, ( guint32*& )pStop );
+
+                // build the type once; pass the parse context
+                // so a named type resolves now and a forward
+                // reference is queued for a retry
+                ObjPtr pTypeNode;
+                gint32 ret = 0;
+                if( iType == RuleDerived_type_access &&
+                    !pInit.IsEmpty() )
+                {
+                    // the initializer is the variable's, so the
+                    // named type can still be shared
+                    ObjPtr pTarget;
+                    ret = stc::type_decl::
+                        ResolveInplaceTypeRef(
+                        pCtx, strTypeName, pTarget );
+                    if( SUCCEEDED( ret ) &&
+                        !pTarget.IsEmpty() )
+                        pTypeNode = pTarget;
+                    else
+                        ret = stc::type_decl::
+                            BuildStTypeNode(
+                            pTypeInfo, pTypeNode, pCtx );
+                }
+                else
+                {
+                    ret = stc::type_decl::BuildStTypeNode(
+                        pTypeInfo, pTypeNode, pCtx );
+                }
+                if( ERROR( ret ) )
+                {
+                    pCtx->LogError( pStart,
+                        "Invalid type in global "
+                        "declaration(%d).", ret );
+                    continue;
+                }
+
+                for( auto& strName : ( *pNames )() )
+                {
+                    ObjPtr pVar;
+                    pVar.NewObj( clsid( CStVarDeclNode ) );
+                    auto pv = ( CStVarDeclNode* )pVar;
+                    pv->m_strName = strName;
+                    pv->m_vecNames = ( *pNames )();
+                    pv->m_pType = pTypeNode;
+                    pv->m_pInitialValue = pInit;
+                    pv->m_eCategory =
+                        CStVarDeclNode::vcGlobal;
+                    if( pgvl->m_bConstant )
+                        pv->m_eQualifier =
+                            CStVarDeclNode::vqConstant;
+                    else if( pgvl->m_bRetain )
+                        pv->m_eQualifier =
+                            CStVarDeclNode::vqRetain;
+                    pv->m_bConstant = pgvl->m_bConstant;
+
+                    if( !pAddr.IsEmpty() )
+                    {
+                        auto pda = ( CStDirectAddressNode* )
+                            ( CStAstNodeBase* )pAddr;
+                        pv->m_pDirectAddr = pAddr;
+                        pv->m_bAtDirectAddress = true;
+                        pv->m_strDirectAddress =
+                            pda->m_strAddress;
+                    }
+
+                    SymPtr pSym;
+                    ret = ost.Declare( strName,
+                        symVariable, pVar, pSym,
+                        strTypeName,
+                        CStVarDeclNode::vcGlobal );
+                    if( ERROR( ret ) )
+                    {
+                        pCtx->LogError( pStart,
+                            "Error: '%s' already defined",
+                            strName.c_str() );
+                        continue;
+                    }
+                    pSym->SetTokens( pStart, pStop );
+                    pv->m_pSymbol = pSym;
+                    pv->SetParent(
+                        ( CStAstNodeBase* )pObj );
+                    pgvl->m_vecGlobalVars.push_back( pVar );
+                }
+            }
+        }while( 0 );
+
+        $pDecls = pObj;
+    }}
     ;
 
 retain_or_constant returns [ gint32 tokid ]
@@ -3364,8 +3545,23 @@ retain_or_constant returns [ gint32 tokid ]
     { $tokid = stparser::TOK_CONSTANT; }
     ;
 
-global_var_decl_list
-    : ( global_var_decl TOK_SEMICOLON )+
+global_var_decl_list returns [ ObjPtr pList ]
+    : first=global_var_decl TOK_SEMICOLON
+      ( rest+=global_var_decl TOK_SEMICOLON )*
+    {{
+        ObjVecPtr pvec( true );
+        auto& vec = ( *pvec )();
+        if( !$first.pDecl.IsEmpty() )
+            vec.push_back( $first.pDecl );
+        for( auto& elem : $rest )
+        {
+            if( elem == nullptr ||
+                elem->pDecl.IsEmpty() )
+                continue;
+            vec.push_back( elem->pDecl );
+        }
+        $pList = pvec;
+    }}
     ;
 
 // In/out decls

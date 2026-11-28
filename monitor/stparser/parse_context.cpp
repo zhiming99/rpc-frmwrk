@@ -2003,6 +2003,47 @@ LBL_RESOLVE_SYMBOL:
     return ret;
 }
 
+namespace type_decl
+{
+
+gint32 ResolveInplaceTypeRef( void* pctx,
+    const stdstr& strName, ObjPtr& pTarget )
+{
+    pTarget.Clear();
+    if( pctx == nullptr || strName.empty() )
+        return -ENOENT;
+
+    auto pCtx = reinterpret_cast
+        < CStParseContext* >( pctx );
+    std::vector< stdstr > vecComps =
+        pCtx->m_oSymTab.BreakdownQualified( strName );
+    if( vecComps.empty() )
+        return -EINVAL;
+
+    SymPtr pSym;
+    gint32 ret = ResolveTypeRef( pCtx, vecComps,
+        symDataType, pCtx->m_oSymTab.GetCurrentScope(),
+        pSym );
+    if( ERROR( ret ) )
+        return ret;
+    if( pSym.IsEmpty() || pSym->m_pDeclNode.IsEmpty() )
+        return -ENOENT;
+
+    // an unnamed in-place declaration shares the declared
+    // type's node.  An ambiguous node is a placeholder for a
+    // declaration still being resolved and will be replaced
+    // by a concrete node, so report a retryable miss instead
+    // and let the caller build its own placeholder
+    if( pSym->m_pDeclNode->GetClsid() ==
+        clsid( CStAmbiguousTypeDeclNode ) )
+        return -ENOENT;
+
+    pTarget = pSym->m_pDeclNode;
+    return 0;
+}
+
+}  // namespace type_decl
+
 gint32 ReplaceAmbiguousNode(
     CStParseContext* pCtx,
     CStAmbiguousTypeDeclNode* patd,

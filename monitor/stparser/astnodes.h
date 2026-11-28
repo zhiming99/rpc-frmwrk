@@ -879,9 +879,12 @@ gint32 BuildStRefTypeNode( const ObjPtr& pTypeInfo,
  * @param pTypeNode [out] a CStStructTypeDeclNode, or a
  *                  CStAmbiguousTypeDeclNode when the struct
  *                  type is named and still has to be resolved
+ * @param pctx      the parse context used to resolve member
+ *                  types declared by name, nullptr to defer
+ *                  them to the struct's own resolution
  */
 gint32 BuildStStructTypeNode( const ObjPtr& pTypeInfo,
-    ObjPtr& pTypeNode );
+    ObjPtr& pTypeNode, void* pctx = nullptr );
 
 /**
  * @brief Build a type node from any spec cfg
@@ -889,9 +892,36 @@ gint32 BuildStStructTypeNode( const ObjPtr& pTypeInfo,
  * Dispatches on the spec's shape: array, inline struct,
  * reference (propStRefRank in the type data), string,
  * subrange, and simple type as the fallback.
+ *
+ * @param pTypeInfo the type spec cfg
+ * @param pTypeNode [out] the created type node
+ * @param pctx      the parse context; when given, a type
+ *                  declared by name is resolved now, and the
+ *                  declared type's node is shared.  When it
+ *                  cannot be found yet, an ambiguous node is
+ *                  created and queued for a later retry
  */
 gint32 BuildStTypeNode( const ObjPtr& pTypeInfo,
-    ObjPtr& pTypeNode );
+    ObjPtr& pTypeNode, void* pctx = nullptr );
+
+/**
+ * @brief Resolve an in-place, unnamed type reference
+ *
+ * Looks the name up as a data type and returns the declared
+ * type's node, so an in-place declaration (a struct member or
+ * a variable's type) shares the named declaration instead of
+ * resolving it to its direct type.  Sharing keeps an alias of
+ * an array or a struct visible to the code generator.
+ *
+ * @param pctx     the parse context
+ * @param strName  the (possibly qualified) type name
+ * @param pTarget  [out] the declared type node
+ * @return 0 on success, -ENOENT when the name is not declared
+ *         yet (the caller should build an ambiguous node and
+ *         retry later), or another negative status code
+ */
+gint32 ResolveInplaceTypeRef( void* pctx,
+    const stdstr& strName, ObjPtr& pTarget );
 }
 
 
@@ -1174,6 +1204,15 @@ struct CStNamedvalTypeDeclNode :
 
     CStNamedvalTypeDeclNode() : super()
     { SetClassId( clsid( CStNamedvalTypeDeclNode ) ); }
+
+    // a named-value type has no derived type to look up: its
+    // direct type is recorded at build time, and only the
+    // optional initializer expression may still be unresolved.
+    // Without this override the inherited
+    // CStAmbiguousTypeDeclNode version would always report
+    // false, and arrays or aliases of the type would never
+    // resolve
+    bool IsSymbolResolved() const override;
 };
 
 /**
