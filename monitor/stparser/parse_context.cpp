@@ -27,6 +27,7 @@
 #include <string>
 #include <filesystem>
 #include <regex>
+#include <strings.h>
 #include "antlr4-runtime.h"
 #include "stlexer.h"
 #include "stparser.h"
@@ -35,7 +36,7 @@
 #include "parse_context.h"
 #include "pragma_expr/pragma_exprLexer.h"
 
-namespace rpcf
+namespace stc
 {
 
 std::string CStIncludeManager::ResolveIncludePath(
@@ -1544,6 +1545,26 @@ static enumRefMatch ResolvePathInScope(
     return refMatchNone;
 }
 
+// The nearest enclosing scope owned by a function block or a
+// class, or an empty ScopePtr when the statement is not inside
+// one. 'THIS' and 'SUPER' are only defined there; method and
+// block scopes in between are skipped.
+static ScopePtr FindStMemberScope( ScopePtr pScope )
+{
+    while( !pScope.IsEmpty() )
+    {
+        if( !pScope->m_pSymbol.IsEmpty() )
+        {
+            enumSymKind eKind = pScope->m_pSymbol->m_eKind;
+            if( eKind == symFunctionBlock ||
+                eKind == symClass )
+                return pScope;
+        }
+        pScope = pScope->m_pParent;
+    }
+    return pScope;
+}
+
 gint32 ResolveSymbolicRef( CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     SymPtr& pSym, gint32& iOffset, CStScope* pCurScope )
@@ -1576,6 +1597,108 @@ gint32 ResolveSymbolicRef( CStParseContext* pCtx,
 
     ScopePtr pScope = ( pCurScope == nullptr ?
         ost.GetCurrentScope() : ScopePtr( pCurScope ) );
+
+    // 'THIS' (case-insensitive) denotes the instance of the
+    // enclosing function block or class. Its members live in the
+    // scope that owns that unit, not in an inner block scope, so
+    // the lookup starts there and never walks further out.
+    if( strcasecmp( vecNames[ 0 ].c_str(), "THIS" ) == 0 )
+    {
+        ScopePtr pThisScope = FindStMemberScope( pScope );
+
+        // 'THIS' outside an FB or a class is a semantic error:
+        // no later resolving attempt can turn it into a valid
+        // reference
+        if( pThisScope.IsEmpty() )
+            return -EINVAL;
+
+        // bare 'THIS': the instance itself
+        pSym = pThisScope->m_pSymbol;
+        if( vecNames.size() == 1 )
+            return 0;
+
+        enumRefMatch eMatch = ResolvePathInScope(
+            ost, vecNames, 1, pThisScope, pSym, iOffset );
+        if( eMatch == refMatchFull )
+            return 0;
+        if( eMatch == refMatchPartial )
+            return -ENOENT;
+
+        // the first member did not resolve; report 'THIS'
+        // itself as the bound prefix so the caller can still
+        // tell which instance the members belong to
+        pSym = pThisScope->m_pSymbol;
+        iOffset = 1;
+        return -ENOENT;
+    }
+
+    // 'SUPER' (case-insensitive) denotes the base function
+    // block or class of the enclosing unit. The base type name
+    // comes from the unit's declaration, and its members are
+    // looked up in the scope the base type owns.
+    if( strcasecmp( vecNames[ 0 ].c_str(), "SUPER" ) == 0 )
+    {
+        ScopePtr pThisScope = FindStMemberScope( pScope );
+        // 'SUPER' outside an FB or a class is a semantic error,
+        // same as 'THIS'
+        if( pThisScope.IsEmpty() )
+            return -EINVAL;
+
+        SymPtr pUnit = pThisScope->m_pSymbol;
+        std::string strBase;
+        bool bHasDecl = false;
+        if( !pUnit->m_pDeclNode.IsEmpty() &&
+            pUnit->m_pDeclNode->GetClsid() ==
+                clsid( CStFunctionBlockDecl ) )
+        {
+            bHasDecl = true;
+            CStFunctionBlockDecl* pFb = pUnit->m_pDeclNode;
+            if( pFb != nullptr )
+                strBase = pFb->m_strExtends;
+        }
+        if( strBase.empty() )
+        {
+            // an FB whose declaration has no EXTENDS clause can
+            // never have a SUPER, so do not ask the caller to
+            // retry; without a declaration node there is still
+            // nothing to judge, and a class node is not built
+            // yet, so those cases stay retryable
+            return bHasDecl ? -EINVAL : -ENOENT;
+        }
+
+        // the base type is visible where the derived type is
+        // declared, i.e. in the parent scope of the unit
+        std::vector< std::string > vecBase =
+            ost.BreakdownQualified( strBase );
+        if( vecBase.empty() )
+            return -ENOENT;
+
+        SymPtr pBase;
+        gint32 ret = ResolveTypeRef( pCtx, vecBase,
+            symUnknown, pThisScope->m_pParent, pBase );
+        if( ERROR( ret ) || pBase.IsEmpty() ||
+            pBase->m_pDefScope == nullptr )
+            return -ENOENT;
+
+        // bare 'SUPER': the base type itself
+        pSym = pBase;
+        if( vecNames.size() == 1 )
+            return 0;
+
+        enumRefMatch eMatch = ResolvePathInScope( ost,
+            vecNames, 1,
+            ScopePtr( pBase->m_pDefScope ), pSym, iOffset );
+        if( eMatch == refMatchFull )
+            return 0;
+        if( eMatch == refMatchPartial )
+            return -ENOENT;
+
+        // the first member did not resolve; report 'SUPER'
+        // itself as the bound prefix
+        pSym = pBase;
+        iOffset = 1;
+        return -ENOENT;
+    }
 
     while( !pScope.IsEmpty() )
     {
@@ -1711,8 +1834,7 @@ bool IsCompositeType( gint32 iType )
 
 bool IsElementaryType( gint32 iType )
 {
-    return CStParser::IsElementaryType(
-        iType );
+    return CStParser::IsElementaryType( iType );
 }
 
 bool IsDirectType( gint32 iType )
@@ -1735,12 +1857,18 @@ bool IsDerivedType( gint32 iType )
         stparser::RuleDerived_type_access;
 }
 
+bool IsStringType( gint32 iType )
+{
+    return CStParser::IsStringType( iType );
+}
+
 gint32 ResolveTypeToDirectType(
     CStParseContext* pCtx,
     const std::vector<std::string>& vecNames,
     enumSymKind eKind,
     CStScope* pTopScope,
-    SymPtr& pSym, gint32& iType )
+    SymPtr& pSym, gint32& iType,
+    ObjPtr& pDirectType )
 {
     gint32 ret = 0;
     if( pCtx == nullptr || vecNames.empty() )
@@ -1750,6 +1878,7 @@ gint32 ResolveTypeToDirectType(
         pTopScope =
             pCtx->m_oSymTab.GetCurrentScope();
     }
+    pSym.Clear();
 
     do{
         SymPtr pCurSym;
@@ -1780,10 +1909,54 @@ LBL_RESOLVE_SYMBOL:
         if( pSym.IsEmpty() )
             pSym = pCurSym;
 
+        // the node is on the resolving stack. Its identity is
+        // already known, so a reference to it (a REF_TO, which
+        // adds no inline storage) is satisfied; a by-value use
+        // is caught by the caller's state guard
+        if( ptd->GetTypeState() ==
+            CStTypeDeclNode::tsInProgress )
+        {
+            if( ptd->GetClsid() ==
+                    clsid( CStArrayTypeDeclNode ) ||
+                IsArrayType( ptd->m_iTypeId ) )
+            {
+                iType = stparser::TOK_ARRAY;
+                pDirectType = pNode;
+                break;
+            }
+            if( ptd->m_iDirectType != -1 )
+            {
+                iType = ptd->m_iDirectType;
+                pDirectType = pNode;
+                break;
+            }
+            ret = -ENOENT;
+            break;
+        }
+
         // declared from a direct type
         if( ptd->IsSymbolResolved() )
         {
+            // an array is its own direct type. An alias of an
+            // array keeps m_iTypeId == RuleDerived_type_access
+            // (it is an array, but not declared directly),
+            // which the code generator needs to emit a type
+            // alias rather than an array declaration
+            if( ptd->GetClsid() ==
+                    clsid( CStArrayTypeDeclNode ) ||
+                IsArrayType( ptd->m_iTypeId ) )
+            {
+                iType = stparser::TOK_ARRAY;
+                pDirectType = pNode;
+                break;
+            }
+
             iType = ptd->m_iDirectType;
+            if( ptd->m_iTypeId ==
+                ptd->m_iDirectType )
+                pDirectType = pNode;
+            else
+                pDirectType = ptd->m_pDirectType;
             break;
         }
 
@@ -1814,10 +1987,10 @@ LBL_RESOLVE_SYMBOL:
         }
         else if( IsArrayType( ptd->m_iTypeId ) )
         {
-            if( ptd->m_oTypeRef.second == nullptr )
-                break;
-            pCurSym = ptd->m_oTypeRef.second;
-            goto LBL_RESOLVE_SYMBOL;
+            iType = ptd->m_iTypeId;
+            pDirectType = pNode;
+            ret = 0;
+            break;
         }
 
         if( iType != -1 )
@@ -1829,6 +2002,47 @@ LBL_RESOLVE_SYMBOL:
     }while( 0 );
     return ret;
 }
+
+namespace type_decl
+{
+
+gint32 ResolveInplaceTypeRef( void* pctx,
+    const stdstr& strName, ObjPtr& pTarget )
+{
+    pTarget.Clear();
+    if( pctx == nullptr || strName.empty() )
+        return -ENOENT;
+
+    auto pCtx = reinterpret_cast
+        < CStParseContext* >( pctx );
+    std::vector< stdstr > vecComps =
+        pCtx->m_oSymTab.BreakdownQualified( strName );
+    if( vecComps.empty() )
+        return -EINVAL;
+
+    SymPtr pSym;
+    gint32 ret = ResolveTypeRef( pCtx, vecComps,
+        symDataType, pCtx->m_oSymTab.GetCurrentScope(),
+        pSym );
+    if( ERROR( ret ) )
+        return ret;
+    if( pSym.IsEmpty() || pSym->m_pDeclNode.IsEmpty() )
+        return -ENOENT;
+
+    // an unnamed in-place declaration shares the declared
+    // type's node.  An ambiguous node is a placeholder for a
+    // declaration still being resolved and will be replaced
+    // by a concrete node, so report a retryable miss instead
+    // and let the caller build its own placeholder
+    if( pSym->m_pDeclNode->GetClsid() ==
+        clsid( CStAmbiguousTypeDeclNode ) )
+        return -ENOENT;
+
+    pTarget = pSym->m_pDeclNode;
+    return 0;
+}
+
+}  // namespace type_decl
 
 gint32 ReplaceAmbiguousNode(
     CStParseContext* pCtx,
@@ -1850,7 +2064,7 @@ gint32 ReplaceAmbiguousNode(
             stparser::RuleSubrange_type_decl )
         {
             iClsid = 
-                clsid( CStSubrangeListNode);
+                clsid( CStSubrangeTypeDeclNode );
         }
         else if( iDirectType ==
             stparser::RuleEnum_type_decl )
@@ -1956,7 +2170,17 @@ gint32 ResolveTypeDecl(
                     pObj, ptd->m_iDirectType,
                     pNewNode );
                 if( SUCCEEDED( ret ) )
+                {
                     pObj = pNewNode;
+                    // the ambiguous node only resolved the
+                    // type reference; the concrete node still
+                    // has to resolve its initializer, the
+                    // array bounds, the member types, etc.
+                    CStTypeDeclNode* pNew = pObj;
+                    if( pNew != nullptr )
+                        ret = pNew->ResolveSymbol(
+                            pctx, symDataType );
+                }
             }
             if( bPushedHere )
                 pdtd->m_pScope->PopUsingArr();
@@ -1964,14 +2188,40 @@ gint32 ResolveTypeDecl(
             return ret;
         });
         ret = func( pObj, pctx );
-        if( ERROR( ret ) )
+        if( ret == -ENOENT )
         {
+            // a forward reference: retry after the parse.
+            // Read the node back from pObj: the closure may
+            // have replaced it, and the old node may be gone.
             auto pCtx = reinterpret_cast
                 < CStParseContext* >( pctx );
             auto& ost = pCtx->m_oSymTab;
-            auto pSym = ptd->m_pSymbol;
+            CStTypeDeclNode* pCur = pObj;
+            auto pSym = ( pCur != nullptr ?
+                pCur->m_pSymbol : nullptr );
             ost.AddUnsolved( pObj, func, pSym );
             ret = -EAGAIN;
+        }
+        else if( ERROR( ret ) )
+        {
+            // a permanent failure, e.g. a cyclic type
+            // declaration: report it and do not queue it for
+            // another attempt
+            auto pCtx = reinterpret_cast
+                < CStParseContext* >( pctx );
+            CStTypeDeclNode* pCur = pObj;
+            auto pSym = ( pCur != nullptr ?
+                pCur->m_pSymbol : nullptr );
+            antlr4::Token* pTok = nullptr;
+            stdstr strName;
+            if( pSym != nullptr )
+            {
+                pTok = pSym->m_pStart;
+                strName = pSym->m_strName;
+            }
+            pCtx->LogError( pTok,
+                "Invalid or cyclic type declaration "
+                "'%s'(%d).", strName.c_str(), ret );
         }
 
     }while( 0 );

@@ -35,8 +35,14 @@
 #include <utility>
 #include "rpc.h"
 
+namespace antlr4 { class Token; }
+
+namespace stc
+{
 // legacy parser context used by the address scanners
 struct CSTParserContext;
+// the ANTLR parse context, defined in parse_context.h
+class CStParseContext;
 
 timespec st_time_to_timespec(const char* text);
 
@@ -80,6 +86,18 @@ enum {
     // TOK_WCHAR_LITERAL, since CConfigDb2 has no wide string
     // type.
     propStStrValue = rpcf::propReservedEnd + 1024 + 12,
+    // Type info from elem_type_name, a cfgptr, with
+    // 0: type name in string, 1: type id
+    // propTypeData: the type data from string_spec
+    propStElemTypeInfo = rpcf::propReservedEnd + 1024 + 13,
+    // The CStDirectAddressNode of a located declaration,
+    // e.g. 'head AT %IW0.1 : INT'
+    propStDirectAddr = rpcf::propReservedEnd + 1024 + 14,
+    // The multibit part access of a located declaration, a
+    // cfg with 0: TOK_INT or TOK_MULTPART_ACCESS,
+    // 1: the Variant value, e.g. the bit number
+    propStMbaValue = rpcf::propReservedEnd + 1024 + 15,
+    propStOverlap = rpcf::propReservedEnd + 1024 + 16,
 };
 
 // Values of propStNumFlag for a TOK_REAL literal
@@ -200,7 +218,37 @@ uint64_t ParseStTimeToUnix(const char* input);
 std::string TranslateSTString(const std::string& input);
 std::wstring TranslateSTWString(const std::string& input);
 std::string TranslateSTUString(const std::string& input);
+/**
+ * @brief Parse a peripheral direct address
+ *
+ * Ported from the bison scanner. Accepts
+ * "%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+|"*")?(":P"|":p")?
+ * and returns an IntVecPtr holding, in order: the peripheral
+ * flag, the area letter, the size letter, the byte/word index,
+ * and the bit index (-1 when absent, -2..-2 for the '*' form).
+ *
+ * @param pCtx   the parse context, for diagnostics
+ * @param pToken the TOK_ABS_ADDR_PERIPHERAL token
+ * @return the IntVecPtr, or an empty ObjPtr after logging an
+ *         error
+ */
 rpcf::ObjPtr ParsePeriAddr(
-    const char* szText, CSTParserContext* pCtx );
+    CStParseContext* pCtx, antlr4::Token* pToken );
+
+/**
+ * @brief Parse an rpcf direct address
+ *
+ * Ported from the bison scanner. Accepts
+ * "@"{ATTR_DATA_TYPE}{IDENTIFIER}("."{IDENTIFIER}){0,2}(":"{IDENTIFIER})?
+ * and returns a StrVecPtr holding the point type, the data
+ * size, the attribute name, then the reversed path components:
+ * <point type> <data size> <attr> <point> [<app> [<node>]].
+ *
+ * @param pCtx   the parse context, for diagnostics
+ * @param pToken the TOK_RPCF_ADDR token
+ * @return the StrVecPtr, or an empty ObjPtr after logging an
+ *         error
+ */
 rpcf::ObjPtr ParseRpcfAddr(
-    const char* szText, CSTParserContext* pCtx );
+    CStParseContext* pCtx, antlr4::Token* pToken );
+}

@@ -275,13 +275,15 @@ TOK_INT:   '16#' HEX_DIGIT ( '_'? HEX_DIGIT )*  // Based literal 16#FF
            ;
 
 
-// Peripheral address: %IW0:P, %PIW0, %Q*.1
-TOK_ABS_ADDR_PERIPHERAL : '%' [P]? [IQM] [XBWDL]? DIGIT+ ('.' DIGIT+ | '*')? (':' [P])?;
+// Peripheral address: %IW0:P, %PIW0, %Q0.1
+TOK_ABS_ADDR_PERIPHERAL : '%' [P]? [IQM] [XBWDL]? DIGIT+ ('.' DIGIT+)? (':' [P])?;
 
 // Multi-part access: %QW0.1
 TOK_MULTPART_ACCESS : '%' [XBWD]? DIGIT+;
 
-// Partial address: %I* %Q*
+// Partial address: %I*, %Q*, %M*, exactly as the spec
+// defines it: '%' [IQM] '*'. The location details are
+// supplied by the VAR_CONFIG section
 TOK_PART_ADDR : '%' [IQM] '*';
 
 // RPCF address: @IOSensor.Name

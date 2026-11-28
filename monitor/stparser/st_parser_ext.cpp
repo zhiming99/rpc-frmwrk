@@ -17,7 +17,7 @@
  */
 #include "st_parser_ext.h"
 
-namespace rpcf
+namespace stc
 {
 
 typedef enum : int {

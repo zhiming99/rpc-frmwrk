@@ -6,7 +6,7 @@
 #include "clsids.h"
 #include "stbase.h"
 
-namespace rpcf 
+namespace stc 
 {
 
 /**

@@ -35,7 +35,7 @@ pragma_obj = $(pragma_auto_gen:.cpp=.o)
 key_headers=pragma.h parse_context.h st_parser_ext.h stsymtab.h stparser.h stast.h astnodes.h stclsids.h $(pragma_auto_headers)
 
 # Build rpcfstc
-$(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parser_ext.o astnodes.o parse_context.o stsymtab.o stbase.o
+$(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parser_ext.o astnodes.o parse_context.o stsymtab.o stbase.o primexpr.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) -L. -lpragma
 
 %.o: %.cpp
@@ -45,10 +45,12 @@ $(rpcfstc): $(other_obj) $(PRAGMA_TARGET) st_main.o st_parse_listener.o st_parse
 $(gen_src) &: stparser.g4 stlexer.g4 Makefile
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -listener -message-format gnu -o . stparser.g4 stlexer.g4
 	@echo "Injecting extension at the tail of stparser.h"
+	@echo 'using namespace rpcf;' >> stparser.h
 	@echo '#include "astnodes.h"' >> stparser.h
 	@echo '#include "stsymtab.h"' >> stparser.h
 	@echo '#include "parse_context.h"' >> stparser.h
 	@echo '#include "st_parser_ext.h"' >> stparser.h
+	@echo 'using namespace stc;' >> stparser.h
 
 $(PRAGMA_TARGET): $(pragma_obj) pragma.o
 	$(AR) $(ARFLAGS) -o $@ $^
@@ -62,6 +64,13 @@ astnodes.o: astnodes.cpp $(key_headers)
 stsymtab.o: stsymtab.cpp $(key_headers)
 stbase.o: stbase.cpp stbase.h $(key_headers)
 st_main.o: st_main.cpp $(key_headers)
+primexpr.o: primexpr.cpp $(key_headers)
+
+# the generated parser/lexer include the AST headers (injected
+# at the tail of stparser.h), so a header change must rebuild
+# them too: a stale object has the old class layout
+stparser.o stlexer.o stparserVisitor.o stparserBaseListener.o \
+stparserListener.o stparserBaseVisitor.o: $(key_headers)
 
 $(pragma_auto_gen) $(pragma_auto_headers) &: pragma_expr.g4
 	java -jar $(ANTLR4_JAR) -Dlanguage=Cpp -visitor -message-format gnu -listener -o ./pragma_expr pragma_expr.g4

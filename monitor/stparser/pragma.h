@@ -31,7 +31,7 @@
 #include "Parser.h"
 #include "TokenStream.h"
 
-namespace rpcf 
+namespace stc 
 {
 struct CStParseContext;
 struct CStPragmaEvaluator :

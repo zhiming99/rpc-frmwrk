@@ -78,7 +78,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStUnaryExpr );
     INIT_MAP_ENTRY( CStCallExpr );
     INIT_MAP_ENTRY( CStArgListNode );
-    INIT_MAP_ENTRY( CStArrayAccessExpr );
+    INIT_MAP_ENTRY( CStSubscriptList );
     INIT_MAP_ENTRY( CStMemberAccessExpr );
     INIT_MAP_ENTRY( CStDereferenceExpr );
     INIT_MAP_ENTRY( CStPointerMemberExpr );
@@ -94,11 +94,11 @@ static FactoryPtr InitClassFactory()
 
     // AST Type Nodes
     INIT_MAP_ENTRY( CStConstValueNode );
-    INIT_MAP_ENTRY( CStArrayTypeNode );
-    INIT_MAP_ENTRY( CStStructTypeNode );
     INIT_MAP_ENTRY( CStEnumValueRef );
     INIT_MAP_ENTRY( CStNamedvalValueRef );
     INIT_MAP_ENTRY( CStAmbiguousValueRef );
+    INIT_MAP_ENTRY( CStSymbolicVariableRef );
+
     INIT_MAP_ENTRY( CStDataTypeDeclNode );
     INIT_MAP_ENTRY( CStTypeDeclNode );
     INIT_MAP_ENTRY( CStAmbiguousTypeDeclNode );
@@ -145,7 +145,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStAccessDeclNode );
     INIT_MAP_ENTRY( CStAccessDeclListNode );
     INIT_MAP_ENTRY( CStAccessDeclsNode );
-    INIT_MAP_ENTRY( CStGlobalVarDeclListNode );
+    INIT_MAP_ENTRY( CStGlobalVarDeclsNode );
     INIT_MAP_ENTRY( CStConfigDeclNode );
     INIT_MAP_ENTRY( CStDeclsNode );
     INIT_MAP_ENTRY( CStSingleResourceDeclNode );
@@ -163,7 +163,6 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStVarConfigListNode );
     INIT_MAP_ENTRY( CStProgConfigListNode );
     INIT_MAP_ENTRY( CStProgConfigNode );
-    INIT_MAP_ENTRY( CStSymbolicVarNode );
     INIT_MAP_ENTRY( CStFbTaskNode );
     INIT_MAP_ENTRY( CStProgCnxnNode );
     INIT_MAP_ENTRY( CStProgConfElemNode );
